@@ -84,10 +84,16 @@ def init_db():
 def get_dataframe(query, params=()):
     conn = get_connection()
     query = query.replace("?", "%s")
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        df = pd.read_sql_query(query, conn, params=params)
+    c = conn.cursor()
+    c.execute(query, params)
+    
+    if c.description:
+        columns = [desc[0] for desc in c.description]
+        data = c.fetchall()
+        df = pd.DataFrame(data, columns=columns)
+    else:
+        df = pd.DataFrame()
+        
     conn.close()
     return df
 
