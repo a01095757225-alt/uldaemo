@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+import psycopg2
 import os
 import urllib.parse
 from datetime import datetime, date, timedelta
@@ -23,10 +23,8 @@ def call_gemini(prompt):
 # =========================================================
 # 1. 데이터베이스 헬퍼 함수
 # =========================================================
-DB_NAME = "campus_buddy_v4.db"
-
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    return psycopg2.connect(st.secrets["supabase"]["url"])
 
 def init_db():
     conn = get_connection()
@@ -40,44 +38,44 @@ def init_db():
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, author_id TEXT, title TEXT, category TEXT,
+        id INTEGER PRIMARY KEY SERIAL, author_id TEXT, title TEXT, category TEXT,
         meet_date TEXT, meet_time TEXT, location TEXT, max_participants INTEGER DEFAULT 1,
         meeting_style TEXT, status TEXT DEFAULT '모집중'
     )
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS applications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, applicant_id TEXT, status TEXT DEFAULT '대기중'
+        id INTEGER PRIMARY KEY SERIAL, post_id INTEGER, applicant_id TEXT, status TEXT DEFAULT '대기중'
     )
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS reviews (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reviewer_id TEXT, reviewee_id TEXT,
+        id INTEGER PRIMARY KEY SERIAL, post_id INTEGER, reviewer_id TEXT, reviewee_id TEXT,
         rating INTEGER, is_noshow INTEGER DEFAULT 0
     )
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS keyword_reviews (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reviewer_id TEXT, reviewee_id TEXT,
+        id INTEGER PRIMARY KEY SERIAL, post_id INTEGER, reviewer_id TEXT, reviewee_id TEXT,
         keyword TEXT
     )
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, sender_id TEXT, text TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY SERIAL, post_id INTEGER, sender_id TEXT, text TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_id TEXT, reported_id TEXT, reason TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY SERIAL, reporter_id TEXT, reported_id TEXT, reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, message TEXT, is_read INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY SERIAL, user_id TEXT, message TEXT, is_read INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
     conn.commit()
@@ -85,13 +83,19 @@ def init_db():
 
 def get_dataframe(query, params=()):
     conn = get_connection()
-    df = pd.read_sql_query(query, conn, params=params)
+    query = query.replace("?", "%s")
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     return df
 
 def execute_commit(query, params=()):
     conn = get_connection()
-    conn.execute(query, params)
+    query = query.replace("?", "%s")
+    c = conn.cursor()
+    c.execute(query, params)
     conn.commit()
     conn.close()
 
