@@ -268,7 +268,7 @@ except TypeError:
     
 if stored_user_id and not st.session_state.logged_in:
     st.session_state.logged_in = True
-    st.session_state.user_id = stored_user_id
+    st.session_state.user_id = str(stored_user_id)
     st.rerun()
 
 def verify_email():
