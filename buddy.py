@@ -704,45 +704,58 @@ def get_user_top_keywords(student_id, limit=2):
         return ["약속을 잘 지켜요", "친절해요"]
     return [str(r["keyword"]).split()[0] + " " + (str(r["keyword"]).split()[1] if len(str(r["keyword"]).split()) > 1 else "") for _, r in kws_df.iterrows()]
 
-def MeetupCard(row, accepted_cnt, my_app_status, key_prefix="feed"):
+def calc_campus_distance_meters(lat1, lng1, lat2, lng2):
+    import math
+    r_earth = 6371000.0
+    p1, p2 = math.radians(float(lat1)), math.radians(float(lat2))
+    dp = math.radians(float(lat2) - float(lat1))
+    dl = math.radians(float(lng2) - float(lng1))
+    a = math.sin(dp / 2.0) ** 2 + math.cos(p1) * math.cos(p2) * (math.sin(dl / 2.0) ** 2)
+    return int(round(r_earth * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))))
+
+def MeetupCard(row, accepted_cnt, my_app_status, key_prefix="feed", distance_m=None):
     badge_label, meta = format_category_badge(row["category"])
     dept_str = row["department"] if "department" in row and pd.notna(row["department"]) else "컴퓨터공학과"
     is_mine = str(row["author_id"]) == str(st.session_state.user_id)
     is_full = int(accepted_cnt) >= int(row["max_participants"])
     top_kws = get_user_top_keywords(row["author_id"], limit=2)
 
+    dist_badge_html = ""
+    if distance_m is not None:
+        if distance_m < 25:
+            dist_str = "📍 현재 계신 장소 바로 근처"
+        else:
+            walk_min = max(1, int(round(distance_m / 67.0)))
+            dist_str = f"🚶 내 위치에서 약 {distance_m}m (도보 {walk_min}분)"
+        dist_badge_html = f'<span style="background:#E8F3FF; color:#1B64DA; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:999px;">{dist_str}</span>'
+
+    privacy_pill_html = "<span class='privacy-pill-mini'>⭐ 내 모집글</span>" if is_mine else "<span class='privacy-pill-mini'>🔒 익명 보장</span>"
+
     with st.container(border=True):
-        st.markdown(f"""
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-                <span style="background:{meta['chip_bg']}; color:{meta['chip_fg']}; font-size:12px; font-weight:800; padding:3px 10px; border-radius:999px;">
-                    {badge_label}
-                </span>
-                {"<span class='privacy-pill-mini'>⭐ 내 모집글</span>" if is_mine else "<span class='privacy-pill-mini'>🔒 익명 보장</span>"}
-            </div>
-            <span style="font-size:11px; color:#8B95A1; font-weight:600;">{row['meeting_style']}</span>
-        </div>
-        <div style="font-size:17px; font-weight:800; color:#191F28; margin-bottom:6px; line-height:1.35;">
-            {row['title']}
-        </div>
-        <div style="font-size:12.5px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
-            <span>📍 <b>{row['location']}</b></span>
-            <span>🕒 <b>{row['meet_date']} {row['meet_time']}</b></span>
-            <span>👥 <b>{accepted_cnt} / {row['max_participants']}명</b></span>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:4px;">
-            <div>
-                <div style="font-size:13.5px; font-weight:700; color:#191F28;">
-                    {row['avatar']} {row['nickname']} {'✅' if float(row['manner_temp']) >= 40.0 else ''}
-                </div>
-                <div style="font-size:11.5px; color:#6B7684;">{dept_str} · {row['mbti']}</div>
-            </div>
-            <div style="width:135px;">
-                {MannerTemperature(row['manner_temp'], show_label=False)}
-            </div>
-        </div>
-        {PraiseTag(top_kws)}
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:4px;">'
+            f'<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">'
+            f'<span style="background:{meta["chip_bg"]}; color:{meta["chip_fg"]}; font-size:12px; font-weight:800; padding:3px 10px; border-radius:999px;">{badge_label}</span>'
+            f'{privacy_pill_html}{dist_badge_html}'
+            f'</div>'
+            f'<span style="font-size:11px; color:#8B95A1; font-weight:600;">{row["meeting_style"]}</span>'
+            f'</div>'
+            f'<div style="font-size:17px; font-weight:800; color:#191F28; margin-bottom:6px; line-height:1.35;">{row["title"]}</div>'
+            f'<div style="font-size:12.5px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">'
+            f'<span>📍 <b>{row["location"]}</b></span>'
+            f'<span>🕒 <b>{row["meet_date"]} {row["meet_time"]}</b></span>'
+            f'<span>👥 <b>{accepted_cnt} / {row["max_participants"]}명</b></span>'
+            f'</div>'
+            f'<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:4px;">'
+            f'<div>'
+            f'<div style="font-size:13.5px; font-weight:700; color:#191F28;">{row["avatar"]} {row["nickname"]} {"✅" if float(row["manner_temp"]) >= 40.0 else ""}</div>'
+            f'<div style="font-size:11.5px; color:#6B7684;">{dept_str} · {row["mbti"]}</div>'
+            f'</div>'
+            f'<div style="width:135px;">{MannerTemperature(row["manner_temp"], show_label=False)}</div>'
+            f'</div>'
+            f'{PraiseTag(top_kws)}',
+            unsafe_allow_html=True,
+        )
 
         b_col1, b_col2 = st.columns([1, 1.3])
         with b_col1:
@@ -1445,7 +1458,7 @@ if st.session_state.active_modal == "detail" and st.session_state.selected_post_
     # 4. 방장 권한 관리 또는 참여자 신청 버튼
     if str(post["author_id"]) == str(st.session_state.user_id):
         with st.container(border=True):
-            st.markdown("#### 👑 방장 전용: 신청자 수락 및 관리")
+            st.markdown("#### 👑 방장 전용: 신청자 수락 및 모임 관리")
             if apps_df.empty:
                 st.caption("아직 참여를 신청한 학우가 없습니다.")
             else:
@@ -1460,14 +1473,48 @@ if st.session_state.active_modal == "detail" and st.session_state.selected_post_
                             if accepted_cnt + 1 >= int(post["max_participants"]):
                                 execute_commit("UPDATE posts SET status='매칭완료' WHERE id=?", (post["id"],))
                             st.rerun()
+
+            with st.expander("✏️ 모집 내용(제목·장소·시간·인원) 수정하기"):
+                edit_title = st.text_input("모집 제목 수정", value=str(post["title"]), key=f"edit_post_title_{post['id']}")
+                b_opts = list(ULSAN_CAMPUS_COORDS.keys())
+                if str(post["location"]) not in b_opts:
+                    b_opts = [str(post["location"])] + b_opts
+                edit_loc = st.selectbox(
+                    "만날 장소 수정 (직접 입력 가능)",
+                    b_opts,
+                    index=b_opts.index(str(post["location"])),
+                    accept_new_options=True,
+                    key=f"edit_post_loc_{post['id']}",
+                )
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    edit_time_str = st.text_input("모임 시간 (HH:MM)", value=str(post["meet_time"]), key=f"edit_post_time_{post['id']}")
+                with ec2:
+                    edit_max_p = st.number_input("최대 인원", min_value=1, max_value=10, value=int(post["max_participants"]), key=f"edit_post_max_{post['id']}")
+                if st.button("💾 수정사항 저장", key=f"save_edit_post_{post['id']}", use_container_width=True, type="primary"):
+                    if len(edit_title.strip()) < 2:
+                        st.error("모집 제목은 2글자 이상 입력해주세요.")
+                    else:
+                        execute_commit(
+                            "UPDATE posts SET title=?, location=?, meet_time=?, max_participants=? WHERE id=?",
+                            (edit_title.strip(), str(edit_loc).strip(), edit_time_str.strip(), int(edit_max_p), post["id"]),
+                        )
+                        st.toast("모집 내용이 수정되었습니다!")
+                        st.rerun()
+
             c_m1, c_m2 = st.columns(2)
             with c_m1:
                 if st.button("🔒 모집 조기 마감", key=f"detail_close_{post['id']}", use_container_width=True):
                     execute_commit("UPDATE posts SET status='매칭완료' WHERE id=?", (post["id"],))
+                    st.toast("모집이 마감 처리되었습니다.")
+                    st.session_state.active_modal = None
                     st.rerun()
             with c_m2:
-                if st.button("🚫 모임 취소", key=f"detail_cancel_{post['id']}", use_container_width=True):
-                    execute_commit("UPDATE posts SET status='취소됨' WHERE id=?", (post["id"],))
+                if st.button("🗑️ 모임 삭제(취소)", key=f"detail_cancel_{post['id']}", use_container_width=True):
+                    execute_commit("DELETE FROM applications WHERE post_id=?", (post["id"],))
+                    execute_commit("DELETE FROM posts WHERE id=?", (post["id"],))
+                    st.toast("모집글이 삭제되었습니다.")
+                    st.session_state.active_modal = None
                     st.rerun()
     else:
         if my_app_status == "승인됨":
@@ -1591,14 +1638,24 @@ elif st.session_state.nav_tab == "지도":
             key="map_location_consent_toggle",
         )
         st.session_state.location_consent = loc_consent
+
+        my_loc_mode = "📡 기기 GPS 실시간 자동 감지"
         if loc_consent:
-            st.caption("✅ 위치 정보 수집 활성화됨: 울산대 캠퍼스 내 현재 위치(🔵)와 주변 번개 모임을 실시간으로 연동합니다.")
+            st.caption("✅ 위치 정보 수집 활성화됨: 기기 GPS로 내 위치를 찾거나, PC 오차 시 아래에서 현재 계신 건물을 직접 지정·지도에서 파란 핀(🔵)을 드래그해 보정할 수 있습니다.")
+            my_loc_options = ["📡 기기 GPS 실시간 자동 감지"] + list(ULSAN_CAMPUS_COORDS.keys())
+            my_loc_mode = st.selectbox(
+                "🧭 내 현위치 기준 설정 (PC 접속 시 현재 있는 건물 선택 또는 직접 입력 가능)",
+                my_loc_options,
+                index=0,
+                accept_new_options=True,
+                key="map_my_loc_selector",
+            )
         else:
             st.caption("🔒 위치 정보 수집 비활성화됨: 내 현위치 표시 없이 캠퍼스 건물 기준으로만 지도를 탐색합니다.")
 
         place_options = ["전체 캠퍼스 보기"] + list(ULSAN_CAMPUS_COORDS.keys())
         selected_map_place = st.selectbox(
-            "📌 캠퍼스 장소 선택 (건물 선택 또는 새 장소 직접 입력)",
+            "📌 캠퍼스 장소 선택 (모집 글 필터링 · 건물 선택 또는 새 장소 직접 입력)",
             place_options,
             index=0,
             accept_new_options=True,
@@ -1613,6 +1670,16 @@ elif st.session_state.nav_tab == "지도":
         active_place_filter = selected_map_place.strip()
     elif map_search.strip():
         active_place_filter = map_search.strip()
+
+    # 내 현위치 좌표 계산 (수동 건물/장소 지정 시 해당 실제 좌표 사용, 자동 모드 시 브라우저 GPS 호출)
+    use_auto_gps = True
+    my_init_lat, my_init_lng = 35.544432, 129.256411  # 기본 폴백: 22호관 학생회관 정중앙
+    my_loc_label = "내 현위치"
+    if loc_consent and my_loc_mode and my_loc_mode != "📡 기기 GPS 실시간 자동 감지":
+        use_auto_gps = False
+        my_init_lat, my_init_lng, _ = resolve_campus_location(my_loc_mode)
+        short_my = my_loc_mode.split("호관 ", 1)[1] if "호관 " in my_loc_mode else my_loc_mode
+        my_loc_label = f"내 현위치 ({short_my})"
 
     map_posts = get_dataframe("""
         SELECT p.id, p.title, p.category, p.meet_date, p.meet_time, p.location, p.max_participants, p.meeting_style, p.status, p.author_id,
@@ -1665,6 +1732,8 @@ elif st.session_state.nav_tab == "지도":
 
     markers_json = json.dumps(markers_data, ensure_ascii=False)
     loc_consent_js = "true" if loc_consent else "false"
+    use_auto_gps_js = "true" if use_auto_gps else "false"
+    my_loc_label_json = json.dumps(my_loc_label, ensure_ascii=False)
     total_active = sum(m["count"] for m in markers_data)
 
     # 실제 드래그·확대/축소가 가능한 울산대학교 인터랙티브 지도 렌더링 (Leaflet + OSM)
@@ -1736,11 +1805,26 @@ elif st.session_state.nav_tab == "지도":
                 color: #FFFFFF;
                 border: 2px solid #FFFFFF;
                 border-radius: 999px;
-                padding: 3px 9px;
-                font-size: 11px;
+                padding: 4px 10px;
+                font-size: 11.5px;
                 font-weight: 800;
                 white-space: nowrap;
-                box-shadow: 0 2px 8px rgba(27,100,218,0.45);
+                box-shadow: 0 3px 10px rgba(27,100,218,0.45);
+            }}
+            .my-pin-tail {{
+                width: 0; height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 7px solid #1B64DA;
+                margin-top: -1px;
+            }}
+            .my-pin-dot {{
+                width: 9px; height: 9px;
+                background: #1B64DA;
+                border: 2px solid #FFFFFF;
+                border-radius: 50%;
+                box-shadow: 0 0 0 4px rgba(27,100,218,0.28);
+                margin-top: 1px;
             }}
             .gps-btn {{
                 position: absolute;
@@ -1761,10 +1845,10 @@ elif st.session_state.nav_tab == "지도":
     </head>
     <body>
         <div id="campus-map">
-            <button class="gps-btn" onclick="findMyCampusLocation()">🎯 내 위치 찾기</button>
+            <button class="gps-btn" id="gps-find-btn" onclick="findMyCampusLocation(true)">🎯 내 위치 찾기</button>
         </div>
         <script>
-            var map = L.map('campus-map').setView([35.5435, 129.2582], 16);
+            var map = L.map('campus-map').setView([{my_init_lat}, {my_init_lng}], 16);
             map.attributionControl.setPrefix(false);
             L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
                 maxZoom: 19,
@@ -1773,6 +1857,8 @@ elif st.session_state.nav_tab == "지도":
 
             var markers = {markers_json};
             var locConsent = {loc_consent_js};
+            var useAutoGps = {use_auto_gps_js};
+            var myLocLabel = {my_loc_label_json};
             var latlngs = [];
             markers.forEach(function(m) {{
                 latlngs.push([m.lat, m.lng]);
@@ -1792,41 +1878,88 @@ elif st.session_state.nav_tab == "지도":
             }});
 
             var myLocMarker = null;
-            function renderMyLoc(lat, lng) {{
+            var myAccCircle = null;
+            function renderMyLoc(lat, lng, labelText, accMeters) {{
                 if (myLocMarker) {{ map.removeLayer(myLocMarker); }}
+                if (myAccCircle) {{ map.removeLayer(myAccCircle); }}
+                var dispLabel = labelText || myLocLabel || '내 현위치';
                 var myIcon = L.divIcon({{
                     className: '',
-                    html: '<div class="pin-wrap"><div class="my-loc-pill">🔵 내 현위치</div></div>',
+                    html: '<div class="pin-wrap"><div class="my-loc-pill">🔵 ' + dispLabel + '</div><div class="my-pin-tail"></div><div class="my-pin-dot"></div></div>',
                     iconSize: [0, 0],
-                    iconAnchor: [0, 0]
+                    iconAnchor: [0, 0],
+                    popupAnchor: [0, -40]
                 }});
-                myLocMarker = L.marker([lat, lng], {{icon: myIcon}}).addTo(map).bindPopup('<b>🔵 내 현재 위치</b><br>위치 정보 수집 동의됨');
+                myLocMarker = L.marker([lat, lng], {{icon: myIcon, draggable: true, zIndexOffset: 900}}).addTo(map);
+                myLocMarker.bindPopup('<b>🔵 ' + dispLabel + '</b><br><span style="font-size:11.5px;color:#4E5968;">핀을 마우스로 드래그하면 내 위치를 미세 조정할 수 있습니다.</span>');
+                myLocMarker.on('dragend', function(e) {{
+                    var p = e.target.getLatLng();
+                    myLocMarker.setPopupContent('<b>🔵 내 현위치 (직접 보정됨)</b><br><span style="font-size:11.5px;color:#4E5968;">위도 ' + p.lat.toFixed(5) + ', 경도 ' + p.lng.toFixed(5) + '</span>').openPopup();
+                }});
+                if (accMeters && accMeters < 500) {{
+                    myAccCircle = L.circle([lat, lng], {{radius: accMeters, color: '#1B64DA', fillColor: '#1B64DA', fillOpacity: 0.1, weight: 1}}).addTo(map);
+                }}
+            }}
+
+            function getGeoObject() {{
+                try {{
+                    if (window.parent && window.parent.navigator && window.parent.navigator.geolocation) {{
+                        return window.parent.navigator.geolocation;
+                    }}
+                }} catch (e) {{}}
+                return navigator.geolocation;
+            }}
+
+            function findMyCampusLocation(panToMe) {{
+                if (!locConsent) {{
+                    if (panToMe) alert('상단의 [위치 정보 수집 및 내 현위치 표시 동의] 설정을 먼저 켜주세요.');
+                    return;
+                }}
+                if (!useAutoGps) {{
+                    renderMyLoc({my_init_lat}, {my_init_lng}, myLocLabel, 25);
+                    if (panToMe) map.setView([{my_init_lat}, {my_init_lng}], 17);
+                    return;
+                }}
+                var geo = getGeoObject();
+                var btn = document.getElementById('gps-find-btn');
+                if (geo) {{
+                    if (btn && panToMe) btn.innerText = '📡 GPS 수신 중...';
+                    geo.getCurrentPosition(function(pos) {{
+                        if (btn) btn.innerText = '🎯 내 위치 찾기';
+                        var gLat = pos.coords.latitude;
+                        var gLng = pos.coords.longitude;
+                        var acc = pos.coords.accuracy || 30;
+                        // PC IP 위치 오차로 캠퍼스 반경(약 3km) 밖으로 크게 벗어난 경우 안내와 함께 실제 GPS 위치로 이동할지 표시
+                        var distKm = Math.sqrt(Math.pow((gLat - 35.5438) * 111, 2) + Math.pow((gLng - 129.2563) * 88, 2));
+                        if (distKm > 3.0 && !panToMe) {{
+                            // 초기 자동 로드 시 PC IP 오차(타 지역)인 경우 캠퍼스 중심(학생회관)에 표시하되 안내 제공
+                            renderMyLoc({my_init_lat}, {my_init_lng}, '내 현위치 (학생회관 기준)', 0);
+                        }} else {{
+                            renderMyLoc(gLat, gLng, '내 현위치 (GPS)', acc);
+                            if (panToMe) map.setView([gLat, gLng], 17);
+                        }}
+                    }}, function(err) {{
+                        if (btn) btn.innerText = '🎯 내 위치 찾기';
+                        renderMyLoc({my_init_lat}, {my_init_lng}, myLocLabel, 0);
+                        if (panToMe) map.setView([{my_init_lat}, {my_init_lng}], 17);
+                    }}, {{enableHighAccuracy: true, timeout: 6000, maximumAge: 0}});
+                }} else {{
+                    renderMyLoc({my_init_lat}, {my_init_lng}, myLocLabel, 0);
+                    if (panToMe) map.setView([{my_init_lat}, {my_init_lng}], 17);
+                }}
             }}
 
             if (locConsent) {{
-                renderMyLoc(35.5437, 129.2579);
-            }}
-
-            function findMyCampusLocation() {{
-                if (!locConsent) {{
-                    alert('상단의 [위치 정보 수집 및 내 현위치 표시 동의] 설정을 먼저 켜주세요.');
-                    return;
-                }}
-                if (navigator.geolocation) {{
-                    navigator.geolocation.getCurrentPosition(function(pos) {{
-                        renderMyLoc(pos.coords.latitude, pos.coords.longitude);
-                        map.setView([pos.coords.latitude, pos.coords.longitude], 17);
-                    }}, function() {{
-                        renderMyLoc(35.5437, 129.2579);
-                        map.setView([35.5437, 129.2579], 17);
-                    }}, {{timeout: 2500}});
-                }} else {{
-                    renderMyLoc(35.5437, 129.2579);
-                    map.setView([35.5437, 129.2579], 17);
+                // 초기 렌더링 시 즉시 핀을 생성하고(수동 지정 위치 또는 기본값), 자동 GPS 모드이면 실제 GPS로 갱신
+                renderMyLoc({my_init_lat}, {my_init_lng}, myLocLabel, 0);
+                if (useAutoGps) {{
+                    findMyCampusLocation(false);
                 }}
             }}
 
-            if (latlngs.length === 1) {{
+            if (!useAutoGps && locConsent) {{
+                map.setView([{my_init_lat}, {my_init_lng}], 17);
+            }} else if (latlngs.length === 1) {{
                 map.setView(latlngs[0], 17);
             }} else if (latlngs.length > 1) {{
                 map.fitBounds(latlngs, {{ padding: [45, 45], maxZoom: 17 }});
@@ -1844,22 +1977,42 @@ elif st.session_state.nav_tab == "지도":
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### 📌 주변 모집 글")
+    s_head1, s_head2 = st.columns([1.3, 1.4])
+    with s_head1:
+        st.markdown("#### 📌 주변 모집 글")
+    with s_head2:
+        map_sort_mode = st.selectbox(
+            "정렬 기준",
+            ["📍 내 위치에서 가까운 순", "🕒 최신 등록순"],
+            index=0 if loc_consent else 1,
+            label_visibility="collapsed",
+            key="map_nearby_sort",
+        )
+
     my_apps_map = {}
     my_apps_df = get_dataframe("SELECT post_id, status FROM applications WHERE applicant_id=?", (st.session_state.user_id,))
     for _, ar in my_apps_df.iterrows():
         my_apps_map[int(ar["post_id"])] = ar["status"]
 
-    shown = 0
+    filtered_rows = []
     for _, row in map_posts.iterrows():
         norm_cat = normalize_category(row["category"])
         if map_cat != "전체" and norm_cat != map_cat:
             continue
         if active_place_filter and active_place_filter.lower() not in str(row["location"]).lower() and active_place_filter.lower() not in str(row["title"]).lower():
             continue
+        p_lat, p_lng, _ = resolve_campus_location(row["location"])
+        dist_m = calc_campus_distance_meters(my_init_lat, my_init_lng, p_lat, p_lng) if loc_consent else None
+        filtered_rows.append((dist_m if dist_m is not None else 999999, row, dist_m))
+
+    if map_sort_mode == "📍 내 위치에서 가까운 순" and loc_consent:
+        filtered_rows.sort(key=lambda item: (item[0], -int(item[1]["id"])))
+
+    shown = 0
+    for _, row, dist_m in filtered_rows:
         acc_df = get_dataframe("SELECT count(*) as cnt FROM applications WHERE post_id=? AND status='승인됨'", (row["id"],))
         acc_cnt = int(acc_df.iloc[0]["cnt"]) if not acc_df.empty else 0
-        MeetupCard(row, acc_cnt, my_apps_map.get(int(row["id"])), key_prefix="map")
+        MeetupCard(row, acc_cnt, my_apps_map.get(int(row["id"])), key_prefix="map", distance_m=dist_m)
         shown += 1
 
     if shown == 0:
