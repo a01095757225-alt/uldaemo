@@ -36,8 +36,11 @@ def call_gemini(prompt):
 # =========================================================
 # 1. 데이터베이스 헬퍼 함수 (클라우드 Supabase & 로컬 SQLite 호환)
 # =========================================================
+_PG_FAILED = False
+
 def is_postgres():
-    if not HAS_PSYCOPG2:
+    global _PG_FAILED
+    if not HAS_PSYCOPG2 or _PG_FAILED:
         return False
     try:
         return "supabase" in st.secrets and "url" in st.secrets["supabase"]
@@ -45,8 +48,12 @@ def is_postgres():
         return False
 
 def get_connection():
+    global _PG_FAILED
     if is_postgres():
-        return psycopg2.connect(st.secrets["supabase"]["url"])
+        try:
+            return psycopg2.connect(st.secrets["supabase"]["url"], connect_timeout=3)
+        except Exception:
+            _PG_FAILED = True
     return sqlite3.connect("campus_buddy_v4.db", check_same_thread=False)
 
 def get_dataframe(query, params=()):
