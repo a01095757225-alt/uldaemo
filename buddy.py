@@ -140,14 +140,21 @@ def init_db():
 def seed_demo_data_if_empty():
     """DB에 오늘 이후 활성 모집글이 하나도 없을 때 와이어프레임 시안과 동일한 예시 데이터를 초기화합니다."""
     try:
+        # 기존에 '🐶 강아지' 형태로 저장된 아바타 텍스트를 이모지('🐶')만 남기도록 정규화
+        users_with_text_avatar = get_dataframe("SELECT student_id, avatar FROM users WHERE avatar LIKE '% %'")
+        if not users_with_text_avatar.empty:
+            for _, u_row in users_with_text_avatar.iterrows():
+                clean_emoji = str(u_row["avatar"]).split()[0]
+                execute_commit("UPDATE users SET avatar=? WHERE student_id=?", (clean_emoji, u_row["student_id"]))
+
         today_str = date.today().strftime("%Y-%m-%d")
         cnt_df = get_dataframe("SELECT count(*) as cnt FROM posts WHERE status='모집중' AND meet_date >= ?", (today_str,))
         if not cnt_df.empty and int(cnt_df.iloc[0]["cnt"]) > 0:
             return
         demo_users = [
-            ("20241001", "cloud@ulsan.ac.kr", 1, "구름한점", "🐶 강아지", "남성", "컴퓨터공학과", "ENFP", 38.5, 0),
-            ("20241002", "sunset@ulsan.ac.kr", 1, "노을이", "🐱 고양이", "여성", "전자공학과", "INFP", 37.2, 0),
-            ("20241003", "runner@ulsan.ac.kr", 1, "민트러너", "🦊 여우", "남성", "기계공학부", "ESTP", 40.2, 0),
+            ("20241001", "cloud@ulsan.ac.kr", 1, "구름한점", "🐶", "남성", "컴퓨터공학과", "ENFP", 38.5, 0),
+            ("20241002", "sunset@ulsan.ac.kr", 1, "노을이", "🐱", "여성", "전자공학과", "INFP", 37.2, 0),
+            ("20241003", "runner@ulsan.ac.kr", 1, "민트러너", "🦊", "남성", "기계공학부", "ESTP", 40.2, 0),
         ]
         for u in demo_users:
             existing = get_dataframe("SELECT student_id FROM users WHERE student_id=?", (u[0],))
@@ -520,6 +527,19 @@ def inject_design_tokens():
         padding: 14px !important;
         margin-bottom: 12px !important;
     }
+    .st-key-header_notif_toggle_btn {
+        display: none !important;
+    }
+    #uldaemo-notif-pill {
+        cursor: pointer !important;
+        user-select: none;
+        transition: all 0.15s ease;
+    }
+    #uldaemo-notif-pill:hover {
+        background: #DDF2E7 !important;
+        border-color: #287D62 !important;
+        color: #287D62 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -527,11 +547,38 @@ def render_uldaemo_logo_svg(size=32):
     return f'<svg width="{size}" height="{size}" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="12" fill="#287D62"/><circle cx="14.5" cy="14.5" r="3" fill="#DDF2E7"/><circle cx="25.5" cy="14.5" r="3" fill="#DDF2E7"/><path d="M12 22.5C13.8 26.5 16.8 28.5 20 28.5C23.2 28.5 26.2 26.5 28 22.5" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round"/></svg>'
 
 def AppHeader(unread_cnt=0):
+    is_notif_open = st.session_state.get("active_modal") == "notifications"
     notif_badge = f"🔔 {unread_cnt}" if unread_cnt > 0 else "🔔 알림"
-    notif_style = "background:#EEF8F3; color:#287D62; border-color:#287D62;" if unread_cnt > 0 else ""
+    notif_style = "background:#EEF8F3; color:#287D62; border-color:#287D62;" if (unread_cnt > 0 or is_notif_open) else ""
     st.markdown(
-        f'<div class="app-header"><div class="app-logo-wrap">{render_uldaemo_logo_svg(32)}<div><div class="app-logo-title">울대모</div><div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div></div></div><div style="display:flex; align-items:center; gap:6px;"><span class="campus-pill">📍 울산대학교 ▾</span><span class="campus-pill" style="{notif_style}">{notif_badge}</span></div></div>',
+        f'<div class="app-header"><div class="app-logo-wrap">{render_uldaemo_logo_svg(32)}<div><div class="app-logo-title">울대모</div><div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div></div></div><div style="display:flex; align-items:center; gap:6px;"><span class="campus-pill">📍 울산대학교 ▾</span><span id="uldaemo-notif-pill" class="campus-pill" style="{notif_style}" title="클릭하여 알림 내역 확인">{notif_badge}</span></div></div>',
         unsafe_allow_html=True,
+    )
+    if st.button("🔔 알림센터 열기", key="header_notif_toggle_btn"):
+        if st.session_state.get("active_modal") == "notifications":
+            st.session_state.active_modal = None
+        else:
+            st.session_state.active_modal = "notifications"
+        st.rerun()
+    st.components.v1.html(
+        """
+        <script>
+        (function() {
+            try {
+                const doc = window.parent.document;
+                const pill = doc.getElementById('uldaemo-notif-pill');
+                if (pill && !pill.dataset.boundNotif) {
+                    pill.dataset.boundNotif = '1';
+                    pill.addEventListener('click', function() {
+                        const btnWrap = doc.querySelector('.st-key-header_notif_toggle_btn button');
+                        if (btnWrap) btnWrap.click();
+                    });
+                }
+            } catch (e) {}
+        })();
+        </script>
+        """,
+        height=0,
     )
 
 def MainBanner():
@@ -748,7 +795,7 @@ def MeetupCard(row, accepted_cnt, my_app_status, key_prefix="feed", distance_m=N
             f'</div>'
             f'<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:4px;">'
             f'<div>'
-            f'<div style="font-size:13.5px; font-weight:700; color:#191F28;">{row["avatar"]} {row["nickname"]} {"✅" if float(row["manner_temp"]) >= 40.0 else ""}</div>'
+            f'<div style="font-size:13.5px; font-weight:700; color:#191F28;">{str(row["avatar"]).split()[0]} {row["nickname"]} {"✅" if float(row["manner_temp"]) >= 40.0 else ""}</div>'
             f'<div style="font-size:11.5px; color:#6B7684;">{dept_str} · {row["mbti"]}</div>'
             f'</div>'
             f'<div style="width:135px;">{MannerTemperature(row["manner_temp"], show_label=False)}</div>'
@@ -1155,7 +1202,7 @@ if not st.session_state.logged_in:
             user_nickname = st.text_input("닉네임 (익명 표시용) (필수)", placeholder="예: 푸른솔", key="signup_nick_input")
             c_p1, c_p2 = st.columns(2)
             with c_p1:
-                user_avatar = st.selectbox("프로필 아바타 (필수)", ["🐶 강아지", "🐱 고양이", "🦊 여우", "🐻 곰", "🐰 토끼", "🐹 햄스터"], key="signup_avatar_select")
+                user_avatar = st.selectbox("프로필 아바타 (필수)", ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"], key="signup_avatar_select")
                 user_gender = st.selectbox("성별 (필수)", ["남성", "여성"], key="signup_gender_select")
             with c_p2:
                 user_dept = st.text_input("학과 (필수)", value="컴퓨터공학과", key="signup_dept_input")
@@ -1241,6 +1288,63 @@ st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
 
 now = datetime.now()
 KW_OPTIONS = ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊", "적극적이에요 👍", "대화가 즐거워요 💬", "조용히 집중하기 좋아요 📚"]
+
+# =========================================================
+# 서브 화면 0: 실시간 알림 센터 (Notifications View)
+# =========================================================
+if st.session_state.active_modal == "notifications":
+    if st.button("← 이전 화면으로 돌아가기", key="back_from_notifications"):
+        st.session_state.active_modal = None
+        st.rerun()
+
+    st.markdown("### 🔔 실시간 알림 센터")
+    notifs_df = get_dataframe(
+        "SELECT id, message, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 30",
+        (st.session_state.user_id,),
+    )
+
+    n_col1, n_col2, n_col3 = st.columns(3)
+    with n_col1:
+        if st.button("✅ 모두 읽음 처리", key="notif_mark_all_read", use_container_width=True, type="primary", disabled=(unread_cnt == 0)):
+            execute_commit("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (st.session_state.user_id,))
+            st.toast("모든 알림을 읽음 처리했습니다.")
+            st.rerun()
+    with n_col2:
+        if st.button("💬 채팅/신청 관리", key="notif_go_chat_tab", use_container_width=True):
+            execute_commit("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (st.session_state.user_id,))
+            st.session_state.active_modal = None
+            st.session_state.nav_tab = "채팅"
+            st.rerun()
+    with n_col3:
+        if st.button("🗑️ 알림 비우기", key="notif_clear_all", use_container_width=True, disabled=notifs_df.empty):
+            execute_commit("DELETE FROM notifications WHERE user_id = ?", (st.session_state.user_id,))
+            st.toast("알림 목록을 모두 비웠습니다.")
+            st.rerun()
+
+    if notifs_df.empty:
+        EmptyState("도착한 알림이 없어요", "모임에 참여 신청이 오거나 수락되면 이곳에 실시간으로 표시됩니다!")
+    else:
+        for _, nrow in notifs_df.iterrows():
+            is_unread = int(nrow["is_read"]) == 0
+            card_bg = "#EEF8F3" if is_unread else "#FFFFFF"
+            card_border = "#287D62" if is_unread else "#E5E8EB"
+            badge_html = (
+                '<span style="background:#287D62; color:#FFFFFF; font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:999px;">🟢 새 알림</span>'
+                if is_unread
+                else '<span style="background:#F2F4F6; color:#8B95A1; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px;">읽음</span>'
+            )
+            created_str = str(nrow["created_at"])[:16] if nrow["created_at"] else ""
+            st.markdown(
+                f'<div class="uldaemo-card" style="background:{card_bg}; border-color:{card_border}; padding:14px 16px; margin-bottom:8px;">'
+                f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">'
+                f'{badge_html}'
+                f'<span style="font-size:11.5px; color:#8B95A1;">{created_str}</span>'
+                f'</div>'
+                f'<div style="font-size:14px; font-weight:700; color:#191F28;">{nrow["message"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    st.stop()
 
 # =========================================================
 # 서브 화면 1: 번개 모집하기 폼 (Create Meetup View)
@@ -1489,7 +1593,7 @@ if st.session_state.active_modal == "detail" and st.session_state.selected_post_
             else:
                 for _, app_row in apps_df.iterrows():
                     st.markdown(
-                        f"**{app_row['avatar']} {app_row['nickname']}** ({app_row['department']} · {app_row['mbti']} · 🌡️{app_row['manner_temp']:.1f}°C) — 상태: `{app_row['status']}`"
+                        f"**{str(app_row['avatar']).split()[0]} {app_row['nickname']}** ({app_row['department']} · {app_row['mbti']} · 🌡️{app_row['manner_temp']:.1f}°C) — 상태: `{app_row['status']}`"
                     )
                     if app_row["status"] == "대기중" and accepted_cnt < int(post["max_participants"]):
                         if st.button(f"✅ {app_row['nickname']}님 수락하기", key=f"detail_accept_{app_row['app_id']}", type="primary"):
@@ -2081,7 +2185,7 @@ elif st.session_state.nav_tab == "채팅":
             st.markdown("#### 🔔 방장 수락 대기 중인 신청자")
             for _, prow in pending_host.iterrows():
                 st.markdown(
-                    f"**{prow['partner_avatar']} {prow['partner_name']}** ({prow['partner_mbti']} · 🌡️{prow['partner_temp']:.1f}°C) → 📌 **{prow['title']}**"
+                    f"**{str(prow['partner_avatar']).split()[0]} {prow['partner_name']}** ({prow['partner_mbti']} · 🌡️{prow['partner_temp']:.1f}°C) → 📌 **{prow['title']}**"
                 )
                 if st.button(f"✅ 수락하고 안심 채팅 열기", key=f"chat_accept_{prow['app_id']}", use_container_width=True, type="primary"):
                     execute_commit("UPDATE applications SET status='승인됨' WHERE id=?", (prow["app_id"],))
@@ -2238,11 +2342,12 @@ elif st.session_state.nav_tab == "마이":
 
     # 프로필 수정 아코디언
     with st.expander("⚙️ 내 프로필 및 자기소개 수정하기 (프로필 필수 목록)", expanded=True):
-        avatars_list = ["🐶 강아지", "🐱 고양이", "🦊 여우", "🐻 곰", "🐰 토끼", "🐹 햄스터"]
+        avatars_list = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"]
         mbti_list = ["ENFP", "ENTP", "INFP", "INTP", "ESFJ", "ESTJ", "ISFJ", "ISTJ", "ENFJ", "ENTJ", "INFJ", "INTJ", "ESFP", "ESTP", "ISFP", "ISTP", "모름/비공개"]
         new_nick = st.text_input("닉네임 변경 (필수)", value=user["nickname"], key="edit_prof_nick")
         new_dept = st.text_input("학과 변경 (필수)", value=user["department"], key="edit_prof_dept")
-        new_avatar = st.selectbox("아바타 (필수)", avatars_list, index=avatars_list.index(user["avatar"]) if user["avatar"] in avatars_list else 0, key="edit_prof_avatar")
+        cur_avatar_emoji = str(user["avatar"]).split()[0] if user["avatar"] else "🐶"
+        new_avatar = st.selectbox("아바타 (필수)", avatars_list, index=avatars_list.index(cur_avatar_emoji) if cur_avatar_emoji in avatars_list else 0, key="edit_prof_avatar")
         new_mbti = st.selectbox("MBTI (필수)", mbti_list, index=mbti_list.index(user["mbti"]) if user["mbti"] in mbti_list else 0, key="edit_prof_mbti")
         new_bio = st.text_area("자기소개 한마디", value=st.session_state[bio_key], key="edit_prof_bio")
 

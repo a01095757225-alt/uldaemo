@@ -1,0 +1,5 @@
+*.py
+*.db
+requirements.txt
+.streamlit/
+__pycache__/
