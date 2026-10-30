@@ -957,17 +957,11 @@ def render_sidebar_profile(user):
         st.sidebar.markdown(PraiseTag([f"{r['keyword']} ({r['cnt']})" for _, r in kws.iterrows()]), unsafe_allow_html=True)
 
     if st.sidebar.button("로그아웃", key="sidebar_logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_id = ""
-        st.session_state.verified_email = None
-        try:
-            controller.remove("user_id")
-        except Exception:
-            pass
+        clear_login_session()
         st.rerun()
 
 # =========================================================
-# 4. 앱 초기 설정 및 인증 (쿠키 적용)
+# 4. 앱 초기 설정 및 인증 (30일 자동 로그인 쿠키 & 세션 유지)
 # =========================================================
 st.set_page_config(page_title="울대모 - 우리 학교, 가볍게 모여!", page_icon="🟢", layout="centered")
 inject_design_tokens()
@@ -979,6 +973,8 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user_id" not in st.session_state:
     st.session_state.user_id = ""
+if "explicit_logout" not in st.session_state:
+    st.session_state.explicit_logout = False
 if "nav_tab" not in st.session_state:
     st.session_state.nav_tab = "홈"
 if "active_modal" not in st.session_state:
@@ -986,14 +982,52 @@ if "active_modal" not in st.session_state:
 if "selected_post_id" not in st.session_state:
     st.session_state.selected_post_id = None
 
+def persist_login_session(uid_str):
+    uid_clean = str(uid_str).strip()
+    st.session_state.logged_in = True
+    st.session_state.user_id = uid_clean
+    st.session_state.explicit_logout = False
+    try:
+        controller.set("user_id", uid_clean, max_age=30 * 24 * 3600)
+    except Exception:
+        pass
+    try:
+        st.query_params["uid"] = uid_clean
+    except Exception:
+        pass
+
+def clear_login_session():
+    st.session_state.logged_in = False
+    st.session_state.user_id = ""
+    st.session_state.verified_email = None
+    st.session_state.explicit_logout = True
+    try:
+        controller.remove("user_id")
+    except Exception:
+        pass
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+    st.components.v1.html(
+        "<script>try { window.parent.document.cookie = 'user_id=; path=/; max-age=0'; } catch(e){}</script>",
+        height=0,
+    )
+
 try:
     stored_user_id = controller.get("user_id")
 except Exception:
     stored_user_id = None
 
-if stored_user_id and not st.session_state.logged_in:
+if not stored_user_id:
+    try:
+        stored_user_id = st.query_params.get("uid", None)
+    except Exception:
+        stored_user_id = None
+
+if stored_user_id and not st.session_state.logged_in and not st.session_state.explicit_logout:
     st.session_state.logged_in = True
-    st.session_state.user_id = str(stored_user_id)
+    st.session_state.user_id = str(stored_user_id).strip()
     st.rerun()
 
 def verify_email():
@@ -1093,12 +1127,7 @@ if not st.session_state.logged_in:
                     if found_u.empty:
                         st.error("아직 등록되지 않은 학번입니다. 우측 '🎓 신규 학우 가입' 탭을 이용해주세요!")
                     else:
-                        st.session_state.logged_in = True
-                        st.session_state.user_id = login_sid.strip()
-                        try:
-                            controller.set("user_id", login_sid.strip())
-                        except Exception:
-                            pass
+                        persist_login_session(login_sid.strip())
                         st.rerun()
 
         with st.container(border=True):
@@ -1107,21 +1136,11 @@ if not st.session_state.logged_in:
             d_col1, d_col2 = st.columns(2)
             with d_col1:
                 if st.button("🐶 구름한점 (38.5°C)\n컴공 · ENFP", key="demo_login_1", use_container_width=True):
-                    st.session_state.logged_in = True
-                    st.session_state.user_id = "20241001"
-                    try:
-                        controller.set("user_id", "20241001")
-                    except Exception:
-                        pass
+                    persist_login_session("20241001")
                     st.rerun()
             with d_col2:
                 if st.button("🐱 노을이 (37.2°C)\n전자 · INFP", key="demo_login_2", use_container_width=True):
-                    st.session_state.logged_in = True
-                    st.session_state.user_id = "20241002"
-                    try:
-                        controller.set("user_id", "20241002")
-                    except Exception:
-                        pass
+                    persist_login_session("20241002")
                     st.rerun()
 
     with login_tab2:
@@ -1161,12 +1180,7 @@ if not st.session_state.logged_in:
                         new_student_id.strip(), verified_email, user_nickname.strip(), user_avatar, user_gender, user_dept.strip(), user_mbti,
                         verified_email, user_nickname.strip(), user_avatar, user_gender, user_dept.strip(), user_mbti
                     ))
-                    st.session_state.logged_in = True
-                    st.session_state.user_id = new_student_id.strip()
-                    try:
-                        controller.set("user_id", new_student_id.strip())
-                    except Exception:
-                        pass
+                    persist_login_session(new_student_id.strip())
                     st.rerun()
     st.stop()
 
@@ -1175,8 +1189,19 @@ if not st.session_state.logged_in:
 # =========================================================
 user_info = get_dataframe("SELECT * FROM users WHERE student_id = ?", (st.session_state.user_id,))
 if user_info.empty:
-    st.session_state.logged_in = False
+    clear_login_session()
     st.rerun()
+
+# 로그인 성공 상태에서 브라우저 30일 쿠키 및 URL 파라미터 동기화 유지 (st.rerun으로 인해 쿠키 저장이 누락되는 현상 완벽 방지)
+try:
+    controller.set("user_id", str(st.session_state.user_id), max_age=30 * 24 * 3600)
+    st.query_params["uid"] = str(st.session_state.user_id)
+except Exception:
+    pass
+st.components.v1.html(
+    f"<script>try {{ window.parent.document.cookie = 'user_id={st.session_state.user_id}; path=/; max-age=2592000; SameSite=Lax'; }} catch(e){{}}</script>",
+    height=0,
+)
 
 user = user_info.iloc[0]
 if int(user["report_count"]) >= 3:
@@ -2234,10 +2259,5 @@ elif st.session_state.nav_tab == "마이":
                 st.rerun()
 
     if st.button("🚪 로그아웃", key="main_profile_logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_id = ""
-        try:
-            controller.remove("user_id")
-        except Exception:
-            pass
+        clear_login_session()
         st.rerun()
