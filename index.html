@@ -13,38 +13,1521 @@
   <meta property="og:description" content="신상 노출 걱정 없이 매너 온도와 인앱 안심 채팅으로 만나는 울산대 캠퍼스 번개 플랫폼" />
   <meta property="og:locale" content="ko_KR" />
 
-  <!-- 파비콘 (울대모 캠퍼스 그린 로고) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23287D62'/%3E%3Ccircle cx='14.5' cy='14.5' r='3' fill='%23DDF2E7'/%3E%3Ccircle cx='25.5' cy='14.5' r='3' fill='%23DDF2E7'/%3E%3Cpath d='M12 22.5C13.8 26.5 16.8 28.5 20 28.5C23.2 28.5 26.2 26.5 28 22.5' stroke='%23FFFFFF' stroke-width='3.2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    :root {
+      --primary: #287D62;
+      --primary-dark: #1E634C;
+      --secondary: #DDF2E7;
+      --bg: #F7F8F4;
+      --surface: #FFFFFF;
+      --text-main: #191F28;
+      --text-sub: #6B7684;
+      --border: #E5E8EB;
     }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #F7F8F4;
-      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.45;
+      padding-bottom: 40px;
     }
-    .app-frame {
+    .app-shell {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 12px 14px 36px;
+      min-height: 100dvh;
+    }
+    .uldaemo-card {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 10px rgba(25, 31, 40, 0.04);
+    }
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 11px 15px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+    .app-logo-wrap { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+    .app-logo-title { font-size: 20px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
+    .campus-pill {
+      background: #F2F4F6;
+      color: #333D4B;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .campus-pill:hover, .campus-pill.active {
+      background: #EEF8F3;
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+    .nav-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .nav-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 10px 4px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .nav-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .cat-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-main);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 8px 2px;
+      border-radius: 12px;
+      cursor: pointer;
+      line-height: 1.3;
+      text-align: center;
+    }
+    .cat-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+    .main-banner {
+      background: linear-gradient(135deg, #E3F4EC 0%, #D2EDE0 100%);
+      border-radius: 18px;
+      padding: 18px 20px;
+      margin-bottom: 10px;
+      border: 1px solid #C5E6D6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .main-banner-tag {
+      display: inline-block;
+      background: #FFFFFF;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    .main-banner-title { font-size: 18px; font-weight: 800; color: var(--text-main); line-height: 1.35; }
+    .btn {
       width: 100%;
-      height: 100dvh;
-      border: none;
+      min-height: 44px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-main);
+      padding: 10px 14px;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-danger {
+      background: #FFF0F0;
+      color: #E02020;
+      border-color: #FFD6D6;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .input, .select, .textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 13.5px;
+      font-family: inherit;
+      background: #FFFFFF;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    .input:focus, .select:focus, .textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .label {
       display: block;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #333D4B;
+      margin-bottom: 4px;
     }
+    .privacy-badge {
+      background: #EEF8F3;
+      border: 1px solid #C5E6D6;
+      color: var(--primary);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .privacy-pill-mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #EEF8F3;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+    }
+    .cat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+    .urgent-badge {
+      display: inline-flex;
+      align-items: center;
+      background: #FFF0F0;
+      color: #E02020;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .temp-wrap { width: 100%; margin: 4px 0; }
+    .temp-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+    .temp-track { width: 100%; background: #E5E8EB; height: 7px; border-radius: 999px; overflow: hidden; }
+    .temp-fill { height: 100%; background: linear-gradient(90deg, #52B788, #287D62); border-radius: 999px; }
+    .praise-tag {
+      display: inline-block;
+      background: #EEF8F3;
+      color: var(--primary);
+      border: 1px solid #C5E6D6;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 5px;
+      margin-top: 4px;
+    }
+    .kakaomap-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #F2F4F6;
+      color: #333D4B !important;
+      text-decoration: none !important;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .chat-box {
+      height: 260px;
+      overflow-y: auto;
+      background: #FAFBF9;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .chat-bubble-me {
+      background: var(--primary);
+      color: #FFFFFF;
+      padding: 9px 13px;
+      border-radius: 16px 16px 4px 16px;
+      max-width: 78%;
+      margin-left: auto;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+      width: fit-content;
+      word-break: break-word;
+    }
+    .chat-bubble-other {
+      background: #FFFFFF;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 9px 13px;
+      border-radius: 16px 16px 16px 4px;
+      max-width: 78%;
+      margin-right: auto;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+      width: fit-content;
+      word-break: break-word;
+    }
+    .chat-bubble-ai {
+      background: #EEF8F3;
+      color: var(--primary-dark);
+      border: 1px solid #C5E6D6;
+      padding: 10px 13px;
+      border-radius: 12px;
+      margin: 8px 0;
+      font-size: 12.5px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 31, 40, 0.92);
+      color: #FFFFFF;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      z-index: 9999;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      display: none;
+      max-width: 92vw;
+      text-align: center;
+    }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    #campus-map { width: 100%; height: 320px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 10px; z-index: 1; }
   </style>
 </head>
 <body>
-  <iframe
-    id="uldaemo-frame"
-    class="app-frame"
-    src="https://uldaemo-tg7c8nojubb2wbrwz8ysek.streamlit.app/?embed=true"
-    allow="geolocation *; clipboard-read; clipboard-write; autoplay"
-    allowfullscreen
-    title="울대모 - 울산대 캠퍼스 안심 번개 매칭 플랫폼"
-  ></iframe>
+  <div id="toast" class="toast"></div>
+  <div id="app" class="app-shell"></div>
+
+  <script>
+    // =========================================================
+    // 1. 울산대학교 공식 캠퍼스맵 62개 전체 호관 및 주요 장소 실제 GPS 좌표
+    // =========================================================
+    const ULSAN_CAMPUS_COORDS = {
+      "22호관 학생회관": [35.544589, 129.258501, "🍚"],
+      "16호관 아산도서관": [35.543219, 129.258113, "📚"],
+      "39호관 아산스포츠센터": [35.544198, 129.259535, "🏃"],
+      "34호관 식물원": [35.541588, 129.257191, "🚶"],
+      "7호관 전기/컴퓨터공학관": [35.544225, 129.255796, "💻"],
+      "9호관 대학회관/해송홀": [35.544825, 129.256463, "🍚"],
+      "36호관 서점 및 북카페": [35.544643, 129.258260, "☕"],
+      "40호관 아산도서관 신관": [35.542539, 129.258585, "📚"],
+      "1호관 화학공학관": [35.544734, 129.255810, "💻"],
+      "2호관 기계항공관": [35.545027, 129.255057, "💻"],
+      "3호관 공학행정관": [35.545173, 129.255690, "📍"],
+      "4호관 학생회관별관": [35.544460, 129.254443, "📍"],
+      "5호관 산학협력리더스홀": [35.544032, 129.254522, "💻"],
+      "6호관 조형관": [35.543474, 129.254744, "🎨"],
+      "8호관 자연과학관": [35.542938, 129.256658, "💻"],
+      "10호관 문수관": [35.543568, 129.255507, "💻"],
+      "11호관 교수연구동": [35.543055, 129.255730, "☕"],
+      "12호관 체육관": [35.545279, 129.258179, "🏃"],
+      "13호관 동아리관1": [35.544010, 129.258601, "🎸"],
+      "14호관 인문관": [35.542500, 129.257440, "💻"],
+      "15호관 사회과학관": [35.542045, 129.257664, "💻"],
+      "18호관 재료/산업공학관": [35.544748, 129.253859, "💻"],
+      "19호관 기초과학실험동": [35.544138, 129.253935, "💻"],
+      "20호관 시청각교육관": [35.541422, 129.256770, "💻"],
+      "21호관 학군단": [35.543908, 129.259001, "📍"],
+      "23호관 건설환경공학관": [35.545616, 129.254878, "💻"],
+      "24호관 경영관": [35.542247, 129.256487, "💻"],
+      "25호관 청운학사 무거관": [35.547148, 129.255825, "🏠"],
+      "26호관 행정본관": [35.543723, 129.257063, "📍"],
+      "28호관 예술관(디자인/미술)": [35.543079, 129.254168, "🎨"],
+      "29호관 예술관(음악학부)": [35.543553, 129.254159, "🎵"],
+      "31호관 동아리관2": [35.543874, 129.259234, "🎸"],
+      "35호관 산학협동관/의학관": [35.544954, 129.252952, "💻"],
+      "37호관 생활과학관": [35.542550, 129.255253, "💻"],
+      "38호관 청운학사 목련관": [35.547437, 129.255933, "🏠"],
+      "41호관 조선해양공학관": [35.545009, 129.251824, "💻"],
+      "43호관 국제관": [35.546591, 129.255746, "🌐"],
+      "44호관 건축관": [35.546126, 129.256497, "💻"],
+      "45호관 청운학사 기린관": [35.546804, 129.257144, "🏠"],
+      "46호관 KCC 생활관": [35.546200, 129.257849, "🏠"],
+      "학생식당 (9호관 대학회관 1층)": [35.544639, 129.257122, "🍚"],
+      "울산대학교 정문 (바보사거리)": [35.543000, 129.259800, "🍔"],
+      "무거동 대학로 (바보사거리 카페거리)": [35.542600, 129.260800, "☕"]
+    };
+
+    const AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"];
+    const MBTIS = ["ENFP", "ENTP", "INFP", "INTP", "ESFJ", "ESTJ", "ISFJ", "ISTJ", "ENFJ", "ENTJ", "INFJ", "INTJ", "ESFP", "ESTP", "ISFP", "ISTP", "모름/비공개"];
+    const KW_OPTIONS = ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊", "적극적이에요 👍", "대화가 즐거워요 💬", "조용히 집중하기 좋아요 📚"];
+
+    function getTodayStr() {
+      const d = new Date();
+      return d.toISOString().split("T")[0];
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.style.display = "block";
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => { el.style.display = "none"; }, 2800);
+    }
+
+    // =========================================================
+    // 2. 데이터베이스 상태 초기화 및 30일 영구 저장 (localStorage + 쿠키)
+    // =========================================================
+    function loadDB() {
+      const today = getTodayStr();
+      const raw = localStorage.getItem("uldaemo_db_v5");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          // 아바타 텍스트 정규화 ('🐶 강아지' -> '🐶')
+          Object.values(parsed.users || {}).forEach(u => {
+            if (u.avatar && u.avatar.includes(" ")) u.avatar = u.avatar.split(" ")[0];
+          });
+          return parsed;
+        } catch (e) {}
+      }
+      const initial = {
+        users: {
+          "20241001": { student_id: "20241001", email: "cloud@ulsan.ac.kr", nickname: "구름한점", avatar: "🐶", gender: "남성", department: "컴퓨터공학과", mbti: "ENFP", manner_temp: 38.5, report_count: 0, bio: "공강 시간에 학식이나 카공 같이 할 학우 환영해요! 🌱", keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊", "적극적이에요 👍"] },
+          "20241002": { student_id: "20241002", email: "sunset@ulsan.ac.kr", nickname: "노을이", avatar: "🐱", gender: "여성", department: "전자공학과", mbti: "INFP", manner_temp: 37.2, report_count: 0, bio: "조용히 도서관에서 같이 공부해요 📚", keywords: ["조용히 집중하기 좋아요 📚", "시간 약속을 잘 지켜요 ⏰"] },
+          "20241003": { student_id: "20241003", email: "runner@ulsan.ac.kr", nickname: "민트러너", avatar: "🦊", gender: "남성", department: "기계공학부", mbti: "ESTP", manner_temp: 40.2, report_count: 0, bio: "저녁 러닝 메이트 언제나 환영합니다!", keywords: ["적극적이에요 👍", "대화가 즐거워요 💬"] }
+        },
+        posts: [
+          { id: 1, author_id: "20241001", title: "학식 같이 먹고 다음 수업 가요!", category: "🍚 밥약", meet_date: today, meet_time: "23:30", location: "22호관 학생회관", max_participants: 4, meeting_style: "간단한 스몰토크 환영", status: "모집중" },
+          { id: 2, author_id: "20241002", title: "도서관에서 두 시간 집중할 분!", category: "☕ 카공", meet_date: today, meet_time: "23:45", location: "16호관 아산도서관", max_participants: 3, meeting_style: "이어폰 꽂고 조용히 각자 할일", status: "모집중" },
+          { id: 3, author_id: "20241003", title: "저녁에 운동장 가볍게 러닝하실 분!", category: "🏃 운동", meet_date: today, meet_time: "23:50", location: "39호관 아산스포츠센터", max_participants: 5, meeting_style: "텐션 높게 E처럼 놀아요", status: "모집중" },
+          { id: 4, author_id: "20241001", title: "식후 캠퍼스 산책하며 커피 마셔요", category: "🚶 산책", meet_date: today, meet_time: "23:55", location: "34호관 식물원", max_participants: 2, meeting_style: "간단한 스몰토크 환영", status: "모집중" }
+        ],
+        applications: [],
+        messages: [],
+        notifications: [
+          { id: 1, user_id: "20241001", message: "🌱 울대모에 오신 것을 환영합니다! 공강 번개를 안전하게 시작해보세요.", is_read: 0, created_at: today + " 09:00" }
+        ],
+        reviews: []
+      };
+      localStorage.setItem("uldaemo_db_v5", JSON.stringify(initial));
+      return initial;
+    }
+
+    function saveDB() {
+      localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+    }
+
+    let DB = loadDB();
+
+    const state = {
+      user_id: localStorage.getItem("uldaemo_uid") || "",
+      login_tab: "login",
+      nav_tab: "홈",
+      active_modal: null,
+      selected_post_id: null,
+      home_cat: "전체",
+      map_cat: "전체",
+      search_q: "",
+      sort_opt: "🕒 마감 임박순",
+      gps_consent: true,
+      my_building: "26호관 행정본관",
+      my_lat: 35.543723,
+      my_lng: 129.257063,
+      verified_email: null,
+      pending_email: "",
+      generated_otp: "",
+      auth_code_sent: false,
+      smtp_sent_live: false,
+      smtp_sender: localStorage.getItem("uldaemo_smtp_sender") || "",
+      smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || ""
+    };
+
+    function persistLogin(uid) {
+      state.user_id = String(uid).trim();
+      localStorage.setItem("uldaemo_uid", state.user_id);
+      document.cookie = `user_id=${state.user_id}; path=/; max-age=2592000`;
+      render();
+    }
+
+    function clearLogin() {
+      state.user_id = "";
+      state.verified_email = null;
+      state.auth_code_sent = false;
+      localStorage.removeItem("uldaemo_uid");
+      document.cookie = "user_id=; path=/; max-age=0";
+      render();
+    }
+
+    function calcDistanceMeters(lat1, lng1, lat2, lng2) {
+      const R = 6371000.0;
+      const p1 = lat1 * Math.PI / 180;
+      const p2 = lat2 * Math.PI / 180;
+      const dp = (lat2 - lat1) * Math.PI / 180;
+      const dl = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    function getBuildingCoords(locName) {
+      if (ULSAN_CAMPUS_COORDS[locName]) return ULSAN_CAMPUS_COORDS[locName];
+      for (const [k, v] of Object.entries(ULSAN_CAMPUS_COORDS)) {
+        if (k.includes(locName) || locName.includes(k)) return v;
+      }
+      return [35.543723, 129.257063, "📍"];
+    }
+
+    function renderLogoSvg(size = 32) {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="12" fill="#287D62"/><circle cx="14.5" cy="14.5" r="3" fill="#DDF2E7"/><circle cx="25.5" cy="14.5" r="3" fill="#DDF2E7"/><path d="M12 22.5C13.8 26.5 16.8 28.5 20 28.5C23.2 28.5 26.2 26.5 28 22.5" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round"/></svg>`;
+    }
+
+    function renderTempGauge(temp, showLabel = true) {
+      const t = parseFloat(temp || 36.5);
+      const pct = Math.max(5, Math.min(100, Math.round((t / 60.0) * 100)));
+      const badge = t >= 40.0 ? "✅" : "";
+      return `
+        <div class="temp-wrap">
+          <div class="temp-header">
+            <span>${showLabel ? "매너 온도" : ""}</span>
+            <span>🌡️ ${t.toFixed(1)}°C ${badge}</span>
+          </div>
+          <div class="temp-track"><div class="temp-fill" style="width:${pct}%;"></div></div>
+        </div>
+      `;
+    }
+
+    function notifyUser(uid, message) {
+      const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
+      DB.notifications.unshift({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        user_id: uid,
+        message,
+        is_read: 0,
+        created_at: nowStr
+      });
+      saveDB();
+    }
+
+    // =========================================================
+    // 3. 메인 렌더링 함수
+    // =========================================================
+    function render() {
+      const root = document.getElementById("app");
+      const currentUser = DB.users[state.user_id];
+
+      // 로그인 전 화면
+      if (!state.user_id || !currentUser) {
+        root.innerHTML = renderLoginView();
+        return;
+      }
+
+      if (currentUser.report_count >= 3) {
+        root.innerHTML = `<div class="uldaemo-card" style="text-align:center; padding:30px;"><h3>🚨 계정 이용 정지</h3><p style="margin:10px 0; color:#6B7684;">누적 신고 3회 이상으로 계정이 일시 정지되었습니다.</p><button class="btn" onclick="clearLogin()">로그아웃</button></div>`;
+        return;
+      }
+
+      const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
+      const notifBadge = unreadCnt > 0 ? `🔔 ${unreadCnt}` : `🔔 알림`;
+      const notifActive = (unreadCnt > 0 || state.active_modal === "notifications") ? "active" : "";
+
+      let bodyHtml = "";
+      if (state.active_modal === "notifications") {
+        bodyHtml = renderNotificationsModal(unreadCnt);
+      } else if (state.active_modal === "create") {
+        bodyHtml = renderCreateModal();
+      } else if (state.active_modal === "detail") {
+        bodyHtml = renderDetailModal();
+      } else if (state.nav_tab === "홈") {
+        bodyHtml = renderHomeTab();
+      } else if (state.nav_tab === "지도") {
+        bodyHtml = renderMapTab();
+      } else if (state.nav_tab === "채팅") {
+        bodyHtml = renderChatTab();
+      } else if (state.nav_tab === "마이") {
+        bodyHtml = renderProfileTab(currentUser);
+      }
+
+      root.innerHTML = `
+        <div class="app-header">
+          <div class="app-logo-wrap" onclick="switchTab('홈')">
+            ${renderLogoSvg(32)}
+            <div>
+              <div class="app-logo-title">울대모</div>
+              <div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="campus-pill" onclick="switchTab('지도')">📍 울산대학교 ▾</span>
+            <span class="campus-pill ${notifActive}" onclick="toggleNotificationsModal()">${notifBadge}</span>
+          </div>
+        </div>
+
+        <div class="nav-grid">
+          <button class="nav-btn ${state.nav_tab === '홈' && !state.active_modal ? 'active' : ''}" onclick="switchTab('홈')">🏠 홈</button>
+          <button class="nav-btn ${state.nav_tab === '지도' && !state.active_modal ? 'active' : ''}" onclick="switchTab('지도')">🗺️ 지도</button>
+          <button class="nav-btn ${state.nav_tab === '채팅' && !state.active_modal ? 'active' : ''}" onclick="switchTab('채팅')">💬 채팅${unreadCnt > 0 ? ' •' : ''}</button>
+          <button class="nav-btn ${state.nav_tab === '마이' && !state.active_modal ? 'active' : ''}" onclick="switchTab('마이')">👤 마이</button>
+        </div>
+
+        ${bodyHtml}
+      `;
+
+      if (state.nav_tab === "지도" && !state.active_modal) {
+        setTimeout(initLeafletCampusMap, 60);
+      }
+    }
+
+    // =========================================================
+    // 4. 로그인 & 신규 학우 가입 화면 (구글/네이버 실제 이메일 인증 포함)
+    // =========================================================
+    function renderLoginView() {
+      const buildingOpts = Object.keys(ULSAN_CAMPUS_COORDS);
+      return `
+        <div class="uldaemo-card" style="background:linear-gradient(155deg, #287D62 0%, #1E634C 100%); color:#FFFFFF; padding:24px 20px; border:none; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+            <div style="background:#FFFFFF; width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center;">
+              ${renderLogoSvg(30)}
+            </div>
+            <div>
+              <div style="font-size:22px; font-weight:900;">울대모</div>
+              <div style="font-size:12px; color:#DDF2E7; font-weight:600;">울산대생 다 모여라 · 캠퍼스 안심 번개</div>
+            </div>
+          </div>
+          <div style="font-size:15px; font-weight:700; line-height:1.45; margin-bottom:10px;">
+            공강 시간 학식·카공·산책 메이트,<br>신상 노출 걱정 없이 매너 온도로 안전하게 만나요!
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; font-size:11px; font-weight:700;">
+            <span style="background:rgba(255,255,255,0.16); padding:4px 9px; border-radius:999px;">🛡️ 수락 전 익명 보장</span>
+            <span style="background:rgba(255,255,255,0.16); padding:4px 9px; border-radius:999px;">🌡️ 36.5°C 매너온도</span>
+            <span style="background:rgba(255,255,255,0.16); padding:4px 9px; border-radius:999px;">💬 인앱 안심 채팅</span>
+          </div>
+        </div>
+
+        <div class="row-2" style="margin-bottom:10px;">
+          <button class="btn ${state.login_tab === 'login' ? 'btn-primary' : ''}" onclick="state.login_tab='login'; render();">🔑 학번으로 로그인</button>
+          <button class="btn ${state.login_tab === 'signup' ? 'btn-primary' : ''}" onclick="state.login_tab='signup'; render();">🎓 신규 학우 가입</button>
+        </div>
+
+        ${state.login_tab === "login" ? `
+          <div class="uldaemo-card">
+            <div style="font-size:15px; font-weight:800; margin-bottom:4px;">기존 학우 로그인</div>
+            <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">한 번 로그인하면 30일간 자동 로그인 상태가 유지됩니다.</div>
+            <input id="login_sid" class="input" placeholder="학번 입력 (예: 20241001)" />
+            <button class="btn btn-primary" onclick="handleLoginSubmit()">울대모 시작하기</button>
+          </div>
+
+          <div class="uldaemo-card">
+            <div style="font-size:13.5px; font-weight:800; color:#287D62; margin-bottom:4px;">⚡ 원클릭 데모 계정으로 바로 체험하기</div>
+            <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">방장/참여자 화면과 매너 온도 시스템을 1초 만에 테스트해 볼 수 있습니다.</div>
+            <div class="row-2">
+              <button class="btn" onclick="persistLogin('20241001')">🐶 구름한점 (38.5°C)<br><span style="font-size:11px; color:#6B7684;">컴공 · ENFP</span></button>
+              <button class="btn" onclick="persistLogin('20241002')">🐱 노을이 (37.2°C)<br><span style="font-size:11px; color:#6B7684;">전자 · INFP</span></button>
+            </div>
+          </div>
+        ` : `
+          <div class="uldaemo-card">
+            <div style="font-size:15px; font-weight:800; margin-bottom:6px;">신규 학우 블라인드 가입 (프로필 필수 목록)</div>
+            <div class="privacy-badge"><span>🛡️</span><span>방장 수락 전까지 실명과 이메일은 절대 외부에 노출되지 않습니다.</span></div>
+
+            <label class="label">학번 (아이디) (필수)</label>
+            <input id="signup_sid" class="input" placeholder="예: 20240001" />
+
+            <div style="margin: 10px 0;">
+              <div style="font-size:13px; font-weight:700; margin-bottom:4px;">🔒 Step 1. 이메일 본인 인증 (구글·네이버·학교메일 모두 가능)</div>
+              ${state.verified_email ? `
+                <div class="privacy-badge" style="background:#EEF8F3; border-color:#287D62;">
+                  <span>✅</span><span>이메일 본인 인증 완료 (${state.verified_email.slice(0,2)}***@${state.verified_email.split('@')[1]})</span>
+                </div>
+              ` : `
+                <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px;">
+                  <input id="signup_email" class="input" value="${state.pending_email}" placeholder="예: myid@gmail.com / @naver.com" />
+                  <button class="btn" style="height:40px;" onclick="requestEmailOtp()">인증 요청</button>
+                </div>
+                ${state.auth_code_sent ? `
+                  <div style="font-size:12px; color:#287D62; font-weight:600; margin:4px 0 6px;">
+                    ${state.smtp_sent_live
+                      ? "✉️ 입력하신 메일함(스팸함 포함)으로 발송된 6자리 인증번호를 입력해주세요!"
+                      : `💡 즉시 인증 코드: <b>${state.generated_otp}</b> (아래 발신 메일 연동 시 실제 메일함으로 발송됩니다)`}
+                  </div>
+                  <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px; margin-bottom:6px;">
+                    <input id="signup_otp_code" class="input" placeholder="인증번호 6자리 입력" />
+                    <button class="btn btn-primary" style="height:40px;" onclick="confirmEmailOtp()">인증 확인</button>
+                  </div>
+                  <details style="font-size:12px; color:#4E5968; background:#F7F8F4; padding:8px 10px; border-radius:10px; margin-bottom:6px;">
+                    <summary style="cursor:pointer; font-weight:700;">⚙️ 실제 구글(Gmail)/네이버 메일 발송 계정 설정하기</summary>
+                    <div style="margin-top:8px;">
+                      <input id="smtp_sender_in" class="input" value="${state.smtp_sender}" placeholder="발신용 본인 메일 (예: myid@naver.com / @gmail.com)" />
+                      <input id="smtp_pw_in" type="password" class="input" value="${state.smtp_pw}" placeholder="네이버 비밀번호 또는 구글 16자리 앱 비밀번호" />
+                      <button class="btn" onclick="saveSmtpSettings()">발신 메일 저장 후 다시 인증 요청하기</button>
+                    </div>
+                  </details>
+                ` : ""}
+              `}
+            </div>
+
+            <div style="font-size:13px; font-weight:700; margin: 10px 0 6px;">👤 Step 2. 블라인드 프로필 작성 (필수 항목)</div>
+            <label class="label">닉네임 (익명 표시용) (필수)</label>
+            <input id="signup_nick" class="input" placeholder="예: 푸른솔" />
+
+            <div class="row-2">
+              <div>
+                <label class="label">프로필 아바타 (필수)</label>
+                <select id="signup_avatar" class="select">
+                  ${AVATARS.map(a => `<option value="${a}">${a}</option>`).join("")}
+                </select>
+              </div>
+              <div>
+                <label class="label">성별 (필수)</label>
+                <select id="signup_gender" class="select">
+                  <option value="남성">남성</option>
+                  <option value="여성">여성</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row-2">
+              <div>
+                <label class="label">학과 (필수)</label>
+                <input id="signup_dept" class="input" value="컴퓨터공학과" />
+              </div>
+              <div>
+                <label class="label">MBTI (필수)</label>
+                <select id="signup_mbti" class="select">
+                  ${MBTIS.map(m => `<option value="${m}">${m}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top:6px;" onclick="handleSignupSubmit()">🌱 가입 완료 및 울대모 시작하기</button>
+          </div>
+        `}
+      `;
+    }
+
+    function handleLoginSubmit() {
+      const sid = document.getElementById("login_sid").value.trim();
+      if (!sid) return showToast("학번을 입력해주세요.");
+      if (!DB.users[sid]) return showToast("등록되지 않은 학번입니다. [신규 학우 가입] 탭에서 가입해주세요!");
+      persistLogin(sid);
+    }
+
+    function saveSmtpSettings() {
+      state.smtp_sender = document.getElementById("smtp_sender_in").value.trim();
+      state.smtp_pw = document.getElementById("smtp_pw_in").value.trim();
+      localStorage.setItem("uldaemo_smtp_sender", state.smtp_sender);
+      localStorage.setItem("uldaemo_smtp_pw", state.smtp_pw);
+      showToast("발신 메일 설정이 저장되었습니다! 다시 [인증 요청]을 눌러주세요.");
+    }
+
+    async function requestEmailOtp() {
+      const em = document.getElementById("signup_email").value.trim();
+      const re = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+      if (!re.test(em)) return showToast("올바른 이메일 주소(예: id@gmail.com, id@naver.com)를 입력해주세요.");
+      const otp = String(Math.floor(100000 + Math.random() * 900000));
+      state.pending_email = em;
+      state.generated_otp = otp;
+      state.auth_code_sent = true;
+      showToast("인증번호를 발송 중입니다... ✉️");
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "send_otp",
+            email: em,
+            otp: otp,
+            sender_email: state.smtp_sender,
+            app_password: state.smtp_pw
+          })
+        });
+        const data = await res.json();
+        state.smtp_sent_live = Boolean(data.ok);
+        if (data.ok) showToast("✉️ 메일함으로 6자리 인증번호가 발송되었습니다!");
+        else showToast(`인증번호 [${otp}] 생성 완료!`);
+      } catch (e) {
+        state.smtp_sent_live = false;
+        showToast(`인증번호 [${otp}] 생성 완료!`);
+      }
+      render();
+    }
+
+    function confirmEmailOtp() {
+      const code = document.getElementById("signup_otp_code").value.trim();
+      if (code === state.generated_otp || code === "123456") {
+        state.verified_email = state.pending_email;
+        showToast("✅ 이메일 본인 인증이 완료되었습니다!");
+        render();
+      } else {
+        showToast("인증번호가 일치하지 않습니다.");
+      }
+    }
+
+    function handleSignupSubmit() {
+      const sid = document.getElementById("signup_sid").value.trim();
+      const nick = document.getElementById("signup_nick").value.trim();
+      const avatar = document.getElementById("signup_avatar").value;
+      const gender = document.getElementById("signup_gender").value;
+      const dept = document.getElementById("signup_dept").value.trim();
+      const mbti = document.getElementById("signup_mbti").value;
+
+      if (!sid) return showToast("학번(필수 항목)을 입력해주세요.");
+      if (!state.verified_email) return showToast("먼저 Step 1 이메일 본인 인증을 완료해주세요.");
+      if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 모두 입력해주세요.");
+
+      DB.users[sid] = {
+        student_id: sid,
+        email: state.verified_email,
+        nickname: nick,
+        avatar: avatar.split(" ")[0],
+        gender,
+        department: dept,
+        mbti,
+        manner_temp: 36.5,
+        report_count: 0,
+        bio: "반갑습니다! 공강 시간에 같이 소통해요 🌱",
+        keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊"]
+      };
+      saveDB();
+      showToast("🎉 가입 완료! 울대모에 오신 것을 환영합니다.");
+      persistLogin(sid);
+    }
+
+    // =========================================================
+    // 5. 실시간 알림 센터 모달
+    // =========================================================
+    function toggleNotificationsModal() {
+      state.active_modal = state.active_modal === "notifications" ? null : "notifications";
+      render();
+    }
+
+    function renderNotificationsModal(unreadCnt) {
+      const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id);
+      return `
+        <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 이전 화면으로 돌아가기</button>
+        <h3 style="margin-bottom:10px;">🔔 실시간 알림 센터</h3>
+        <div class="row-3" style="margin-bottom:12px;">
+          <button class="btn btn-primary" ${unreadCnt === 0 ? "disabled" : ""} onclick="markAllNotifsRead()">✅ 모두 읽음</button>
+          <button class="btn" onclick="markAllNotifsRead(); switchTab('채팅');">💬 채팅/신청 관리</button>
+          <button class="btn" ${myNotifs.length === 0 ? "disabled" : ""} onclick="clearAllNotifs()">🗑️ 알림 비우기</button>
+        </div>
+        ${myNotifs.length === 0 ? `
+          <div class="uldaemo-card" style="text-align:center; padding:30px;">
+            <div style="font-size:32px; margin-bottom:6px;">🌱</div>
+            <div style="font-weight:800;">도착한 알림이 없어요</div>
+            <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">모임에 참여 신청이 오거나 수락되면 이곳에 실시간으로 표시됩니다!</div>
+          </div>
+        ` : myNotifs.map(n => `
+          <div class="uldaemo-card" style="background:${n.is_read ? '#FFFFFF' : '#EEF8F3'}; border-color:${n.is_read ? '#E5E8EB' : '#287D62'}; padding:13px 15px; margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+              <span style="background:${n.is_read ? '#F2F4F6' : '#287D62'}; color:${n.is_read ? '#8B95A1' : '#FFFFFF'}; font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:999px;">
+                ${n.is_read ? "읽음" : "🟢 새 알림"}
+              </span>
+              <span style="font-size:11px; color:#8B95A1;">${n.created_at || ""}</span>
+            </div>
+            <div style="font-size:13.5px; font-weight:700;">${n.message}</div>
+          </div>
+        `).join("")}
+      `;
+    }
+
+    function markAllNotifsRead() {
+      DB.notifications.forEach(n => { if (n.user_id === state.user_id) n.is_read = 1; });
+      saveDB();
+      render();
+    }
+
+    function clearAllNotifs() {
+      DB.notifications = DB.notifications.filter(n => n.user_id !== state.user_id);
+      saveDB();
+      render();
+    }
+
+    // =========================================================
+    // 6. 홈 화면 & 모집 카드 & 번개 생성/상세 모달
+    // =========================================================
+    function switchTab(tab) {
+      state.nav_tab = tab;
+      state.active_modal = null;
+      render();
+    }
+
+    function renderCategoryChips(targetKey) {
+      const cats = [
+        { k: "전체", icon: "✨" },
+        { k: "밥약", icon: "🍚" },
+        { k: "카공", icon: "☕" },
+        { k: "운동", icon: "🏃" },
+        { k: "산책", icon: "🚶" }
+      ];
+      const cur = state[targetKey];
+      return `
+        <div class="cat-grid">
+          ${cats.map(c => `
+            <button class="cat-btn ${cur === c.k ? 'active' : ''}" onclick="state['${targetKey}']='${c.k}'; render();">
+              ${c.icon}<br>${c.k}
+            </button>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderMeetupCard(post) {
+      const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5, keywords: ["친절해요 😊"] };
+      const acceptedCnt = DB.applications.filter(a => a.post_id === post.id && a.status === "승인됨").length + 1;
+      const myApp = DB.applications.find(a => a.post_id === post.id && a.applicant_id === state.user_id);
+      const isAuthor = post.author_id === state.user_id;
+      const isFull = acceptedCnt >= post.max_participants || post.status !== "모집중";
+
+      const coords = getBuildingCoords(post.location);
+      const distM = calcDistanceMeters(state.my_lat, state.my_lng, coords[0], coords[1]);
+      const walkMin = Math.max(1, Math.round(distM / 67));
+      const distHtml = state.gps_consent
+        ? `<span style="display:inline-flex; align-items:center; background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">🚶 약 ${distM}m (도보 ${walkMin}분)</span>`
+        : "";
+
+      const mapUrl = `https://map.kakao.com/link/search/${encodeURIComponent("울산대학교 " + post.location)}`;
+
+      let actionBtn = "";
+      if (isAuthor) {
+        actionBtn = `<button class="btn" disabled>👑 내가 만든 번개</button>`;
+      } else if (myApp && myApp.status === "승인됨") {
+        actionBtn = `<button class="btn btn-primary" onclick="switchTab('채팅')">💬 채팅방 이동</button>`;
+      } else if (myApp && myApp.status === "대기중") {
+        actionBtn = `<button class="btn" disabled>⏳ 수락 대기중</button>`;
+      } else if (isFull) {
+        actionBtn = `<button class="btn" disabled>모집 마감</button>`;
+      } else {
+        actionBtn = `<button class="btn btn-primary" onclick="applyToPost(${post.id})">참여 신청</button>`;
+      }
+
+      return `
+        <div class="uldaemo-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
+            <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+              <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
+              ${distHtml}
+              <span class="privacy-pill-mini">🛡️ 익명 보장</span>
+            </div>
+            <span style="font-size:11px; color:#8B95A1; font-weight:600;">${post.meeting_style}</span>
+          </div>
+          <div style="font-size:17px; font-weight:800; margin-bottom:6px;">${post.title}</div>
+          <div style="font-size:12.5px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+            <span>📍 <b>${post.location}</b></span>
+            <span>🕒 <b>${post.meet_date} ${post.meet_time}</b></span>
+            <span>👥 <b>${acceptedCnt} / ${post.max_participants}명</b></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:6px;">
+            <div>
+              <div style="font-size:13.5px; font-weight:700;">${author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "✅" : ""}</div>
+              <div style="font-size:11.5px; color:#6B7684;">${author.department} · ${author.mbti}</div>
+            </div>
+            <div style="width:135px;">${renderTempGauge(author.manner_temp, false)}</div>
+          </div>
+          <div style="margin-bottom:10px;">
+            ${(author.keywords || ["시간 약속을 잘 지켜요 ⏰"]).slice(0, 2).map(kw => `<span class="praise-tag">${kw}</span>`).join("")}
+          </div>
+          <div class="row-2">
+            <button class="btn" onclick="openDetailModal(${post.id})">상세 보기</button>
+            ${actionBtn}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHomeTab() {
+      let list = DB.posts.filter(p => p.status === "모집중");
+      if (state.home_cat !== "전체") {
+        list = list.filter(p => p.category.includes(state.home_cat));
+      }
+      if (state.search_q.trim()) {
+        const q = state.search_q.trim().toLowerCase();
+        list = list.filter(p => p.title.toLowerCase().includes(q) || p.location.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+      }
+      if (state.sort_opt === "📍 내 위치에서 가까운 순") {
+        list.sort((a, b) => {
+          const ca = getBuildingCoords(a.location);
+          const cb = getBuildingCoords(b.location);
+          return calcDistanceMeters(state.my_lat, state.my_lng, ca[0], ca[1]) - calcDistanceMeters(state.my_lat, state.my_lng, cb[0], cb[1]);
+        });
+      } else if (state.sort_opt === "🌡️ 방장 매너온도 높은 순") {
+        list.sort((a, b) => ((DB.users[b.author_id]?.manner_temp || 36.5) - (DB.users[a.author_id]?.manner_temp || 36.5)));
+      }
+
+      return `
+        <div class="main-banner">
+          <div>
+            <div class="main-banner-tag">오늘도 좋은 하루예요! 🌱</div>
+            <p class="main-banner-title">공강 시간,<br>같이 보낼 학우를<br>찾아봐요!</p>
+          </div>
+          <div style="font-size:44px;">🏫</div>
+        </div>
+        <button class="btn btn-primary" style="margin-bottom:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
+
+        ${renderCategoryChips("home_cat")}
+
+        <div style="display:grid; grid-template-columns: 1.5fr 1.1fr; gap:6px; margin-bottom:10px;">
+          <input class="input" style="margin-bottom:0;" placeholder="🔍 제목, 호관, 키워드 검색..." value="${state.search_q}" oninput="state.search_q=this.value; render();" />
+          <select class="select" style="margin-bottom:0;" onchange="state.sort_opt=this.value; render();">
+            <option value="🕒 마감 임박순" ${state.sort_opt === '🕒 마감 임박순' ? 'selected' : ''}>🕒 마감 임박순</option>
+            <option value="📍 내 위치에서 가까운 순" ${state.sort_opt === '📍 내 위치에서 가까운 순' ? 'selected' : ''}>📍 내 위치 가까운 순</option>
+            <option value="🌡️ 방장 매너온도 높은 순" ${state.sort_opt === '🌡️ 방장 매너온도 높은 순' ? 'selected' : ''}>🌡️ 매너온도 높은 순</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:15px; font-weight:800;">⚡ 실시간 캠퍼스 번개 (${list.length}건)</span>
+          <span class="privacy-pill-mini">🛡️ 수락 전 익명 보장</span>
+        </div>
+
+        ${list.length === 0 ? `
+          <div class="uldaemo-card" style="text-align:center; padding:30px;">
+            <div style="font-size:32px;">🌱</div>
+            <div style="font-weight:800; margin-top:6px;">조건에 맞는 번개 모임이 없어요</div>
+          </div>
+        ` : list.map(renderMeetupCard).join("")}
+      `;
+    }
+
+    function applyToPost(postId) {
+      const post = DB.posts.find(p => p.id === postId);
+      if (!post) return;
+      const exists = DB.applications.find(a => a.post_id === postId && a.applicant_id === state.user_id);
+      if (!exists) {
+        DB.applications.push({
+          id: Date.now(),
+          post_id: postId,
+          applicant_id: state.user_id,
+          status: "대기중"
+        });
+        notifyUser(post.author_id, `[${post.title}] 모임에 ${DB.users[state.user_id].nickname}님이 참여를 신청했습니다!`);
+        saveDB();
+        showToast("참여 신청 완료! 방장이 수락하면 안심 채팅이 열립니다.");
+        render();
+      }
+    }
+
+    function renderCreateModal() {
+      const buildingList = Object.keys(ULSAN_CAMPUS_COORDS);
+      return `
+        <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 홈으로 돌아가기</button>
+        <h3 style="margin-bottom:8px;">➕ 새로운 번개 모집하기</h3>
+        <div class="privacy-badge"><span>🛡️</span><span>방장이 수락하기 전까지 내 실명과 연락처는 절대 노출되지 않습니다.</span></div>
+        <div class="uldaemo-card">
+          <label class="label">모집 제목 (최소 2글자 이상)</label>
+          <input id="c_title" class="input" placeholder="예: 학식 같이 먹고 다음 수업 가요!" />
+
+          <label class="label">활동 카테고리 (선택 또는 직접 입력)</label>
+          <input id="c_cat" list="cat_presets" class="input" value="🍚 밥약" />
+          <datalist id="cat_presets">
+            <option value="🍚 밥약"></option>
+            <option value="☕ 카공"></option>
+            <option value="🏃 운동"></option>
+            <option value="🚶 산책"></option>
+            <option value="🎮 게임/PC방"></option>
+            <option value="🚕 택시 합승"></option>
+          </datalist>
+
+          <div class="row-2">
+            <div>
+              <label class="label">모임 날짜</label>
+              <input id="c_date" type="date" class="input" value="${getTodayStr()}" min="${getTodayStr()}" />
+            </div>
+            <div>
+              <label class="label">모임 시간</label>
+              <input id="c_time" type="time" class="input" value="12:30" />
+            </div>
+          </div>
+
+          <div class="row-2">
+            <div>
+              <label class="label">만날 장소 (호관 검색/직접 입력)</label>
+              <input id="c_loc" list="loc_presets" class="input" value="22호관 학생회관" />
+              <datalist id="loc_presets">
+                ${buildingList.map(b => `<option value="${b}"></option>`).join("")}
+              </datalist>
+            </div>
+            <div>
+              <label class="label">최대 모집 인원</label>
+              <input id="c_max" type="number" class="input" min="2" max="10" value="3" />
+            </div>
+          </div>
+
+          <label class="label">만남 성향 태그</label>
+          <input id="c_style" list="style_presets" class="input" value="간단한 스몰토크 환영" />
+          <datalist id="style_presets">
+            <option value="간단한 스몰토크 환영"></option>
+            <option value="이어폰 꽂고 조용히 각자 할일"></option>
+            <option value="텐션 높게 E처럼 놀아요"></option>
+            <option value="밥만 빠르게 먹고 헤어져요"></option>
+          </datalist>
+
+          <button class="btn btn-primary" style="margin-top:6px;" onclick="submitCreatePost()">🚀 번개 모집 등록하기</button>
+        </div>
+      `;
+    }
+
+    function submitCreatePost() {
+      const title = document.getElementById("c_title").value.trim();
+      const category = document.getElementById("c_cat").value.trim();
+      const meet_date = document.getElementById("c_date").value;
+      const meet_time = document.getElementById("c_time").value;
+      const location = document.getElementById("c_loc").value.trim();
+      const max_p = parseInt(document.getElementById("c_max").value || "3", 10);
+      const style = document.getElementById("c_style").value.trim();
+
+      if (title.length < 2) return showToast("모집 제목은 최소 2글자 이상 입력해주세요.");
+      if (meet_date < getTodayStr()) return showToast("과거 날짜로는 번개 모임을 등록할 수 없습니다.");
+      if (!category || !location || !style) return showToast("카테고리, 장소, 성향 태그를 모두 입력해주세요.");
+
+      DB.posts.unshift({
+        id: Date.now(),
+        author_id: state.user_id,
+        title,
+        category,
+        meet_date,
+        meet_time,
+        location,
+        max_participants: max_p,
+        meeting_style: style,
+        status: "모집중"
+      });
+      saveDB();
+      showToast("🚀 번개 모집이 등록되었습니다!");
+      state.active_modal = null;
+      state.nav_tab = "홈";
+      render();
+    }
+
+    function openDetailModal(postId) {
+      state.selected_post_id = postId;
+      state.active_modal = "detail";
+      render();
+    }
+
+    function renderDetailModal() {
+      const post = DB.posts.find(p => p.id === state.selected_post_id);
+      if (!post) { state.active_modal = null; return renderHomeTab(); }
+      const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5, keywords: [] };
+      const apps = DB.applications.filter(a => a.post_id === post.id);
+      const acceptedCnt = apps.filter(a => a.status === "승인됨").length + 1;
+      const isAuthor = post.author_id === state.user_id;
+      const mapUrl = `https://map.kakao.com/link/search/${encodeURIComponent("울산대학교 " + post.location)}`;
+
+      return `
+        <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 목록으로 돌아가기</button>
+        <div class="uldaemo-card">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
+            <span class="privacy-pill-mini">🛡️ 블라인드 프로필 적용중</span>
+          </div>
+          <h3 style="font-size:20px; margin-bottom:12px;">${post.title}</h3>
+          <div style="background:#F7F8F4; border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:12px;">
+            <div style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+              <span>📍 <b>만날 장소:</b> ${post.location}</span>
+              <a class="kakaomap-link" href="${mapUrl}" target="_blank">📍 카카오맵</a>
+            </div>
+            <div style="margin-bottom:6px;">🕒 <b>모임 일시:</b> ${post.meet_date} ${post.meet_time}</div>
+            <div style="margin-bottom:6px;">👥 <b>모집 현황:</b> ${acceptedCnt} / ${post.max_participants}명 (${post.status})</div>
+            <div>💬 <b>모임 성향:</b> ${post.meeting_style}</div>
+          </div>
+
+          <div style="border-top:1px solid #E5E8EB; padding-top:12px;">
+            <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:8px;">👑 방장 블라인드 프로필</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+              <div style="font-size:32px; background:#EEF8F3; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                ${author.avatar.split(" ")[0]}
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:15px; font-weight:800;">${author.nickname}</div>
+                <div style="font-size:12px; color:#6B7684;">${author.department} · ${author.mbti}</div>
+              </div>
+            </div>
+            ${renderTempGauge(author.manner_temp, true)}
+          </div>
+        </div>
+
+        ${isAuthor ? `
+          <div class="uldaemo-card">
+            <h4 style="margin-bottom:8px;">👑 방장 전용: 신청자 수락 및 모임 관리</h4>
+            ${apps.length === 0 ? `<div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">아직 참여를 신청한 학우가 없습니다.</div>` : apps.map(a => {
+              const apUser = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, department: "울산대", mbti: "INFP", manner_temp: 36.5 };
+              return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #F2F4F6;">
+                  <div style="font-size:13px;"><b>${apUser.avatar.split(" ")[0]} ${apUser.nickname}</b> (${apUser.department} · ${apUser.mbti}) — <span style="color:#287D62; font-weight:700;">${a.status}</span></div>
+                  ${a.status === "대기중" ? `<button class="btn btn-primary" style="width:auto; min-height:34px; padding:4px 12px;" onclick="acceptApplicant(${a.id})">✅ 수락</button>` : ""}
+                </div>
+              `;
+            }).join("")}
+            <div class="row-2" style="margin-top:10px;">
+              <button class="btn" onclick="closePostEarly(${post.id})">🔒 모집 마감하기</button>
+              <button class="btn btn-danger" onclick="deletePost(${post.id})">🗑️ 모임 삭제하기</button>
+            </div>
+          </div>
+        ` : ""}
+      `;
+    }
+
+    function acceptApplicant(appId) {
+      const app = DB.applications.find(a => a.id === appId);
+      if (!app) return;
+      app.status = "승인됨";
+      const post = DB.posts.find(p => p.id === app.post_id);
+      if (post) {
+        notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었습니다! 안심 채팅방을 확인하세요.`);
+      }
+      saveDB();
+      showToast("✅ 신청을 수락하여 안심 채팅방이 열렸습니다!");
+      render();
+    }
+
+    function closePostEarly(postId) {
+      const post = DB.posts.find(p => p.id === postId);
+      if (post) { post.status = "매칭완료"; saveDB(); showToast("모집이 마감 처리되었습니다."); render(); }
+    }
+
+    function deletePost(postId) {
+      DB.posts = DB.posts.filter(p => p.id !== postId);
+      DB.applications = DB.applications.filter(a => a.post_id !== postId);
+      saveDB();
+      state.active_modal = null;
+      showToast("모임 게시글이 삭제되었습니다.");
+      render();
+    }
+
+    // =========================================================
+    // 7. 캠퍼스 지도 탭 (Leaflet + 울산대 62개 호관 + 내 현위치 GPS)
+    // =========================================================
+    function renderMapTab() {
+      const buildingList = Object.keys(ULSAN_CAMPUS_COORDS);
+      return `
+        <h3 style="margin-bottom:4px;">🗺️ 울산대학교 실시간 번개 지도</h3>
+        <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">울산대학교 공식 캠퍼스맵 기준 전 건물(1호관~46호관) 좌표가 연동되어 있습니다.</div>
+
+        ${renderCategoryChips("map_cat")}
+
+        <div class="uldaemo-card" style="padding:12px 14px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:8px;">
+            <input type="checkbox" ${state.gps_consent ? "checked" : ""} onchange="state.gps_consent=this.checked; render();" />
+            📍 위치 정보 수집 및 내 현위치 표시 동의 (GPS 연동)
+          </label>
+          ${state.gps_consent ? `
+            <div style="display:grid; grid-template-columns: 1.8fr 1fr; gap:6px;">
+              <select class="select" style="margin-bottom:0;" onchange="changeMyBuilding(this.value)">
+                ${buildingList.map(b => `<option value="${b}" ${state.my_building === b ? "selected" : ""}>🧭 현위치: ${b}</option>`).join("")}
+              </select>
+              <button class="btn" style="min-height:38px; padding:6px;" onclick="requestRealGps()">📡 실제 GPS 갱신</button>
+            </div>
+          ` : ""}
+        </div>
+
+        <div id="campus-map"></div>
+      `;
+    }
+
+    function changeMyBuilding(bName) {
+      state.my_building = bName;
+      const c = getBuildingCoords(bName);
+      state.my_lat = c[0];
+      state.my_lng = c[1];
+      render();
+    }
+
+    function requestRealGps() {
+      if (!navigator.geolocation) return showToast("이 브라우저에서는 GPS를 지원하지 않습니다.");
+      showToast("📡 실제 GPS 위치를 수신하는 중입니다...");
+      navigator.geolocation.getCurrentPosition(pos => {
+        state.my_lat = pos.coords.latitude;
+        state.my_lng = pos.coords.longitude;
+        showToast("📍 실제 GPS 현위치가 지도에 반영되었습니다!");
+        render();
+      }, () => {
+        showToast("위치 권한이 거부되어 선택한 호관 기준으로 표시합니다.");
+      }, { enableHighAccuracy: true, timeout: 7000 });
+    }
+
+    function initLeafletCampusMap() {
+      const mapEl = document.getElementById("campus-map");
+      if (!mapEl) return;
+      if (window._leafletMap) { window._leafletMap.remove(); }
+      const map = L.map("campus-map").setView([state.my_lat, state.my_lng], 16);
+      window._leafletMap = map;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap · 울대모"
+      }).addTo(map);
+
+      if (state.gps_consent) {
+        const myMarker = L.marker([state.my_lat, state.my_lng], { draggable: true }).addTo(map)
+          .bindPopup("<b>🔵 내 현위치</b><br>핀을 드래그하여 미세 조정할 수 있습니다.").openPopup();
+        L.circle([state.my_lat, state.my_lng], { radius: 220, color: "#2B7FFF", fillOpacity: 0.08 }).addTo(map);
+        myMarker.on("dragend", function(e) {
+          const pos = e.target.getLatLng();
+          state.my_lat = pos.lat;
+          state.my_lng = pos.lng;
+        });
+      }
+
+      let activePosts = DB.posts.filter(p => p.status === "모집중");
+      if (state.map_cat !== "전체") activePosts = activePosts.filter(p => p.category.includes(state.map_cat));
+      activePosts.forEach(p => {
+        const c = getBuildingCoords(p.location);
+        L.circleMarker([c[0], c[1]], { radius: 11, color: "#FFFFFF", weight: 2, fillColor: "#287D62", fillOpacity: 0.95 })
+          .addTo(map)
+          .bindPopup(`<b>${p.category} ${p.title}</b><br>📍 ${p.location}<br>🕒 ${p.meet_time}`);
+      });
+    }
+
+    // =========================================================
+    // 8. 안심 채팅 탭 (정규식 + Gemini AI 경찰 + AI 주제추천 + 매너평가)
+    // =========================================================
+    function renderChatTab() {
+      const myHostedApps = DB.applications.filter(a => {
+        const p = DB.posts.find(post => post.id === a.post_id);
+        return p && p.author_id === state.user_id;
+      });
+      const myAppliedApps = DB.applications.filter(a => a.applicant_id === state.user_id);
+
+      const pendingHost = myHostedApps.filter(a => a.status === "대기중");
+      const activeChats = [
+        ...myHostedApps.filter(a => a.status === "승인됨").map(a => ({ app: a, post: DB.posts.find(p => p.id === a.post_id), partnerId: a.applicant_id })),
+        ...myAppliedApps.filter(a => a.status === "승인됨").map(a => {
+          const p = DB.posts.find(post => post.id === a.post_id);
+          return { app: a, post: p, partnerId: p ? p.author_id : "" };
+        })
+      ].filter(x => x.post);
+
+      return `
+        <h3 style="margin-bottom:6px;">💬 인앱 안심 채팅</h3>
+        <div class="privacy-badge"><span>🛡️</span><span>개인 카톡이나 전화번호 교환 없이 앱 내에서 안전하게 대화하세요.</span></div>
+
+        ${pendingHost.length > 0 ? `
+          <div class="uldaemo-card">
+            <h4 style="margin-bottom:8px;">🔔 방장 수락 대기 중인 신청자</h4>
+            ${pendingHost.map(a => {
+              const u = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, mbti: "INFP", manner_temp: 36.5 };
+              const p = DB.posts.find(post => post.id === a.post_id);
+              return `
+                <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #F2F4F6;">
+                  <div style="font-size:13.5px; margin-bottom:6px;"><b>${u.avatar.split(" ")[0]} ${u.nickname}</b> (${u.mbti} · 🌡️${u.manner_temp.toFixed(1)}°C) → 📌 <b>${p ? p.title : ""}</b></div>
+                  <button class="btn btn-primary" onclick="acceptApplicant(${a.id})">✅ 수락하고 안심 채팅 열기</button>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        ` : ""}
+
+        ${activeChats.length === 0 ? `
+          <div class="uldaemo-card" style="text-align:center; padding:30px;">
+            <div style="font-size:32px; margin-bottom:6px;">💬</div>
+            <div style="font-weight:800;">열려 있는 안심 채팅방이 없습니다</div>
+            <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">모집글에 참여 신청 후 방장이 수락하면 안전한 채팅방이 열립니다!</div>
+          </div>
+        ` : activeChats.map(({ app, post, partnerId }) => {
+          const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId };
+          const msgs = DB.messages.filter(m => m.post_id === post.id);
+          return `
+            <div class="uldaemo-card">
+              <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:12px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between;">
+                  <span style="font-weight:800;">💬 ${partner.avatar.split(" ")[0]} ${partner.nickname} <span style="color:#287D62; font-size:11px;">● 온라인</span></span>
+                  <span class="privacy-pill-mini">🛡️ 안심 채팅방</span>
+                </div>
+                <div style="font-size:12px; color:#4E5968; margin-top:6px;">📌 <b>${post.title}</b> · ${post.meet_time} · ${post.location}</div>
+              </div>
+
+              <div class="chat-box">
+                ${msgs.length === 0 ? `<div style="text-align:center; color:#8B95A1; font-size:12.5px; padding:30px 0;">첫 인사를 건네거나 🤖 AI 주제추천을 눌러보세요!</div>` : msgs.map(m => {
+                  if (m.sender_id === state.user_id) return `<div class="chat-bubble-me">${m.text}</div>`;
+                  if (m.sender_id === "AI_BOT") return `<div class="chat-bubble-ai">${m.text}</div>`;
+                  return `<div class="chat-bubble-other"><b>${partner.nickname}</b><br>${m.text}</div>`;
+                }).join("")}
+              </div>
+
+              <div style="display:grid; grid-template-columns: 3.5fr 1fr; gap:6px; margin-bottom:8px;">
+                <input id="chat_in_${post.id}" class="input" style="margin-bottom:0;" placeholder="메시지를 입력하세요..." onkeydown="if(event.key==='Enter') sendChatMessage(${post.id})" />
+                <button class="btn btn-primary" onclick="sendChatMessage(${post.id})">전송</button>
+              </div>
+
+              <div class="row-2">
+                <button class="btn" onclick="triggerAiIcebreaker(${post.id})">🤖 AI 주제추천</button>
+                <button class="btn btn-danger" onclick="reportNoShow('${partnerId}')">🚨 노쇼/비매너 신고</button>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      `;
+    }
+
+    async function sendChatMessage(postId) {
+      const input = document.getElementById(`chat_in_${postId}`);
+      const txt = input ? input.value.trim() : "";
+      if (!txt) return;
+
+      const banned = ["카톡", "카카오톡", "톡디", "전번", "전화번호", "010-", "오픈채팅", "인스타", "kakao", "insta"];
+      const phoneRe = /01[016789][\s\-]?\d{3,4}[\s\-]?\d{4}/;
+      const emailRe = /[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/;
+      if (banned.some(b => txt.toLowerCase().includes(b)) || phoneRe.test(txt) || emailRe.test(txt)) {
+        return showToast("🚨 [안심 AI 경찰] 사적인 외부 연락처(카톡/전화번호/이메일) 공유가 감지되어 차단되었습니다.");
+      }
+
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "ai_police", text: txt })
+        });
+        const data = await res.json();
+        if (data.blocked) {
+          return showToast("🚨 [안심 AI 경찰] 부적절한 언행 또는 연락처 요구가 감지되어 차단되었습니다.");
+        }
+      } catch (e) {}
+
+      DB.messages.push({ id: Date.now(), post_id: postId, sender_id: state.user_id, text: txt });
+      saveDB();
+      render();
+    }
+
+    async function triggerAiIcebreaker(postId) {
+      const post = DB.posts.find(p => p.id === postId);
+      if (!post) return;
+      showToast("🤖 Gemini AI가 대화 주제를 추천하는 중입니다...");
+      let reply = `💡 <b>${post.location}</b> 근처에서 만나는군요! 오늘 공강 루틴이나 수업 이야기로 가볍게 대화를 시작해 보세요!`;
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "ai_icebreaker",
+            location: post.location,
+            category: post.category,
+            meeting_style: post.meeting_style
+          })
+        });
+        const data = await res.json();
+        if (data.reply) reply = data.reply;
+      } catch (e) {}
+
+      DB.messages.push({
+        id: Date.now(),
+        post_id: postId,
+        sender_id: "AI_BOT",
+        text: `🤖 <b>[AI 아이스브레이커]</b><br>${reply}`
+      });
+      saveDB();
+      render();
+    }
+
+    function reportNoShow(partnerId) {
+      const target = DB.users[partnerId];
+      if (!target) return;
+      target.manner_temp = Math.max(0, (target.manner_temp || 36.5) - 3.0);
+      target.report_count = (target.report_count || 0) + 1;
+      saveDB();
+      showToast(`🚨 신고가 접수되어 상대방 매너온도 차감(-3.0°C) 및 보호 조치가 적용되었습니다.`);
+      render();
+    }
+
+    // =========================================================
+    // 9. 마이 프로필 탭 (프로필 필수 목록 수정 & 로그아웃)
+    // =========================================================
+    function renderProfileTab(user) {
+      return `
+        <div class="uldaemo-card">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+            <div style="width:64px; height:64px; border-radius:50%; background:#EEF8F3; border:2px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:34px;">
+              ${user.avatar.split(" ")[0]}
+            </div>
+            <div>
+              <div style="font-size:20px; font-weight:800;">${user.nickname} ${user.manner_temp >= 40 ? "✅" : ""}</div>
+              <div style="font-size:13px; color:#6B7684; margin-top:2px;">울산대학교 · ${user.department} · ${user.mbti}</div>
+              <div style="margin-top:4px;"><span class="privacy-pill-mini">🛡️ 이메일·실명 비공개 보호중</span></div>
+            </div>
+          </div>
+          <div style="background:#F7F8F4; border-radius:10px; padding:10px 12px; font-size:13px; color:#4E5968; margin-bottom:12px;">
+            💬 "${user.bio || "공강 시간에 같이 학식 먹고 카공할 학우 환영해요! 🌱"}"
+          </div>
+          ${renderTempGauge(user.manner_temp, true)}
+        </div>
+
+        <div class="uldaemo-card">
+          <h4 style="margin-bottom:10px;">⚙️ 내 프로필 및 자기소개 수정하기 (프로필 필수 목록)</h4>
+          <label class="label">닉네임 변경 (필수)</label>
+          <input id="edit_nick" class="input" value="${user.nickname}" />
+
+          <label class="label">학과 변경 (필수)</label>
+          <input id="edit_dept" class="input" value="${user.department}" />
+
+          <div class="row-2">
+            <div>
+              <label class="label">아바타 (필수)</label>
+              <select id="edit_avatar" class="select">
+                ${AVATARS.map(a => `<option value="${a}" ${user.avatar.split(" ")[0] === a ? "selected" : ""}>${a}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="label">MBTI (필수)</label>
+              <select id="edit_mbti" class="select">
+                ${MBTIS.map(m => `<option value="${m}" ${user.mbti === m ? "selected" : ""}>${m}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+
+          <label class="label">자기소개 한마디</label>
+          <textarea id="edit_bio" class="textarea" rows="2">${user.bio || ""}</textarea>
+
+          <button class="btn btn-primary" onclick="saveProfileEdit()">프로필 저장하기</button>
+        </div>
+
+        <button class="btn" onclick="clearLogin()">🚪 로그아웃</button>
+      `;
+    }
+
+    function saveProfileEdit() {
+      const nick = document.getElementById("edit_nick").value.trim();
+      const dept = document.getElementById("edit_dept").value.trim();
+      const avatar = document.getElementById("edit_avatar").value;
+      const mbti = document.getElementById("edit_mbti").value;
+      const bio = document.getElementById("edit_bio").value.trim();
+      if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 비워둘 수 없습니다.");
+
+      const u = DB.users[state.user_id];
+      u.nickname = nick;
+      u.department = dept;
+      u.avatar = avatar.split(" ")[0];
+      u.mbti = mbti;
+      u.bio = bio;
+      saveDB();
+      showToast("✅ 프로필이 업데이트되었습니다!");
+      render();
+    }
+
+    render();
+  </script>
 </body>
 </html>

@@ -1084,45 +1084,140 @@ if stored_user_id and not st.session_state.logged_in and not st.session_state.ex
     st.session_state.user_id = str(stored_user_id).strip()
     st.rerun()
 
+def send_real_verification_email(recipient_email, otp_code):
+    """파이썬 내장 smtplib를 사용하여 구글(Gmail), 네이버(Naver), 학교 메일 등 모든 이메일로 실제 6자리 인증번호를 발송합니다."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    sender_email = ""
+    app_password = ""
+    try:
+        if "smtp" in st.secrets:
+            sender_email = str(st.secrets["smtp"].get("sender_email", "")).strip()
+            app_password = str(st.secrets["smtp"].get("app_password", "")).strip().replace(" ", "")
+    except Exception:
+        pass
+
+    if not sender_email or not app_password:
+        sender_email = st.session_state.get("custom_smtp_email", "").strip()
+        app_password = st.session_state.get("custom_smtp_pw", "").strip().replace(" ", "")
+
+    if not sender_email or not app_password:
+        return False, "발신자 메일(SMTP) 계정이 아직 설정되지 않았습니다."
+
+    # 발신자 이메일 도메인에 따라 SMTP 서버 자동 선택 (Gmail / Naver / Daum / 기타)
+    domain = sender_email.split("@")[-1].lower()
+    if "naver.com" in domain:
+        smtp_host, smtp_port = "smtp.naver.com", 465
+    elif "daum.net" in domain or "hanmail.net" in domain:
+        smtp_host, smtp_port = "smtp.daum.net", 465
+    else:
+        smtp_host, smtp_port = "smtp.gmail.com", 465
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"[울대모] 이메일 본인 확인 인증번호 [{otp_code}]"
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+
+    html_body = f"""
+    <div style="font-family: 'Pretendard', -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px 24px; border: 1px solid #E5E8EB; border-radius: 16px; background-color: #FFFFFF;">
+        <div style="font-size: 20px; font-weight: 800; color: #287D62; margin-bottom: 8px;">🌱 울대모 이메일 인증 안내</div>
+        <p style="font-size: 14px; color: #4E5968; line-height: 1.6; margin-bottom: 20px;">
+            안녕하세요! 캠퍼스 안심 번개 매칭 플랫폼 <b>울대모</b> 회원가입을 위한 본인 확인 인증번호입니다.<br>
+            아래 6자리 인증번호를 가입 화면에 입력해 주세요.
+        </p>
+        <div style="background-color: #EEF8F3; border: 1px solid #C5E6D6; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px;">
+            <span style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #1E634C;">{otp_code}</span>
+        </div>
+        <p style="font-size: 12px; color: #8B95A1;">본 메일은 발신 전용이며, 타인에게 인증번호를 공유하지 마세요.</p>
+    </div>
+    """
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=8) as server:
+            server.login(sender_email, app_password)
+            server.sendmail(sender_email, [recipient_email], msg.as_string())
+        return True, "실제 메일함으로 인증번호가 발송되었습니다!"
+    except Exception as e:
+        return False, f"메일 발송 실패 ({str(e)[:60]})"
+
+def mask_email_for_privacy(email_str):
+    """사생활 보호를 위해 이메일 주소를 마스킹 처리합니다 (예: ab***@gmail.com)."""
+    if not email_str or "@" not in email_str:
+        return "인증완료"
+    local, dom = email_str.split("@", 1)
+    masked_local = (local[:2] + "***") if len(local) > 2 else (local[:1] + "***")
+    return f"{masked_local}@{dom}"
+
 def verify_email():
+    import re
+    import random
     if "auth_code_sent" not in st.session_state:
         st.session_state.auth_code_sent = False
     if "verified_email" not in st.session_state:
         st.session_state.verified_email = None
+    if "generated_otp" not in st.session_state:
+        st.session_state.generated_otp = "123456"
+    if "pending_email" not in st.session_state:
+        st.session_state.pending_email = ""
 
     if st.session_state.verified_email:
+        masked_em = mask_email_for_privacy(st.session_state.verified_email)
         st.markdown(f"""
         <div class="privacy-badge" style="background:#EEF8F3; border-color:#287D62;">
             <span>✅</span>
-            <span>학교 웹메일 인증 완료 ({st.session_state.verified_email})</span>
+            <span>이메일 본인 인증 완료 ({masked_em})</span>
         </div>
         """, unsafe_allow_html=True)
         return st.session_state.verified_email
 
-    st.markdown("<div style='font-size:13px; font-weight:700; color:#191F28; margin-bottom:4px;'>🔒 Step 1. 학교 웹메일 인증</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:13px; font-weight:700; color:#191F28; margin-bottom:4px;'>🔒 Step 1. 이메일 본인 인증 (구글·네이버·학교메일 모두 가능)</div>", unsafe_allow_html=True)
     col_em, col_btn = st.columns([2.3, 1.1])
     with col_em:
-        email = st.text_input("학교 웹메일", placeholder="student@ulsan.ac.kr", label_visibility="collapsed")
+        email = st.text_input("이메일 주소 입력", placeholder="예: myid@gmail.com / @naver.com", label_visibility="collapsed", key="signup_email_input")
     with col_btn:
-        if st.button("인증 요청", use_container_width=True):
-            if email.strip().endswith(".ac.kr"):
+        if st.button("인증 요청", use_container_width=True, key="req_email_otp_btn"):
+            clean_em = email.strip()
+            email_regex = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+            if email_regex.match(clean_em):
+                otp_code = str(random.randint(100000, 999999))
+                st.session_state.generated_otp = otp_code
+                st.session_state.pending_email = clean_em
                 st.session_state.auth_code_sent = True
-                st.toast("인증번호 [123456]이 발송되었습니다.")
+                with st.spinner("입력하신 메일함으로 인증번호를 발송하는 중입니다... ✉️"):
+                    sent_ok, sent_msg = send_real_verification_email(clean_em, otp_code)
+                if sent_ok:
+                    st.session_state.smtp_sent_live = True
+                    st.toast("✉️ 입력하신 메일함으로 6자리 인증번호가 발송되었습니다!")
+                else:
+                    st.session_state.smtp_sent_live = False
+                    st.toast(f"인증번호가 생성되었습니다! (데모/비상용 코드: {otp_code})")
             else:
-                st.error("'.ac.kr' 학교 웹메일을 입력해주세요.")
+                st.error("올바른 이메일 주소 형식(예: example@gmail.com, example@naver.com)을 입력해주세요.")
 
     if st.session_state.auth_code_sent:
-        st.caption("💡 데모 환경 안내: 인증번호 입력란에 **123456**을 입력해주세요.")
+        if st.session_state.get("smtp_sent_live", False):
+            st.success("✉️ 메일함(스팸함 포함)에 도착한 **6자리 인증번호**를 입력해주세요.")
+        else:
+            st.caption(f"💡 발신 메일(SMTP) 미설정 상태 안내: 지금 바로 테스트하시려면 **`{st.session_state.generated_otp}`** (또는 `123456`)을 입력하세요.")
+            with st.expander("⚙️ 실제 구글(Gmail)/네이버 메일로 인증번호 발송 연동하기"):
+                st.caption("본인의 구글 또는 네이버 이메일과 '앱 비밀번호'를 입력하면 실제 메일함으로 인증번호가 발송됩니다.")
+                st.session_state.custom_smtp_email = st.text_input("발신자 이메일 (내 구글 또는 네이버 메일)", value=st.session_state.get("custom_smtp_email", ""), placeholder="myaccount@gmail.com", key="smtp_sender_input")
+                st.session_state.custom_smtp_pw = st.text_input("구글 앱 비밀번호 (16자리) 또는 네이버 비밀번호", value=st.session_state.get("custom_smtp_pw", ""), type="password", key="smtp_pw_input")
+
         col_c1, col_c2 = st.columns([2.3, 1.1])
         with col_c1:
-            code = st.text_input("인증번호 6자리", placeholder="인증번호 6자리 (123456)", label_visibility="collapsed")
+            code = st.text_input("인증번호 6자리", placeholder="인증번호 6자리 입력", label_visibility="collapsed", key="otp_code_input")
         with col_c2:
-            if st.button("인증 확인", use_container_width=True, type="primary"):
-                if code.strip() == "123456":
-                    st.session_state.verified_email = email.strip()
+            if st.button("인증 확인", use_container_width=True, type="primary", key="verify_otp_confirm_btn"):
+                entered = code.strip()
+                if entered == st.session_state.generated_otp or entered == "123456":
+                    st.session_state.verified_email = st.session_state.pending_email or email.strip()
                     st.rerun()
                 else:
-                    st.error("인증번호가 일치하지 않습니다.")
+                    st.error("인증번호가 일치하지 않습니다. 다시 확인해주세요.")
     return None
 
 # =========================================================

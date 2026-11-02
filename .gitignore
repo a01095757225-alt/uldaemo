@@ -1,0 +1,9 @@
+mingit/
+*.db
+__pycache__/
+.streamlit/secrets.toml
+fix.py
+make_ppt.py
+migrate.py
+uldaemo_presentation.pptx
+기프 실습/
