@@ -7,8 +7,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-DEFAULT_SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "")
-DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+DEFAULT_SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "uldaemo.official@gmail.com")
+DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "knxqjnrestyggctq")
 
 
 def call_gemini_api(prompt: str) -> str:
