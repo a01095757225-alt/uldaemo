@@ -35,32 +35,38 @@
       background-color: var(--bg);
       color: var(--text-main);
       line-height: 1.45;
-      padding-bottom: 40px;
+      padding-bottom: 96px;
     }
     .app-shell {
       max-width: 480px;
       margin: 0 auto;
-      padding: 12px 14px 36px;
+      padding: 12px 14px 100px;
       min-height: 100dvh;
+      position: relative;
     }
     .uldaemo-card {
       background: var(--surface);
-      border-radius: 16px;
-      padding: 16px 18px;
-      margin-bottom: 12px;
-      border: 1px solid var(--border);
-      box-shadow: 0 2px 10px rgba(25, 31, 40, 0.04);
+      border-radius: 20px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      border: 1px solid rgba(229, 232, 235, 0.85);
+      box-shadow: 0 4px 16px rgba(25, 31, 40, 0.05);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .uldaemo-card:hover {
+      box-shadow: 0 6px 20px rgba(40, 125, 98, 0.08);
     }
     .app-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: var(--surface);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 11px 15px;
-      margin-bottom: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      border-radius: 18px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
     }
     .app-logo-wrap { display: flex; align-items: center; gap: 9px; cursor: pointer; }
     .app-logo-title { font-size: 20px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
@@ -69,7 +75,7 @@
       color: #333D4B;
       font-size: 12px;
       font-weight: 700;
-      padding: 6px 10px;
+      padding: 6px 12px;
       border-radius: 999px;
       border: 1px solid var(--border);
       cursor: pointer;
@@ -80,60 +86,162 @@
       color: var(--primary);
       border-color: var(--primary);
     }
-    .nav-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-    .nav-btn {
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-main);
-      font-weight: 700;
-      font-size: 13.5px;
-      padding: 10px 4px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .nav-btn.active {
-      background: var(--primary);
-      color: #FFFFFF;
-      border-color: var(--primary);
-    }
-    .cat-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-    .cat-btn {
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-main);
-      font-weight: 700;
-      font-size: 12px;
-      padding: 8px 2px;
-      border-radius: 12px;
-      cursor: pointer;
-      line-height: 1.3;
-      text-align: center;
-    }
-    .cat-btn.active {
-      background: var(--primary);
-      color: #FFFFFF;
-      border-color: var(--primary);
-    }
-    .main-banner {
-      background: linear-gradient(135deg, #E3F4EC 0%, #D2EDE0 100%);
-      border-radius: 18px;
-      padding: 18px 20px;
-      margin-bottom: 10px;
-      border: 1px solid #C5E6D6;
+
+    /* 컨셉 1: 하단 플로팅 글래스모피즘 독 (Floating Dock Navigation) */
+    .floating-dock-wrap {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
+      z-index: 999;
+      pointer-events: none;
+    }
+    .floating-dock {
+      pointer-events: auto;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 10px 30px rgba(40, 125, 98, 0.15), 0 2px 8px rgba(0,0,0,0.06);
+      border-radius: 999px;
+      padding: 6px 10px;
+      display: flex;
+      gap: 6px;
+      max-width: 380px;
+      width: calc(100% - 32px);
+    }
+    .dock-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: #6B7684;
+      font-weight: 700;
+      font-size: 12.5px;
+      padding: 10px 4px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
       align-items: center;
+      gap: 3px;
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+    }
+    .dock-btn .dock-icon { font-size: 18px; line-height: 1; }
+    .dock-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(40, 125, 98, 0.35);
+      transform: translateY(-2px);
+    }
+    .dock-badge-dot {
+      position: absolute;
+      top: 6px;
+      right: 18%;
+      width: 8px;
+      height: 8px;
+      background: #E02020;
+      border-radius: 50%;
+      border: 1.5px solid #FFFFFF;
+    }
+
+    /* 컨셉 3: 에어비앤비형 말풍선 지도 핀 & 레이더 파동 */
+    .bubble-pin {
+      background: #FFFFFF;
+      color: #191F28;
+      border: 1.5px solid var(--primary);
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-weight: 800;
+      font-size: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transform: translate(-50%, -100%);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .bubble-pin:hover {
+      transform: translate(-50%, -105%) scale(1.06);
+      background: #EEF8F3;
+    }
+    .bubble-pin::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 6px 5px 0;
+      border-style: solid;
+      border-color: var(--primary) transparent transparent;
+      display: block;
+      width: 0;
+    }
+    .radar-pulse-center {
+      width: 14px;
+      height: 14px;
+      background: #2B7FFF;
+      border-radius: 50%;
+      border: 2.5px solid #FFFFFF;
+      box-shadow: 0 0 10px rgba(43,127,255,0.8);
+      position: relative;
+    }
+    .radar-pulse-ring {
+      position: absolute;
+      top: -15px;
+      left: -15px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(43, 127, 255, 0.25);
+      animation: pulseAnim 2s infinite ease-out;
+    }
+    @keyframes pulseAnim {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* 컨셉 3: 모던 iMessage형 안심 채팅방 버블 */
+    .chat-bubble-me {
+      background: linear-gradient(135deg, #287D62 0%, #1E634C 100%);
+      color: #FFFFFF;
+      padding: 10px 15px;
+      border-radius: 20px 20px 4px 20px;
+      max-width: 78%;
+      margin-left: auto;
+      margin-bottom: 9px;
+      font-size: 13.5px;
+      width: fit-content;
+      word-break: break-word;
+      box-shadow: 0 2px 6px rgba(40, 125, 98, 0.2);
+    }
+    .chat-bubble-other {
+      background: #FFFFFF;
+      color: var(--text-main);
+      border: 1px solid #E5E8EB;
+      padding: 10px 15px;
+      border-radius: 20px 20px 20px 4px;
+      max-width: 78%;
+      margin-right: auto;
+      margin-bottom: 9px;
+      font-size: 13.5px;
+      width: fit-content;
+      word-break: break-word;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+    .chat-bubble-ai {
+      background: linear-gradient(135deg, #EEF8F3 0%, #E2F5EC 100%);
+      color: var(--primary-dark);
+      border: 1px solid #C5E6D6;
+      padding: 12px 15px;
+      border-radius: 16px;
+      margin: 10px 0;
+      font-size: 12.8px;
+      line-height: 1.5;
     }
     .main-banner-tag {
       display: inline-block;
@@ -588,14 +696,29 @@
           </div>
         </div>
 
-        <div class="nav-grid">
-          <button class="nav-btn ${state.nav_tab === '홈' && !state.active_modal ? 'active' : ''}" onclick="switchTab('홈')">🏠 홈</button>
-          <button class="nav-btn ${state.nav_tab === '지도' && !state.active_modal ? 'active' : ''}" onclick="switchTab('지도')">🗺️ 지도</button>
-          <button class="nav-btn ${state.nav_tab === '채팅' && !state.active_modal ? 'active' : ''}" onclick="switchTab('채팅')">💬 채팅${unreadCnt > 0 ? ' •' : ''}</button>
-          <button class="nav-btn ${state.nav_tab === '마이' && !state.active_modal ? 'active' : ''}" onclick="switchTab('마이')">👤 마이</button>
-        </div>
-
         ${bodyHtml}
+
+        <div class="floating-dock-wrap">
+          <div class="floating-dock">
+            <button class="dock-btn ${state.nav_tab === '홈' && !state.active_modal ? 'active' : ''}" onclick="switchTab('홈')">
+              <span class="dock-icon">🏠</span>
+              <span>홈</span>
+            </button>
+            <button class="dock-btn ${state.nav_tab === '지도' && !state.active_modal ? 'active' : ''}" onclick="switchTab('지도')">
+              <span class="dock-icon">🗺️</span>
+              <span>캠퍼스</span>
+            </button>
+            <button class="dock-btn ${state.nav_tab === '채팅' && !state.active_modal ? 'active' : ''}" onclick="switchTab('채팅')">
+              <span class="dock-icon">💬</span>
+              <span>채팅</span>
+              ${unreadCnt > 0 ? '<span class="dock-badge-dot"></span>' : ''}
+            </button>
+            <button class="dock-btn ${state.nav_tab === '마이' && !state.active_modal ? 'active' : ''}" onclick="switchTab('마이')">
+              <span class="dock-icon">👤</span>
+              <span>마이</span>
+            </button>
+          </div>
+        </div>
       `;
 
       if (state.nav_tab === "지도" && !state.active_modal) {
@@ -1273,9 +1396,20 @@
       }).addTo(map);
 
       if (state.gps_consent) {
-        const myMarker = L.marker([state.my_lat, state.my_lng], { draggable: true }).addTo(map)
-          .bindPopup("<b>🔵 내 현위치</b><br>핀을 드래그하여 미세 조정할 수 있습니다.").openPopup();
-        L.circle([state.my_lat, state.my_lng], { radius: 220, color: "#2B7FFF", fillOpacity: 0.08 }).addTo(map);
+        const radarHtml = `
+          <div style="position:relative; width:14px; height:14px;">
+            <div class="radar-pulse-ring"></div>
+            <div class="radar-pulse-center"></div>
+          </div>
+        `;
+        const myIcon = L.divIcon({
+          html: radarHtml,
+          className: "custom-radar-icon",
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+        const myMarker = L.marker([state.my_lat, state.my_lng], { icon: myIcon, draggable: true }).addTo(map)
+          .bindPopup("<div style='font-size:12px; font-weight:700;'>🔵 <b>내 현위치 (GPS 연동)</b><br>핀을 드래그하여 미세 조정할 수 있습니다.</div>").openPopup();
         myMarker.on("dragend", function(e) {
           const pos = e.target.getLatLng();
           state.my_lat = pos.lat;
@@ -1287,9 +1421,26 @@
       if (state.map_cat !== "전체") activePosts = activePosts.filter(p => p.category.includes(state.map_cat));
       activePosts.forEach(p => {
         const c = getBuildingCoords(p.location);
-        L.circleMarker([c[0], c[1]], { radius: 11, color: "#FFFFFF", weight: 2, fillColor: "#287D62", fillOpacity: 0.95 })
-          .addTo(map)
-          .bindPopup(`<b>${p.category} ${p.title}</b><br>📍 ${p.location}<br>🕒 ${p.meet_time}`);
+        const apps = DB.applications.filter(a => a.post_id === p.id && a.status === "승인됨");
+        const currentCnt = apps.length + 1;
+        const iconEmoji = p.category.split(" ")[0] || "⚡";
+        const shortCat = p.category.split(" ")[1] || p.category;
+
+        const pinHtml = `
+          <div class="bubble-pin" onclick="openDetailModal(${p.id})">
+            <span>${iconEmoji}</span>
+            <span>${shortCat}</span>
+            <span style="color:var(--primary);">${currentCnt}/${p.max_participants}</span>
+          </div>
+        `;
+        const bubbleIcon = L.divIcon({
+          html: pinHtml,
+          className: "custom-bubble-pin-wrapper",
+          iconSize: [80, 32],
+          iconAnchor: [40, 32]
+        });
+        L.marker([c[0], c[1]], { icon: bubbleIcon }).addTo(map)
+          .bindPopup(`<b>${p.category} ${p.title}</b><br>📍 ${p.location}<br>🕒 ${p.meet_time}<br><button class="btn btn-primary" style="margin-top:6px; min-height:32px; padding:4px 10px; font-size:12px;" onclick="openDetailModal(${p.id})">상세 보기</button>`);
       });
     }
 
@@ -1343,12 +1494,20 @@
           const msgs = DB.messages.filter(m => m.post_id === post.id);
           return `
             <div class="uldaemo-card">
-              <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:12px; margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between;">
-                  <span style="font-weight:800;">💬 ${partner.avatar.split(" ")[0]} ${partner.nickname} <span style="color:#287D62; font-size:11px;">● 온라인</span></span>
-                  <span class="privacy-pill-mini">🛡️ 안심 채팅방</span>
+              <div style="background:linear-gradient(135deg, #EEF8F3 0%, #E2F5EC 100%); border:1px solid #C5E6D6; border-radius:16px; padding:13px 15px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:20px;">🛡️</span>
+                    <div>
+                      <div style="font-weight:800; font-size:14px; color:#1E634C;">AI Police Safeguard Active</div>
+                      <div style="font-size:11px; color:#287D62;">외부 연락처 요구 및 비매너 언행 실시간 차단 중</div>
+                    </div>
+                  </div>
+                  <span style="background:#287D62; color:#FFFFFF; font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:999px;">● 안심 보호</span>
                 </div>
-                <div style="font-size:12px; color:#4E5968; margin-top:6px;">📌 <b>${post.title}</b> · ${post.meet_time} · ${post.location}</div>
+                <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(40,125,98,0.25); display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:12px; color:#333D4B;"><b>${partner.avatar.split(" ")[0]} ${partner.nickname}</b>님과의 대화 · 📌 ${post.title}</span>
+                </div>
               </div>
 
               <div class="chat-box">
