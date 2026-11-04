@@ -243,6 +243,13 @@
       font-size: 12.8px;
       line-height: 1.5;
     }
+    .main-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
     .main-banner-tag {
       display: inline-block;
       background: #FFFFFF;
@@ -254,6 +261,88 @@
       margin-bottom: 8px;
     }
     .main-banner-title { font-size: 18px; font-weight: 800; color: var(--text-main); line-height: 1.35; }
+    .imp-notice {
+      flex: 1;
+      max-width: 60%;
+      background: linear-gradient(135deg, #FFFFFF 0%, #EEF8F3 100%);
+      border: 1.5px solid #C5E6D6;
+      border-radius: 18px;
+      padding: 12px 14px;
+      text-decoration: none;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 4px 14px rgba(40, 125, 98, 0.08);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .imp-notice:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(40, 125, 98, 0.14);
+      border-color: var(--primary);
+    }
+    .imp-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .imp-tag {
+      display: inline-block;
+      background: var(--primary);
+      color: #FFFFFF;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .imp-more {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .imp-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin: 2px 0 4px;
+    }
+    .imp-meta {
+      font-size: 11px;
+      color: var(--text-sub);
+      font-weight: 600;
+    }
+    .notice-item {
+      display: block;
+      text-decoration: none;
+      color: var(--text-main);
+      padding: 13px 15px;
+      margin-bottom: 8px;
+    }
+    .notice-chip {
+      background: #EEF8F3;
+      color: var(--primary);
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .notice-chip.imp {
+      background: var(--primary);
+      color: #FFFFFF;
+    }
+    .notice-chip.new {
+      background: #FFF0F0;
+      color: #E02020;
+    }
 
     /* ===== 폰 전용 기본 레이아웃: 사이드바/우측패널 숨김, 하단 독 사용 ===== */
     .app-layout { display: block; }
@@ -701,6 +790,7 @@
       login_tab: "login",
       nav_tab: "홈",
       active_modal: null,
+      notif_tab: "mine",
       selected_post_id: null,
       home_cat: "전체",
       map_cat: "전체",
@@ -785,6 +875,188 @@
     }
 
     // =========================================================
+    // 울산대 공식 홈페이지 공지 (서버리스 API가 수집 → 중요 공지는 홈 배너, 나머지는 알림 센터)
+    // =========================================================
+    const DEFAULT_MEETUP_NOTICES = [
+      {
+        id: "MN113-91614",
+        title: "[토스] 마케팅 대외활동 '포리너브릿지' 2기 모집",
+        cat: "행사",
+        date: "2026-11-04",
+        source: "공지사항",
+        link: "https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91614",
+        important: true,
+        new: true
+      },
+      {
+        id: "MN113-91613",
+        title: "[한림대학교]「2026 AI 활용 전국 대학생 창업 해커톤 대회」 개최 안내",
+        cat: "일반",
+        date: "2026-11-04",
+        source: "공지사항",
+        link: "https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91613",
+        important: true,
+        new: true
+      },
+      {
+        id: "MN113-91612",
+        title: "[동성케미컬] 울산대 캠퍼스 리크루팅 행사 안내",
+        cat: "행사",
+        date: "2026-11-04",
+        source: "공지사항",
+        link: "https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91612",
+        important: true,
+        new: true
+      },
+      {
+        id: "MN113-91606",
+        title: "[부산광역시 동구]「부산 동구 AI 숏폼 영상 공모전」 개최 안내",
+        cat: "일반",
+        date: "2026-11-04",
+        source: "공지사항",
+        link: "https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91606",
+        important: true,
+        new: false
+      },
+      {
+        id: "MN224-1",
+        title: "초등아동 기초학습 지도 대학생 자원봉사자 모집 안내",
+        cat: "봉사",
+        date: "2026-11-04",
+        source: "봉사활동",
+        link: "https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN224",
+        important: false,
+        new: true
+      },
+      {
+        id: "MN119-1",
+        title: "울산대학교 중앙동아리 신규 부원 상시 모집 및 분과 안내",
+        cat: "동아리",
+        date: "2026-11-02",
+        source: "중앙동아리",
+        link: "https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN119",
+        important: false,
+        new: false
+      }
+    ];
+    const NOTICES = { items: [], loading: false, loadedAt: 0, failed: false };
+    try {
+      const savedNotices = JSON.parse(localStorage.getItem("uldaemo_notices") || "[]");
+      NOTICES.items = (Array.isArray(savedNotices) && savedNotices.length) ? savedNotices : DEFAULT_MEETUP_NOTICES;
+    } catch (e) {
+      NOTICES.items = DEFAULT_MEETUP_NOTICES;
+    }
+
+    function getSeenNotices() {
+      try { return JSON.parse(localStorage.getItem("uldaemo_notice_seen") || "[]"); } catch (e) { return []; }
+    }
+    function unseenNoticeCnt() {
+      const seen = new Set(getSeenNotices());
+      return NOTICES.items.filter(n => n.new && !seen.has(n.id)).length;
+    }
+    function markNoticesSeen() {
+      localStorage.setItem("uldaemo_notice_seen", JSON.stringify(NOTICES.items.map(n => n.id)));
+    }
+    function escHtml(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function openUlsanNoticesModal(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      state.active_modal = "notifications";
+      state.notif_tab = "ulsan";
+      markNoticesSeen();
+      render();
+      loadNotices(true);
+    }
+
+    async function loadNotices(force) {
+      if (NOTICES.loading) return;
+      if (!force && Date.now() - NOTICES.loadedAt < 5 * 60 * 1000) return;
+      NOTICES.loading = true;
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "ulsan_notices" })
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.items) && data.items.length) {
+          NOTICES.items = data.items;
+          NOTICES.failed = false;
+          localStorage.setItem("uldaemo_notices", JSON.stringify(data.items));
+        } else {
+          NOTICES.failed = true;
+        }
+      } catch (e) {
+        NOTICES.failed = true;
+      }
+      NOTICES.loading = false;
+      NOTICES.loadedAt = Date.now();
+      // 입력 중이 아닐 때만 화면 갱신 (검색창 포커스 보호)
+      const ae = document.activeElement;
+      const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
+      if (state.user_id && !typing && (state.active_modal === "notifications" || (state.nav_tab === "홈" && !state.active_modal))) render();
+    }
+
+    function importantNotices() {
+      return NOTICES.items.filter(n => n.important);
+    }
+    function renderImportantNoticeCard() {
+      const imp = importantNotices();
+      const top = imp[0] || NOTICES.items[0];
+      if (!top) {
+        return `<a class="imp-notice" href="https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113" target="_blank" rel="noopener">
+          <div class="imp-top">
+            <span class="imp-tag">📢 울산대 공지</span>
+          </div>
+          <span class="imp-title">${NOTICES.loading ? "공지를 불러오는 중…" : "공식 공지 보러가기"}</span>
+        </a>`;
+      }
+      const totalCnt = NOTICES.items.length;
+      return `<a class="imp-notice" href="${escHtml(top.link)}" target="_blank" rel="noopener">
+        <div class="imp-top">
+          <span class="imp-tag">📌 중요 만남 공지</span>
+          <span class="imp-more" onclick="openUlsanNoticesModal(event)">전체 ${totalCnt}건 ›</span>
+        </div>
+        <div class="imp-title">${escHtml(top.title)}</div>
+        <div class="imp-meta">${escHtml(top.source)}${top.cat ? ` · ${escHtml(top.cat)}` : ""} · ${escHtml(top.date)}</div>
+      </a>`;
+    }
+    function switchNotifTab(t) {
+      state.notif_tab = t;
+      if (t === "ulsan") markNoticesSeen();
+      render();
+      if (t === "ulsan") loadNotices(true);
+    }
+    function renderUlsanNoticeList() {
+      const items = NOTICES.items;
+      if (!items.length) {
+        return `<div class="uldaemo-card" style="text-align:center; padding:30px;">
+          <div style="font-size:32px; margin-bottom:6px;">🏫</div>
+          <div style="font-weight:800;">${NOTICES.loading ? "공지를 불러오는 중이에요…" : "공지를 불러오지 못했어요"}</div>
+          <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">잠시 후 다시 시도하거나 공식 홈페이지에서 확인해 주세요.</div>
+          <a class="btn" style="margin-top:10px; text-decoration:none;" href="https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113" target="_blank" rel="noopener">울산대 공지사항 바로가기 ↗</a>
+        </div>`;
+      }
+      return `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:11.5px; color:#8B95A1;">울산대 공식 홈페이지의 만남·행사·동아리·봉사 공지예요.</span>
+          <span style="font-size:11.5px; font-weight:700; color:#287D62; cursor:pointer;" onclick="loadNotices(true)">🔄 새로고침</span>
+        </div>`
+        + items.map(n => `
+        <a class="uldaemo-card notice-item" href="${escHtml(n.link)}" target="_blank" rel="noopener">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <span style="display:flex; gap:5px; align-items:center;">
+              ${n.important ? '<span class="notice-chip imp">📌 중요</span>' : ''}
+              <span class="notice-chip">${escHtml(n.source)}${n.cat ? ' · ' + escHtml(n.cat) : ''}</span>
+              ${n.new ? '<span class="notice-chip new">N</span>' : ''}
+            </span>
+            <span style="font-size:11px; color:#8B95A1;">${escHtml(n.date)}</span>
+          </div>
+          <div style="font-size:13.5px; font-weight:700; line-height:1.4;">${escHtml(n.title)}</div>
+        </a>`).join("");
+    }
+
+    // =========================================================
     // 3. 메인 렌더링 함수
     // =========================================================
     // PC(데스크톱) 레이아웃 기준 폭: 1024px 이상이면 3단(사이드바/피드/우측패널) 레이아웃 적용
@@ -812,8 +1084,10 @@
       root.className = "app-shell wide";
 
       const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
-      const notifBadge = unreadCnt > 0 ? `🔔 ${unreadCnt}` : `🔔 알림`;
-      const notifActive = (unreadCnt > 0 || state.active_modal === "notifications") ? "active" : "";
+      const badgeCnt = unreadCnt + unseenNoticeCnt();
+      const notifBadge = badgeCnt > 0 ? `🔔 ${badgeCnt}` : `🔔 알림`;
+      const notifActive = (badgeCnt > 0 || state.active_modal === "notifications") ? "active" : "";
+      loadNotices(false);
 
       let bodyHtml = "";
       if (state.active_modal === "notifications") {
@@ -879,8 +1153,8 @@
         <aside class="pc-right">
           <div class="uldaemo-card" style="padding:14px 16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <span style="font-weight:800; font-size:14px;">🔔 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
-              <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="toggleNotificationsModal()">전체 보기 ›</span>
+              <span style="font-weight:800; font-size:14px;">🔔 알림 ${badgeCnt > 0 ? `<span class="count-chip">${badgeCnt}</span>` : ""}</span>
+              <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 · 전체 ›</span>
             </div>
             ${myNotifs.length === 0
               ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">새로운 알림이 없어요.</div>`
@@ -1206,9 +1480,24 @@
 
     function renderNotificationsModal(unreadCnt) {
       const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id);
+      const newNotice = unseenNoticeCnt();
+      const tabBtn = (key, label) => `<button class="btn ${state.notif_tab === key ? 'btn-primary' : ''}" onclick="switchNotifTab('${key}')">${label}</button>`;
+      const tabsHtml = `<div class="row-2" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px;">
+          ${tabBtn('mine', '🔔 내 알림' + (unreadCnt > 0 ? ' (' + unreadCnt + ')' : ''))}
+          ${tabBtn('ulsan', '🏫 울산대 공지' + (newNotice > 0 ? ' (N' + newNotice + ')' : ''))}
+        </div>`;
+      if (state.notif_tab === "ulsan") {
+        return `
+        <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 이전 화면으로 돌아가기</button>
+        <h3 style="margin-bottom:10px;">🔔 알림 센터</h3>
+        ${tabsHtml}
+        ${renderUlsanNoticeList()}
+      `;
+      }
       return `
         <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 이전 화면으로 돌아가기</button>
         <h3 style="margin-bottom:10px;">🔔 실시간 알림 센터</h3>
+        ${tabsHtml}
         <div class="row-3" style="margin-bottom:12px;">
           <button class="btn btn-primary" ${unreadCnt === 0 ? "disabled" : ""} onclick="markAllNotifsRead()">✅ 모두 읽음</button>
           <button class="btn" onclick="markAllNotifsRead(); switchTab('채팅');">💬 채팅/신청 관리</button>
@@ -1363,7 +1652,7 @@
             <div class="main-banner-tag">오늘도 좋은 하루예요! 🌱</div>
             <p class="main-banner-title">공강 시간,<br>같이 보낼 학우를<br>찾아봐요!</p>
           </div>
-          <div style="font-size:44px;">🏫</div>
+          ${renderImportantNoticeCard()}
         </div>
         <button class="btn btn-primary" style="margin-bottom:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
 

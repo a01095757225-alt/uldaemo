@@ -2,7 +2,11 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import smtplib
+import re
+import html
+import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -74,6 +78,142 @@ def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", a
         return False, f"SMTP 발송 오류: {str(e)[:80]}"
 
 
+ULSAN_BASE = "https://www.ulsan.ac.kr"
+# (게시판 코드, 표시 이름)
+ULSAN_BOARDS = [("MN113", "공지사항"), ("MN119", "중앙동아리"), ("MN224", "봉사활동")]
+MEETUP_KEYWORDS = [
+    "모집", "동아리", "축제", "페스티벌", "행사", "대회", "해커톤", "공모전", "대외활동",
+    "서포터즈", "봉사", "멘토", "스터디", "특강", "캠프", "투어", "체험", "교류", "리크루팅", "설명회", "소모임"
+]
+EXCLUDE_KEYWORDS = ["사칭", "운영 종료", "입찰", "채용공고", "구매", "계약", "제규정", "등록금", "휴학", "복학"]
+IMPORTANT_MEETUP_KEYWORDS = ["축제", "페스티벌", "동아리", "해커톤", "대외활동", "서포터즈", "공모전", "캠퍼스 리크루팅"]
+FALLBACK_NOTICES = [
+    {
+        "id": "MN113-91614",
+        "title": "[토스] 마케팅 대외활동 '포리너브릿지' 2기 모집",
+        "cat": "행사",
+        "date": "2026-11-04",
+        "source": "공지사항",
+        "link": f"{ULSAN_BASE}/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91614",
+        "important": True,
+        "new": True,
+    },
+    {
+        "id": "MN113-91613",
+        "title": "[한림대학교]「2026 AI 활용 전국 대학생 창업 해커톤 대회」 개최 안내",
+        "cat": "일반",
+        "date": "2026-11-04",
+        "source": "공지사항",
+        "link": f"{ULSAN_BASE}/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91613",
+        "important": True,
+        "new": True,
+    },
+    {
+        "id": "MN113-91612",
+        "title": "[동성케미컬] 울산대 캠퍼스 리크루팅 행사 안내",
+        "cat": "행사",
+        "date": "2026-11-04",
+        "source": "공지사항",
+        "link": f"{ULSAN_BASE}/kor/CMS/Board/Board.do?mCode=MN113&mode=view&mgr_seq=35&board_seq=91612",
+        "important": True,
+        "new": True,
+    },
+    {
+        "id": "MN224-1",
+        "title": "초등아동 기초학습 지도 대학생 자원봉사자 모집 안내",
+        "cat": "봉사",
+        "date": "2026-11-04",
+        "source": "봉사활동",
+        "link": f"{ULSAN_BASE}/kor/CMS/Board/Board.do?mCode=MN224",
+        "important": False,
+        "new": True,
+    },
+    {
+        "id": "MN119-1",
+        "title": "울산대학교 중앙동아리 신규 부원 상시 모집 및 분과 안내",
+        "cat": "동아리",
+        "date": "2026-11-02",
+        "source": "중앙동아리",
+        "link": f"{ULSAN_BASE}/kor/CMS/Board/Board.do?mCode=MN119",
+        "important": False,
+        "new": False,
+    },
+]
+_NOTICE_CACHE = {"ts": 0, "items": []}
+
+
+def _fetch_board(code: str, label: str):
+    items = []
+    try:
+        req = urllib.request.Request(
+            f"{ULSAN_BASE}/kor/CMS/Board/Board.do?mCode={code}",
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            page = resp.read().decode("utf-8", "ignore")
+        page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", page, re.S):
+            m = re.search(r"<a href='(\?[^']*board_seq=(\d+)[^']*)'>(.*?)</a>", row, re.S)
+            if not m:
+                continue
+            href, seq, title = m.group(1), m.group(2), m.group(3)
+            title = html.unescape(re.sub(r"\s+", " ", re.sub(r"<.*?>", "", title)).strip())
+            if any(bad in title for bad in EXCLUDE_KEYWORDS):
+                continue
+            cate = re.search(r'<span class="cate">\[(.*?)\]</span>', row)
+            cat_str = html.unescape(cate.group(1)) if cate else ""
+            # 만남/모집/행사 성격의 공지만 필터링 (중앙동아리·봉사활동 게시판은 기본 포함)
+            is_meetup = (
+                code in ("MN119", "MN224")
+                or cat_str in ("행사", "모집", "동아리", "봉사")
+                or any(k in title for k in MEETUP_KEYWORDS)
+            )
+            if not is_meetup:
+                continue
+            date = re.search(r'<td class="date">\s*([\d-]+)\s*</td>', row)
+            important = (
+                cat_str == "행사"
+                or code == "MN119"
+                or any(k in title for k in IMPORTANT_MEETUP_KEYWORDS)
+            )
+            items.append({
+                "id": f"{code}-{seq}",
+                "title": title,
+                "cat": cat_str,
+                "date": date.group(1) if date else "",
+                "source": label,
+                "link": f"{ULSAN_BASE}/kor/CMS/Board/Board.do" + html.unescape(href),
+                "important": important,
+                "new": 'alt="새글"' in row,
+            })
+    except Exception:
+        pass
+    return items
+
+
+def get_ulsan_notices():
+    """울산대 게시판에서 만남·모집·행사 위주 공지를 병렬로 수집(5분 캐시)."""
+    now = time.time()
+    if _NOTICE_CACHE["items"] and now - _NOTICE_CACHE["ts"] < 300:
+        return _NOTICE_CACHE["items"]
+    results = []
+    with ThreadPoolExecutor(max_workers=len(ULSAN_BOARDS)) as ex:
+        for part in ex.map(lambda b: _fetch_board(*b), ULSAN_BOARDS):
+            results.extend(part)
+    seen, items = set(), []
+    for it in results:
+        key = (it["title"], it["date"])
+        if it["id"] not in seen and key not in seen:
+            seen.add(it["id"])
+            seen.add(key)
+            items.append(it)
+    items.sort(key=lambda x: (1 if x["important"] else 0, x["date"]), reverse=True)
+    if items:
+        _NOTICE_CACHE.update({"ts": now, "items": items})
+        return items
+    return FALLBACK_NOTICES
+
+
 class handler(BaseHTTPRequestHandler):
     def _send_json(self, status_code: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -100,6 +240,11 @@ class handler(BaseHTTPRequestHandler):
             data = {}
 
         action = data.get("action", "")
+        if action == "ulsan_notices":
+            items = get_ulsan_notices()
+            self._send_json(200, {"ok": bool(items), "items": items[:40]})
+            return
+
         if action == "send_otp":
             recipient = str(data.get("email", "")).strip()
             otp_code = str(data.get("otp", "")).strip()
