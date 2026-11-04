@@ -254,6 +254,119 @@
       margin-bottom: 8px;
     }
     .main-banner-title { font-size: 18px; font-weight: 800; color: var(--text-main); line-height: 1.35; }
+
+    /* ===== 폰 전용 기본 레이아웃: 사이드바/우측패널 숨김, 하단 독 사용 ===== */
+    .app-layout { display: block; }
+    .pc-sidebar, .pc-right { display: none; }
+    .count-chip {
+      display: inline-block;
+      background: #E02020;
+      color: #FFFFFF;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 1px 7px;
+      border-radius: 999px;
+      margin-left: 4px;
+    }
+    .right-notif {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #F7F8F4;
+      margin-bottom: 6px;
+    }
+    .right-notif.unread {
+      background: #EEF8F3;
+      border-left: 3px solid var(--primary);
+    }
+    #side-map {
+      width: 100%;
+      height: 210px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      z-index: 1;
+    }
+
+    /* ===== PC 전용 레이아웃 (1024px 이상): 왼쪽 사이드바 + 가운데 피드 + 오른쪽 패널 ===== */
+    @media (min-width: 1024px) {
+      body { padding-bottom: 24px; }
+      .app-shell.wide {
+        max-width: 1360px;
+        padding: 20px 24px 40px;
+      }
+      .app-shell.wide .app-layout {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 660px) 340px;
+        gap: 24px;
+        justify-content: center;
+        align-items: start;
+      }
+      .app-shell.wide .pc-sidebar,
+      .app-shell.wide .pc-right {
+        display: block;
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+      }
+      .app-shell.wide .app-header { display: none; }
+      .app-shell.wide .floating-dock-wrap { display: none; }
+
+      .pc-sidebar {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 18px 16px;
+        box-shadow: 0 4px 16px rgba(25, 31, 40, 0.05);
+      }
+      .side-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        padding: 4px 6px 16px;
+        border-bottom: 1px solid #F2F4F6;
+        margin-bottom: 12px;
+      }
+      .side-nav { display: flex; flex-direction: column; gap: 4px; }
+      .side-nav-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: #4E5968;
+        font-weight: 700;
+        font-size: 14.5px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: left;
+        position: relative;
+        transition: all 0.15s ease;
+      }
+      .side-nav-btn:hover { background: #F2F4F6; }
+      .side-nav-btn.active {
+        background: var(--primary);
+        color: #FFFFFF;
+        box-shadow: 0 4px 12px rgba(40, 125, 98, 0.28);
+      }
+      .side-nav-icon { font-size: 18px; width: 24px; text-align: center; }
+      .side-dot {
+        margin-left: auto;
+        width: 8px;
+        height: 8px;
+        background: #E02020;
+        border-radius: 50%;
+      }
+      .side-user {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid #F2F4F6;
+      }
+      .app-shell.wide .main-col { min-width: 0; }
+      #campus-map { height: 520px; }
+    }
     .cat-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -674,20 +787,29 @@
     // =========================================================
     // 3. 메인 렌더링 함수
     // =========================================================
+    // PC(데스크톱) 레이아웃 기준 폭: 1024px 이상이면 3단(사이드바/피드/우측패널) 레이아웃 적용
+    function isPC() {
+      return window.innerWidth >= 1024;
+    }
+
     function render() {
       const root = document.getElementById("app");
       const currentUser = DB.users[state.user_id];
 
       // 로그인 전 화면
       if (!state.user_id || !currentUser) {
+        root.className = "app-shell";
         root.innerHTML = renderLoginView();
         return;
       }
 
       if (currentUser.report_count >= 3) {
+        root.className = "app-shell";
         root.innerHTML = `<div class="uldaemo-card" style="text-align:center; padding:30px;"><h3>🚨 계정 이용 정지</h3><p style="margin:10px 0; color:#6B7684;">누적 신고 3회 이상으로 계정이 일시 정지되었습니다.</p><button class="btn" onclick="clearLogin()">로그아웃</button></div>`;
         return;
       }
+
+      root.className = "app-shell wide";
 
       const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
       const notifBadge = unreadCnt > 0 ? `🔔 ${unreadCnt}` : `🔔 알림`;
@@ -710,42 +832,118 @@
         bodyHtml = renderProfileTab(currentUser);
       }
 
-      root.innerHTML = `
-        <div class="app-header">
-          <div class="app-logo-wrap" onclick="switchTab('홈')">
-            ${renderLogoSvg(32)}
+      const navItems = [
+        { key: "홈", icon: "🏠", label: "홈", mLabel: "홈" },
+        { key: "지도", icon: "🗺️", label: "캠퍼스 지도", mLabel: "캠퍼스" },
+        { key: "채팅", icon: "💬", label: "안심 채팅", mLabel: "채팅" },
+        { key: "마이", icon: "👤", label: "내 프로필", mLabel: "마이" }
+      ];
+      const isActiveNav = (k) => state.nav_tab === k && !state.active_modal;
+
+      const sidebarHtml = `
+        <aside class="pc-sidebar">
+          <div class="side-logo" onclick="switchTab('홈')">
+            ${renderLogoSvg(36)}
             <div>
               <div class="app-logo-title">울대모</div>
               <div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span class="campus-pill" onclick="switchTab('지도')">📍 울산대학교 ▾</span>
-            <span class="campus-pill ${notifActive}" onclick="toggleNotificationsModal()">${notifBadge}</span>
+          <nav class="side-nav">
+            ${navItems.map(n => `
+              <button class="side-nav-btn ${isActiveNav(n.key) ? 'active' : ''}" onclick="switchTab('${n.key}')">
+                <span class="side-nav-icon">${n.icon}</span>
+                <span>${n.label}</span>
+                ${n.key === '채팅' && unreadCnt > 0 ? '<span class="side-dot"></span>' : ''}
+              </button>
+            `).join("")}
+          </nav>
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
+          <div class="side-user">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <div style="width:40px; height:40px; border-radius:50%; background:#EEF8F3; border:2px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:22px;">${currentUser.avatar.split(" ")[0]}</div>
+              <div>
+                <div style="font-weight:800; font-size:14px;">${currentUser.nickname} ${currentUser.manner_temp >= 40 ? "✅" : ""}</div>
+                <div style="font-size:11.5px; color:#6B7684;">${currentUser.department} · ${currentUser.mbti}</div>
+              </div>
+            </div>
+            ${renderTempGauge(currentUser.manner_temp, true)}
+            <button class="btn" style="margin-top:10px; min-height:36px; font-size:13px;" onclick="clearLogin()">🚪 로그아웃</button>
           </div>
-        </div>
+        </aside>
+      `;
 
-        ${bodyHtml}
+      const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id).slice(0, 4);
+      const activeCnt = DB.posts.filter(p => p.status === "모집중").length;
+      const rightHtml = `
+        <aside class="pc-right">
+          <div class="uldaemo-card" style="padding:14px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-weight:800; font-size:14px;">🔔 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
+              <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="toggleNotificationsModal()">전체 보기 ›</span>
+            </div>
+            ${myNotifs.length === 0
+              ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">새로운 알림이 없어요.</div>`
+              : myNotifs.map(n => `
+                <div class="right-notif ${n.is_read ? '' : 'unread'}">
+                  <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
+                  <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}</div>
+                </div>
+              `).join("")}
+          </div>
+          ${state.nav_tab !== "지도" ? `
+            <div class="uldaemo-card" style="padding:14px 16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-weight:800; font-size:14px;">🗺️ 캠퍼스 번개 지도</span>
+                <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="switchTab('지도')">크게 보기 ›</span>
+              </div>
+              <div id="side-map"></div>
+              <div style="font-size:11.5px; color:#6B7684; margin-top:6px;">현재 모집 중인 번개 <b style="color:#287D62;">${activeCnt}건</b></div>
+            </div>
+          ` : ""}
+          <div class="uldaemo-card" style="padding:14px 16px;">
+            <div style="font-weight:800; font-size:14px; margin-bottom:6px;">🛡️ 안심 가이드</div>
+            <div style="font-size:12px; color:#4E5968; line-height:1.55;">
+              · 방장 수락 전까지 실명·이메일은 비공개예요.<br>
+              · 카톡/전화번호는 AI 경찰이 차단해요.<br>
+              · 노쇼 신고가 3회 누적되면 이용이 정지돼요.
+            </div>
+          </div>
+        </aside>
+      `;
+
+      root.innerHTML = `
+        <div class="app-layout">
+          ${sidebarHtml}
+          <main class="main-col">
+            <div class="app-header">
+              <div class="app-logo-wrap" onclick="switchTab('홈')">
+                ${renderLogoSvg(32)}
+                <div>
+                  <div class="app-logo-title">울대모</div>
+                  <div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="campus-pill" onclick="switchTab('지도')">📍 울산대학교 ▾</span>
+                <span class="campus-pill ${notifActive}" onclick="toggleNotificationsModal()">${notifBadge}</span>
+              </div>
+            </div>
+
+            ${bodyHtml}
+          </main>
+          ${rightHtml}
+        </div>
 
         <div class="floating-dock-wrap">
           <div class="floating-dock">
-            <button class="dock-btn ${state.nav_tab === '홈' && !state.active_modal ? 'active' : ''}" onclick="switchTab('홈')">
-              <span class="dock-icon">🏠</span>
-              <span>홈</span>
-            </button>
-            <button class="dock-btn ${state.nav_tab === '지도' && !state.active_modal ? 'active' : ''}" onclick="switchTab('지도')">
-              <span class="dock-icon">🗺️</span>
-              <span>캠퍼스</span>
-            </button>
-            <button class="dock-btn ${state.nav_tab === '채팅' && !state.active_modal ? 'active' : ''}" onclick="switchTab('채팅')">
-              <span class="dock-icon">💬</span>
-              <span>채팅</span>
-              ${unreadCnt > 0 ? '<span class="dock-badge-dot"></span>' : ''}
-            </button>
-            <button class="dock-btn ${state.nav_tab === '마이' && !state.active_modal ? 'active' : ''}" onclick="switchTab('마이')">
-              <span class="dock-icon">👤</span>
-              <span>마이</span>
-            </button>
+            ${navItems.map(n => `
+              <button class="dock-btn ${isActiveNav(n.key) ? 'active' : ''}" onclick="switchTab('${n.key}')">
+                <span class="dock-icon">${n.icon}</span>
+                <span>${n.mLabel}</span>
+                ${n.key === '채팅' && unreadCnt > 0 ? '<span class="dock-badge-dot"></span>' : ''}
+              </button>
+            `).join("")}
           </div>
         </div>
       `;
@@ -753,7 +951,45 @@
       if (state.nav_tab === "지도" && !state.active_modal) {
         setTimeout(initLeafletCampusMap, 60);
       }
+      if (isPC() && document.getElementById("side-map")) {
+        setTimeout(initSideMap, 80);
+      }
     }
+
+    // PC 우측 패널용 미니 지도 (모집 중인 번개 위치를 작게 표시)
+    function initSideMap() {
+      const el = document.getElementById("side-map");
+      if (!el) return;
+      if (window._sideMap) { window._sideMap.remove(); window._sideMap = null; }
+      const map = L.map("side-map", { zoomControl: false, attributionControl: false }).setView([state.my_lat, state.my_lng], 15);
+      window._sideMap = map;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+      DB.posts.filter(p => p.status === "모집중").forEach(p => {
+        const c = getBuildingCoords(p.location);
+        L.circleMarker([c[0], c[1]], { radius: 9, color: "#FFFFFF", weight: 2, fillColor: "#287D62", fillOpacity: 0.95 })
+          .addTo(map)
+          .bindPopup(`<b>${p.category} ${p.title}</b><br>📍 ${p.location}<br><button class="btn btn-primary" style="margin-top:6px; min-height:30px; padding:3px 10px; font-size:12px;" onclick="openDetailModal(${p.id})">상세 보기</button>`);
+      });
+      if (state.gps_consent) {
+        L.circleMarker([state.my_lat, state.my_lng], { radius: 7, color: "#FFFFFF", weight: 2, fillColor: "#2B7FFF", fillOpacity: 1 }).addTo(map);
+      }
+    }
+
+    // 창 크기가 PC/모바일 기준(1024px)을 넘나들면 레이아웃을 다시 그림
+    (function bindResponsiveRerender() {
+      let lastIsPC = isPC();
+      let timer = null;
+      window.addEventListener("resize", function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          const nowPC = isPC();
+          if (nowPC !== lastIsPC) {
+            lastIsPC = nowPC;
+            if (state.user_id && DB.users[state.user_id]) render();
+          }
+        }, 150);
+      });
+    })();
 
     // =========================================================
     // 4. 로그인 & 신규 학우 가입 화면 (구글/네이버 실제 이메일 인증 포함)
