@@ -3154,9 +3154,38 @@
       const favs = user.fav_cats || [];
       const muted = user.fav_muted || [];
       const list = getFavList(user);
+      const isEditing = Boolean(state.editing_fav_cats) || favs.length === 0;
+
+      // 1. 설정 완료 상태: 선택되지 않은 카테고리는 모두 숨기고, 선택한 카테고리만 깔끔하게 표시 + [✏️ 카테고리 변경] 버튼 제공
+      if (!isEditing) {
+        const activeNotifCnt = favs.filter(f => !muted.some(m => catKey(m) === catKey(f))).length;
+        return `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <h4 style="margin:0;">⭐ 내 관심 만남 카테고리</h4>
+            <button class="btn" style="width:auto; min-height:30px; padding:4px 11px; font-size:12px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3;" onclick="startEditFavCats()">✏️ 카테고리 변경</button>
+          </div>
+          <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">아래 카테고리로 새 번개가 올라오면 <b>🔔 내 알림</b>으로 알려드려요. (우측 종 아이콘으로 개별 알림 ON/OFF)</div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+            ${favs.map(c => {
+              const idxInList = list.findIndex(item => catKey(item) === catKey(c));
+              const isMuted = muted.some(m => catKey(m) === catKey(c));
+              return `<span style="display:inline-flex; align-items:center; gap:4px; background:#EEF8F3; border:1.5px solid #287D62; border-radius:999px; padding:4px 6px 4px 12px;">
+                <span style="font-size:13px; font-weight:800; color:#1E634C;">${escHtml(c)}</span>
+                <button class="btn" style="width:auto; min-height:26px; padding:2px 7px; font-size:12px; border-radius:999px; border-color:${isMuted ? '#E5E8EB' : '#C5E6D6'}; background:#FFFFFF;" title="알림 켜기/끄기" onclick="toggleFavMute(${idxInList})">${isMuted ? "🔕 꺼짐" : "🔔 알림중"}</button>
+              </span>`;
+            }).join("")}
+          </div>
+          <div style="font-size:11.5px; color:#8B95A1; margin-top:6px;">설정된 관심 카테고리 ${favs.length}개 · 실시간 알림 ${activeNotifCnt}개 켜짐</div>
+        `;
+      }
+
+      // 2. 편집 모드 (또는 아직 1개도 선택하지 않은 초기 상태): 전체 카테고리 선택지 + 직접 입력 + [✅ 설정 완료] 버튼 표시
       return `
-        <h4 style="margin-bottom:4px;">⭐ 관심 만남 카테고리</h4>
-        <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">좋아하는 카테고리를 선택해 두면, 해당 카테고리로 새 번개가 올라올 때 <b>🔔 내 알림</b>으로 즉시 알려드려요! (우측 종 아이콘으로 카테고리별 알림 ON/OFF 가능)</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <h4 style="margin:0;">⭐ 관심 만남 카테고리 ${favs.length > 0 ? "변경하기" : "설정하기"}</h4>
+          ${favs.length > 0 ? `<button class="btn btn-primary" style="width:auto; min-height:30px; padding:4px 12px; font-size:12px;" onclick="finishEditFavCats()">✅ 설정 완료</button>` : ""}
+        </div>
+        <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">좋아하는 카테고리를 모두 고른 뒤 <b>[✅ 설정 완료]</b>를 누르면 선택하지 않은 카테고리는 숨겨지고 깔끔하게 저장됩니다!</div>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
           ${list.map((c, i) => {
             const on = favs.some(f => catKey(f) === catKey(c));
@@ -3167,12 +3196,25 @@
             </span>`;
           }).join("")}
         </div>
-        <div style="display:grid; grid-template-columns: 3fr 1fr; gap:6px;">
+        <div style="display:grid; grid-template-columns: 3fr 1fr; gap:6px; margin-bottom:10px;">
           <input id="fav_custom_in" class="input" style="margin-bottom:0;" placeholder="나만의 관심 카테고리 직접 입력 (예: 🎬 영화, 🎸 밴드)" onkeydown="if(event.key==='Enter') addCustomFav()" />
           <button class="btn" onclick="addCustomFav()">+ 추가</button>
         </div>
-        <div style="font-size:11.5px; color:#8B95A1; margin-top:8px;">${favs.length === 0 ? "아직 선택한 관심 카테고리가 없어요. 위 버튼을 눌러 선택해보세요!" : `선택됨 ${favs.length}개 · 실시간 알림 ${favs.filter(f => !muted.some(m => catKey(m) === catKey(f))).length}개 켜짐`}</div>
+        ${favs.length > 0 ? `
+          <button class="btn btn-primary" style="min-height:38px;" onclick="finishEditFavCats()">✅ 선택 완료 (${favs.length}개 카테고리 저장 및 접기)</button>
+        ` : `
+          <div style="font-size:11.5px; color:#8B95A1;">아직 선택한 관심 카테고리가 없어요. 위 버튼을 눌러 1개 이상 선택해보세요!</div>
+        `}
       `;
+    }
+    function startEditFavCats() {
+      state.editing_fav_cats = true;
+      refreshFavSection();
+    }
+    function finishEditFavCats() {
+      state.editing_fav_cats = false;
+      showToast("✅ 관심 카테고리 설정이 저장되었습니다!");
+      refreshFavSection();
     }
     function refreshFavSection() {
       const wrap = document.getElementById("fav-wrap");
@@ -3187,13 +3229,14 @@
       const c = getFavList(u)[i];
       if (!c) return;
       u.fav_cats = u.fav_cats || [];
+      state.editing_fav_cats = true;
       const idx = u.fav_cats.findIndex(f => catKey(f) === catKey(c));
       if (idx >= 0) {
         u.fav_cats.splice(idx, 1);
         u.fav_muted = (u.fav_muted || []).filter(m => catKey(m) !== catKey(c));
       } else {
         u.fav_cats.push(c);
-        showToast(`⭐ '${c}' 관심 카테고리로 등록! 새 번개가 올라오면 알려드릴게요.`);
+        showToast(`⭐ '${c}' 선택됨! 다 고르셨다면 [✅ 설정 완료]를 눌러주세요.`);
       }
       u.updated_at = Date.now();
       saveDB(true);
@@ -3222,9 +3265,10 @@
       u.fav_cats = u.fav_cats || [];
       if (u.fav_cats.some(f => catKey(f) === catKey(v))) return showToast("이미 등록된 카테고리예요.");
       u.fav_cats.push(v);
+      state.editing_fav_cats = true;
       u.updated_at = Date.now();
       saveDB(true);
-      showToast(`⭐ '${v}' 관심 카테고리로 등록!`);
+      showToast(`⭐ '${v}' 관심 카테고리로 추가됨!`);
       refreshFavSection();
     }
     // 새 번개가 올라오면 해당 카테고리를 관심으로 둔 다른 학우에게 알림
