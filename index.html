@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -1708,6 +1708,9 @@
         </div>
       `;
 
+      if (state.active_modal === "detail") {
+        setTimeout(initDetailMap, 60);
+      }
       if (state.nav_tab === "지도" && !state.active_modal) {
         setTimeout(initLeafletCampusMap, 60);
       }
@@ -2376,6 +2379,26 @@
       render();
     }
 
+    function initDetailMap() {
+      const el = document.getElementById("detail-map");
+      const post = DB.posts.find(p => p.id === state.selected_post_id);
+      if (!el || !post) return;
+      try {
+        if (window._detailMap) { window._detailMap.remove(); window._detailMap = null; }
+        const c = getBuildingCoords(post.location);
+        const map = L.map("detail-map", { zoomControl: true, attributionControl: false }).setView([c[0], c[1]], 17);
+        window._detailMap = map;
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+        L.circleMarker([c[0], c[1]], { radius: 11, color: "#FFFFFF", weight: 3, fillColor: "#287D62", fillOpacity: 0.95 })
+          .addTo(map)
+          .bindPopup(`<b>📍 ${escHtml(post.location)}</b><br>${escHtml(post.meet_date)} ${escHtml(post.meet_time)}`)
+          .openPopup();
+        if (state.gps_consent) {
+          L.circleMarker([state.my_lat, state.my_lng], { radius: 7, color: "#FFFFFF", weight: 2, fillColor: "#2B7FFF", fillOpacity: 1 }).addTo(map);
+        }
+      } catch (e) {}
+    }
+
     function renderDetailModal() {
       const post = DB.posts.find(p => p.id === state.selected_post_id);
       if (!post) { state.active_modal = null; return renderHomeTab(); }
@@ -2401,6 +2424,11 @@
             <div style="margin-bottom:6px;">🕒 <b>모임 일시:</b> ${post.meet_date} ${post.meet_time}</div>
             <div style="margin-bottom:6px;">👥 <b>모집 현황:</b> ${acceptedCnt} / ${post.max_participants}명 (${post.status})</div>
             <div>💬 <b>모임 성향:</b> ${post.meeting_style}</div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:6px;">🗺️ 만남 장소 지도 · ${post.location}</div>
+            <div id="detail-map" style="height:220px; border-radius:12px; border:1px solid #E5E8EB; overflow:hidden;"></div>
           </div>
 
           <div style="border-top:1px solid #E5E8EB; padding-top:12px;">
