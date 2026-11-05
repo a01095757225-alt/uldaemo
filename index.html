@@ -1093,13 +1093,23 @@
       if (!cloudDb || typeof cloudDb !== "object") return false;
       let changed = false;
 
-      // 1. Users 병합 (PC/폰 어느 쪽에서 가입한 학번이든 모두 보존)
+      // 1. Users 병합 (PC/폰 어느 쪽에서 가입한 학번이든 모두 보존 + 최신 수정본 우선)
       if (cloudDb.users && typeof cloudDb.users === "object") {
-        DB.users = Object.assign({}, cloudDb.users, DB.users || {});
-        // 클라우드의 최신 프로필/온도 정보도 반영
+        DB.users = DB.users || {};
         for (const [uid, uObj] of Object.entries(cloudDb.users)) {
           if (uObj && typeof uObj === "object") {
-            DB.users[uid] = Object.assign({}, DB.users[uid] || {}, uObj);
+            const localU = DB.users[uid];
+            if (!localU) {
+              DB.users[uid] = Object.assign({}, uObj);
+            } else {
+              const localTs = localU.updated_at || 0;
+              const cloudTs = uObj.updated_at || 0;
+              if (cloudTs >= localTs) {
+                DB.users[uid] = Object.assign({}, localU, uObj);
+              } else {
+                DB.users[uid] = Object.assign({}, uObj, localU);
+              }
+            }
           }
         }
         changed = true;
@@ -1185,7 +1195,18 @@
         const data = await res.json();
         if (data && data.ok && data.db) {
           const localUserCountBefore = Object.keys(DB.users || {}).length;
+          const prevNotifIds = new Set((DB.notifications || []).filter(n => n.user_id === state.user_id).map(n => n.id));
           mergeCloudDBIntoLocal(data.db);
+          // 새로 도착한 내 알림이 있으면 토스트 및 브라우저 알림 표시
+          if (state.user_id) {
+            const newlyArrived = (DB.notifications || []).filter(n => n.user_id === state.user_id && !n.is_read && !prevNotifIds.has(n.id));
+            if (newlyArrived.length > 0) {
+              showToast(newlyArrived[0].message);
+              if (typeof pushEnabled === "function" && pushEnabled()) {
+                showSystemNotification("⚡ 울대모 새 알림", newlyArrived[0].message, "/");
+              }
+            }
+          }
           // 만약 이 기기에만 있던 기존 가입 계정이 클라우드에 아직 안 올라가 있었다면 즉시 클라우드로도 업로드
           const cloudUsers = data.db.users || {};
           const hasLocalOnlyUser = Object.keys(DB.users || {}).some(uid => !cloudUsers[uid]);
@@ -1285,16 +1306,29 @@
       `;
     }
 
-    function notifyUser(uid, message) {
+    function notifyUser(uid, message, postId = null) {
       const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
       DB.notifications.unshift({
         id: Date.now() + Math.floor(Math.random() * 1000),
         user_id: uid,
         message,
+        post_id: postId,
         is_read: 0,
         created_at: nowStr
       });
       saveDB();
+    }
+
+    function openNotifItem(notifId) {
+      const n = (DB.notifications || []).find(x => x.id === notifId);
+      if (!n) return;
+      n.is_read = 1;
+      saveDB();
+      if (n.post_id && (DB.posts || []).some(p => p.id === n.post_id)) {
+        openDetailModal(n.post_id);
+      } else {
+        render();
+      }
     }
 
     // =========================================================
@@ -1671,9 +1705,9 @@
             ${myNotifs.length === 0
               ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
               : myNotifs.map(n => `
-                <div class="right-notif ${n.is_read ? '' : 'unread'}">
+                <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
                   <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
-                  <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}</div>
+                  <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
                 </div>
               `).join("")}
           </div>
@@ -2051,12 +2085,12 @@
             ${newNotice > 0 ? `<button class="btn btn-primary" style="margin-top:10px;" onclick="switchNotifTab('ulsan')">🏫 새 울산대 공지 ${newNotice}건 확인하기 ›</button>` : `<div style="font-size:12px; color:#8B95A1; margin-top:8px;">학교 공지는 위의 [🏫 울산대 공지] 탭에서 볼 수 있어요.</div>`}
           </div>
         ` : myNotifs.map(n => `
-          <div class="uldaemo-card" style="background:${n.is_read ? '#FFFFFF' : '#EEF8F3'}; border-color:${n.is_read ? '#E5E8EB' : '#287D62'}; padding:13px 15px; margin-bottom:8px;">
+          <div class="uldaemo-card" style="background:${n.is_read ? '#FFFFFF' : '#EEF8F3'}; border-color:${n.is_read ? '#E5E8EB' : '#287D62'}; padding:13px 15px; margin-bottom:8px; cursor:pointer;" onclick="openNotifItem(${n.id})">
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
               <span style="background:${n.is_read ? '#F2F4F6' : '#287D62'}; color:${n.is_read ? '#8B95A1' : '#FFFFFF'}; font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:999px;">
                 ${n.is_read ? "읽음" : "🟢 새 알림"}
               </span>
-              <span style="font-size:11px; color:#8B95A1;">${n.created_at || ""}</span>
+              <span style="font-size:11px; color:#8B95A1;">${n.created_at || ""}${n.post_id ? ' · <b style="color:#287D62;">번개 상세 보기 ›</b>' : ''}</span>
             </div>
             <div style="font-size:13.5px; font-weight:700;">${n.message}</div>
           </div>
@@ -2401,6 +2435,7 @@
         meeting_style: style,
         status: "모집중"
       });
+      notifyFavCategory(DB.posts[0]);
       window._justCreatedPostId = newId;
       state.prefill_title = "";
       saveDB(true);
@@ -3032,6 +3067,17 @@
     // =========================================================
     // 9. 마이 프로필 탭 (프로필 필수 목록 수정 & 로그아웃)
     // =========================================================
+    function renderFavBadgesHtml(user) {
+      const favs = (user && user.fav_cats) || [];
+      if (!favs.length) return "";
+      return `
+        <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #E5E8EB; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+          <span style="font-size:11.5px; font-weight:800; color:#287D62;">⭐ 관심 카테고리:</span>
+          ${favs.map(c => `<span class="cat-badge" style="background:#EEF8F3; color:#287D62; font-size:11.5px; padding:3px 9px;">${escHtml(c)}</span>`).join("")}
+        </div>
+      `;
+    }
+
     function renderProfileTab(user) {
       return `
         <div class="uldaemo-card">
@@ -3049,7 +3095,10 @@
             💬 "${user.bio || "공강 시간에 같이 학식 먹고 카공할 학우 환영해요! 🌱"}"
           </div>
           ${renderTempGauge(user.manner_temp, true)}
+          <div id="fav-profile-badges">${renderFavBadgesHtml(user)}</div>
         </div>
+
+        <div class="uldaemo-card" id="fav-wrap">${renderFavSection(user)}</div>
 
         <div class="uldaemo-card">
           <h4 style="margin-bottom:10px;">⚙️ 내 프로필 및 자기소개 수정하기 (프로필 필수 목록)</h4>
@@ -3084,6 +3133,115 @@
       `;
     }
 
+    // =========================================================
+    // 9-B. 관심 만남 카테고리 (새 번개가 올라오면 알림)
+    // =========================================================
+    const FAV_PRESETS = ["🍚 밥약", "☕ 카공", "🎮 게임", "🍻 술/번개", "🏃 운동", "🚶 산책", "🚕 택시/카풀", "📚 스터디", "🎤 코노/노래방", "🧩 보드게임/방탈출"];
+    function catKey(s) {
+      return String(s || "").replace(/^[^\w가-힣]+/, "").trim().toLowerCase();
+    }
+    function catMatches(a, b) {
+      const x = catKey(a), y = catKey(b);
+      if (!x || !y) return false;
+      return x === y || x.includes(y) || y.includes(x);
+    }
+    function getFavList(user) {
+      const favs = (user && user.fav_cats) || [];
+      const customs = favs.filter(f => !FAV_PRESETS.some(p => catKey(p) === catKey(f)));
+      return FAV_PRESETS.concat(customs);
+    }
+    function renderFavSection(user) {
+      const favs = user.fav_cats || [];
+      const muted = user.fav_muted || [];
+      const list = getFavList(user);
+      return `
+        <h4 style="margin-bottom:4px;">⭐ 관심 만남 카테고리</h4>
+        <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">좋아하는 카테고리를 선택해 두면, 해당 카테고리로 새 번개가 올라올 때 <b>🔔 내 알림</b>으로 즉시 알려드려요! (우측 종 아이콘으로 카테고리별 알림 ON/OFF 가능)</div>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+          ${list.map((c, i) => {
+            const on = favs.some(f => catKey(f) === catKey(c));
+            const isMuted = muted.some(m => catKey(m) === catKey(c));
+            return `<span style="display:inline-flex; align-items:center; gap:4px;">
+              <button class="cat-btn ${on ? 'active' : ''}" onclick="toggleFavCat(${i})">${escHtml(c)}</button>
+              ${on ? `<button class="btn" style="width:auto; min-height:30px; padding:2px 8px; font-size:13px;" title="알림 켜기/끄기" onclick="toggleFavMute(${i})">${isMuted ? "🔕" : "🔔"}</button>` : ""}
+            </span>`;
+          }).join("")}
+        </div>
+        <div style="display:grid; grid-template-columns: 3fr 1fr; gap:6px;">
+          <input id="fav_custom_in" class="input" style="margin-bottom:0;" placeholder="나만의 관심 카테고리 직접 입력 (예: 🎬 영화, 🎸 밴드)" onkeydown="if(event.key==='Enter') addCustomFav()" />
+          <button class="btn" onclick="addCustomFav()">+ 추가</button>
+        </div>
+        <div style="font-size:11.5px; color:#8B95A1; margin-top:8px;">${favs.length === 0 ? "아직 선택한 관심 카테고리가 없어요. 위 버튼을 눌러 선택해보세요!" : `선택됨 ${favs.length}개 · 실시간 알림 ${favs.filter(f => !muted.some(m => catKey(m) === catKey(f))).length}개 켜짐`}</div>
+      `;
+    }
+    function refreshFavSection() {
+      const wrap = document.getElementById("fav-wrap");
+      const badgeWrap = document.getElementById("fav-profile-badges");
+      const u = DB.users[state.user_id];
+      if (wrap && u) wrap.innerHTML = renderFavSection(u);
+      if (badgeWrap && u) badgeWrap.innerHTML = renderFavBadgesHtml(u);
+    }
+    function toggleFavCat(i) {
+      const u = DB.users[state.user_id];
+      if (!u) return;
+      const c = getFavList(u)[i];
+      if (!c) return;
+      u.fav_cats = u.fav_cats || [];
+      const idx = u.fav_cats.findIndex(f => catKey(f) === catKey(c));
+      if (idx >= 0) {
+        u.fav_cats.splice(idx, 1);
+        u.fav_muted = (u.fav_muted || []).filter(m => catKey(m) !== catKey(c));
+      } else {
+        u.fav_cats.push(c);
+        showToast(`⭐ '${c}' 관심 카테고리로 등록! 새 번개가 올라오면 알려드릴게요.`);
+      }
+      u.updated_at = Date.now();
+      saveDB(true);
+      refreshFavSection();
+    }
+    function toggleFavMute(i) {
+      const u = DB.users[state.user_id];
+      if (!u) return;
+      const c = getFavList(u)[i];
+      if (!c) return;
+      u.fav_muted = u.fav_muted || [];
+      const idx = u.fav_muted.findIndex(m => catKey(m) === catKey(c));
+      if (idx >= 0) { u.fav_muted.splice(idx, 1); showToast(`🔔 '${c}' 알림을 켰어요.`); }
+      else { u.fav_muted.push(c); showToast(`🔕 '${c}' 알림을 껐어요.`); }
+      u.updated_at = Date.now();
+      saveDB(true);
+      refreshFavSection();
+    }
+    function addCustomFav() {
+      const inp = document.getElementById("fav_custom_in");
+      const u = DB.users[state.user_id];
+      if (!inp || !u) return;
+      const v = inp.value.trim();
+      if (catKey(v).length < 1) return showToast("추가할 카테고리 이름을 입력해주세요.");
+      if (v.length > 20) return showToast("카테고리는 20자 이내로 입력해주세요.");
+      u.fav_cats = u.fav_cats || [];
+      if (u.fav_cats.some(f => catKey(f) === catKey(v))) return showToast("이미 등록된 카테고리예요.");
+      u.fav_cats.push(v);
+      u.updated_at = Date.now();
+      saveDB(true);
+      showToast(`⭐ '${v}' 관심 카테고리로 등록!`);
+      refreshFavSection();
+    }
+    // 새 번개가 올라오면 해당 카테고리를 관심으로 둔 다른 학우에게 알림
+    function notifyFavCategory(post) {
+      try {
+        Object.values(DB.users || {}).forEach(u => {
+          if (!u || u.student_id === post.author_id) return;
+          const favs = u.fav_cats || [];
+          if (!favs.length) return;
+          const muted = u.fav_muted || [];
+          const hit = favs.find(f => catMatches(f, post.category) && !muted.some(m => catKey(m) === catKey(f)));
+          if (!hit) return;
+          notifyUser(u.student_id, `⭐ 관심 카테고리 [${post.category}] 새 번개! "${post.title}" · 📍${post.location} ${post.meet_time}`, post.id);
+        });
+      } catch (e) {}
+    }
+
     function saveProfileEdit() {
       const nick = document.getElementById("edit_nick").value.trim();
       const dept = document.getElementById("edit_dept").value.trim();
@@ -3098,7 +3256,8 @@
       u.avatar = avatar.split(" ")[0];
       u.mbti = mbti;
       u.bio = bio;
-      saveDB();
+      u.updated_at = Date.now();
+      saveDB(true);
       showToast("✅ 프로필이 업데이트되었습니다!");
       render();
     }

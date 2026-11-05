@@ -5,6 +5,7 @@ import smtplib
 import re
 import html
 import time
+import random
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
@@ -273,12 +274,28 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         "reviews": [],
     }
     if isinstance(client_db, dict):
-        # 1. Users 병합 (클라이언트 변경사항 및 신규 가입 학번 반영)
+        # 1. Users 병합 (최신 updated_at 우선 반영하여 다른 기기의 관심 카테고리/프로필 보호)
         c_users = client_db.get("users") or {}
         if isinstance(c_users, dict):
-            current.setdefault("users", {}).update(c_users)
+            s_users = current.setdefault("users", {})
+            for uid, c_u in c_users.items():
+                if not isinstance(c_u, dict):
+                    continue
+                s_u = s_users.get(uid)
+                if not isinstance(s_u, dict):
+                    s_users[uid] = c_u
+                else:
+                    if (c_u.get("updated_at") or 0) >= (s_u.get("updated_at") or 0):
+                        merged_u = dict(s_u)
+                        merged_u.update(c_u)
+                        s_users[uid] = merged_u
+                    else:
+                        merged_u = dict(c_u)
+                        merged_u.update(s_u)
+                        s_users[uid] = merged_u
 
         # 2. Posts 병합 (최신 글이 위로 오도록 정렬)
+        prev_post_ids = {p.get("id") for p in (current.get("posts") or []) if isinstance(p, dict)}
         merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), deleted_post_ids)
         merged_posts.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["posts"] = merged_posts
@@ -287,6 +304,36 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         current["applications"] = _merge_list_by_id(current.get("applications"), client_db.get("applications"))
         current["messages"] = _merge_list_by_id(current.get("messages"), client_db.get("messages"))
         merged_notifs = _merge_list_by_id(current.get("notifications"), client_db.get("notifications"))
+
+        # 새로 등록된 번개가 있다면 서버에서도 관심 카테고리 학우들에게 알림 보장 생성
+        def _cat_key(s):
+            return re.sub(r"^[^\w가-힣]+", "", str(s or "")).strip().lower()
+
+        def _cat_match(a, b):
+            x, y = _cat_key(a), _cat_key(b)
+            return bool(x and y and (x == y or x in y or y in x))
+
+        new_posts = [p for p in merged_posts if isinstance(p, dict) and p.get("id") not in prev_post_ids]
+        for np in new_posts:
+            p_id = np.get("id")
+            p_cat = np.get("category", "")
+            p_author = np.get("author_id", "")
+            for uid, u_obj in (current.get("users") or {}).items():
+                if not isinstance(u_obj, dict) or uid == p_author:
+                    continue
+                favs = u_obj.get("fav_cats") or []
+                muted = u_obj.get("fav_muted") or []
+                hit = any(_cat_match(f, p_cat) and not any(_cat_key(m) == _cat_key(f) for m in muted) for f in favs)
+                if hit and not any(n.get("user_id") == uid and n.get("post_id") == p_id for n in merged_notifs if isinstance(n, dict)):
+                    merged_notifs.append({
+                        "id": int(time.time() * 1000) + random.randint(1, 999),
+                        "user_id": uid,
+                        "post_id": p_id,
+                        "message": f"⭐ 관심 카테고리 [{p_cat}] 새 번개! \"{np.get('title', '')}\" · 📍{np.get('location', '')} {np.get('meet_time', '')}",
+                        "is_read": 0,
+                        "created_at": time.strftime("%Y-%m-%d %H:%M"),
+                    })
+
         merged_notifs.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["notifications"] = merged_notifs[:200]
         current["reviews"] = _merge_list_by_id(current.get("reviews"), client_db.get("reviews"))
