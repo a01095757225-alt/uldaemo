@@ -1591,7 +1591,10 @@
 
       const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
       const badgeCnt = unreadCnt + unseenNoticeCnt();
-      const notifBadge = badgeCnt > 0 ? `🔔 ${badgeCnt}` : `🔔 알림`;
+      const newNoticeCnt = unseenNoticeCnt();
+      const notifBadge = badgeCnt > 0
+        ? [unreadCnt > 0 ? `🔔 ${unreadCnt}` : "", newNoticeCnt > 0 ? `🏫 ${newNoticeCnt}` : ""].filter(Boolean).join(" · ")
+        : `🔔 알림`;
       const notifActive = (badgeCnt > 0 || state.active_modal === "notifications") ? "active" : "";
       loadNotices(false);
 
@@ -1662,11 +1665,11 @@
         <aside class="pc-right">
           <div class="uldaemo-card" style="padding:14px 16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <span style="font-weight:800; font-size:14px;">🔔 알림 ${badgeCnt > 0 ? `<span class="count-chip">${badgeCnt}</span>` : ""}</span>
-              <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 · 전체 ›</span>
+              <span style="font-weight:800; font-size:14px;">🔔 내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
+              <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">🏫 울산대 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›</span>
             </div>
             ${myNotifs.length === 0
-              ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">새로운 알림이 없어요.</div>`
+              ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
               : myNotifs.map(n => `
                 <div class="right-notif ${n.is_read ? '' : 'unread'}">
                   <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
@@ -1996,7 +1999,20 @@
     // 5. 실시간 알림 센터 모달
     // =========================================================
     function toggleNotificationsModal() {
-      state.active_modal = state.active_modal === "notifications" ? null : "notifications";
+      if (state.active_modal === "notifications") {
+        state.active_modal = null;
+      } else {
+        const myUnread = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
+        const newNotice = unseenNoticeCnt();
+        state.active_modal = "notifications";
+        // 내 알림은 없고 새 공지만 있으면 공지 탭을 먼저 보여줌
+        if (myUnread === 0 && newNotice > 0) {
+          state.notif_tab = "ulsan";
+          markNoticesSeen();
+        } else {
+          state.notif_tab = "mine";
+        }
+      }
       render();
     }
 
@@ -2030,8 +2046,9 @@
         ${myNotifs.length === 0 ? `
           <div class="uldaemo-card" style="text-align:center; padding:30px;">
             <div style="font-size:32px; margin-bottom:6px;">🌱</div>
-            <div style="font-weight:800;">도착한 알림이 없어요</div>
+            <div style="font-weight:800;">내 알림이 아직 없어요</div>
             <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">모임에 참여 신청이 오거나 수락되면 이곳에 실시간으로 표시됩니다!</div>
+            ${newNotice > 0 ? `<button class="btn btn-primary" style="margin-top:10px;" onclick="switchNotifTab('ulsan')">🏫 새 울산대 공지 ${newNotice}건 확인하기 ›</button>` : `<div style="font-size:12px; color:#8B95A1; margin-top:8px;">학교 공지는 위의 [🏫 울산대 공지] 탭에서 볼 수 있어요.</div>`}
           </div>
         ` : myNotifs.map(n => `
           <div class="uldaemo-card" style="background:${n.is_read ? '#FFFFFF' : '#EEF8F3'}; border-color:${n.is_read ? '#E5E8EB' : '#287D62'}; padding:13px 15px; margin-bottom:8px;">
