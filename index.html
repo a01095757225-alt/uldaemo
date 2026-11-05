@@ -1698,14 +1698,19 @@
       `;
     }
 
-    function renderHomeTab() {
+    function getFilteredHomePosts() {
       let list = DB.posts.filter(p => p.status === "모집중");
       if (state.home_cat !== "전체") {
         list = list.filter(p => p.category.includes(state.home_cat));
       }
       if (state.search_q.trim()) {
         const q = state.search_q.trim().toLowerCase();
-        list = list.filter(p => p.title.toLowerCase().includes(q) || p.location.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+        list = list.filter(p =>
+          p.title.toLowerCase().includes(q) ||
+          p.location.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          (p.meeting_style && p.meeting_style.toLowerCase().includes(q))
+        );
       }
       if (state.sort_opt === "📍 내 위치에서 가까운 순") {
         list.sort((a, b) => {
@@ -1716,7 +1721,39 @@
       } else if (state.sort_opt === "🌡️ 방장 매너온도 높은 순") {
         list.sort((a, b) => ((DB.users[b.author_id]?.manner_temp || 36.5) - (DB.users[a.author_id]?.manner_temp || 36.5)));
       }
+      return list;
+    }
 
+    function renderHomeFeedListHtml() {
+      const list = getFilteredHomePosts();
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:15px; font-weight:800;">⚡ 실시간 캠퍼스 번개 (${list.length}건)</span>
+          <span class="privacy-pill-mini">🛡️ 수락 전 익명 보장</span>
+        </div>
+
+        ${list.length === 0 ? `
+          <div class="uldaemo-card" style="text-align:center; padding:30px;">
+            <div style="font-size:32px;">🌱</div>
+            <div style="font-weight:800; margin-top:6px;">조건에 맞는 번개 모임이 없어요</div>
+          </div>
+        ` : list.map(renderMeetupCard).join("")}
+      `;
+    }
+
+    let _searchDebounceTimer = null;
+    function handleHomeSearchInput(val) {
+      state.search_q = val;
+      clearTimeout(_searchDebounceTimer);
+      _searchDebounceTimer = setTimeout(() => {
+        const wrap = document.getElementById("home-feed-list-wrap");
+        if (wrap) {
+          wrap.innerHTML = renderHomeFeedListHtml();
+        }
+      }, 60);
+    }
+
+    function renderHomeTab() {
       return `
         <div class="main-banner">
           <div>
@@ -1730,7 +1767,7 @@
         ${renderCategoryChips("home_cat")}
 
         <div style="display:grid; grid-template-columns: 1.5fr 1.1fr; gap:6px; margin-bottom:10px;">
-          <input class="input" style="margin-bottom:0;" placeholder="🔍 제목, 호관, 키워드 검색..." value="${state.search_q}" oninput="state.search_q=this.value; render();" />
+          <input id="home-search-input" class="input" style="margin-bottom:0;" placeholder="🔍 제목, 호관, 키워드 검색..." value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
           <select class="select" style="margin-bottom:0;" onchange="state.sort_opt=this.value; render();">
             <option value="🕒 마감 임박순" ${state.sort_opt === '🕒 마감 임박순' ? 'selected' : ''}>🕒 마감 임박순</option>
             <option value="📍 내 위치에서 가까운 순" ${state.sort_opt === '📍 내 위치에서 가까운 순' ? 'selected' : ''}>📍 내 위치 가까운 순</option>
@@ -1738,17 +1775,9 @@
           </select>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:15px; font-weight:800;">⚡ 실시간 캠퍼스 번개 (${list.length}건)</span>
-          <span class="privacy-pill-mini">🛡️ 수락 전 익명 보장</span>
+        <div id="home-feed-list-wrap">
+          ${renderHomeFeedListHtml()}
         </div>
-
-        ${list.length === 0 ? `
-          <div class="uldaemo-card" style="text-align:center; padding:30px;">
-            <div style="font-size:32px;">🌱</div>
-            <div style="font-weight:800; margin-top:6px;">조건에 맞는 번개 모임이 없어요</div>
-          </div>
-        ` : list.map(renderMeetupCard).join("")}
       `;
     }
 
