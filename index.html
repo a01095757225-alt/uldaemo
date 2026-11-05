@@ -1651,7 +1651,7 @@
                 </div>
               `).join("")}
           </div>
-          ${state.nav_tab !== "지도" ? `
+          ${(state.nav_tab !== "지도" && state.active_modal !== "detail") ? `
             <div class="uldaemo-card" style="padding:14px 16px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <span style="font-weight:800; font-size:14px;">🗺️ 캠퍼스 번개 지도</span>
