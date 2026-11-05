@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -1392,6 +1392,65 @@
       loadNotices(true);
     }
 
+    // ---- 상단바 알림 (Service Worker + Notification API, 무료) ----
+    function pushSupported() {
+      return "serviceWorker" in navigator && "Notification" in window;
+    }
+    function pushEnabled() {
+      return pushSupported() && Notification.permission === "granted" && localStorage.getItem("uldaemo_push_on") === "1";
+    }
+    function getPushedIds() {
+      try { return JSON.parse(localStorage.getItem("uldaemo_notice_pushed") || "[]"); } catch (e) { return []; }
+    }
+    async function getSwReg() {
+      try { return await navigator.serviceWorker.register("/sw.js"); } catch (e) { return null; }
+    }
+    async function showSystemNotification(title, body, url) {
+      try {
+        const reg = (await navigator.serviceWorker.getRegistration()) || (await getSwReg());
+        if (reg) await reg.showNotification(title, { body, data: { url: url || "/" }, vibrate: [120, 60, 120] });
+        else new Notification(title, { body });
+      } catch (e) {}
+    }
+    async function enablePush() {
+      if (!pushSupported()) return showToast("이 브라우저는 알림을 지원하지 않아요. (아이폰은 홈 화면에 추가 후 사용)");
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") return showToast("알림이 차단되었어요. 브라우저 설정에서 허용해 주세요.");
+        await getSwReg();
+        localStorage.setItem("uldaemo_push_on", "1");
+        localStorage.setItem("uldaemo_notice_pushed", JSON.stringify(NOTICES.items.map(n => n.id)));
+        await showSystemNotification("🔔 울대모 알림이 켜졌어요!", "울산대 새 행사·공지가 올라오면 알려드릴게요.", "/");
+        showToast("🔔 알림이 켜졌습니다!");
+        render();
+      } catch (e) { showToast("알림 설정 중 오류가 발생했어요."); }
+    }
+    function disablePush() {
+      localStorage.setItem("uldaemo_push_on", "0");
+      showToast("🔕 알림을 껐습니다.");
+      render();
+    }
+    function pushBtnHtml() {
+      if (!pushSupported()) return "";
+      const on = pushEnabled();
+      return `<button class="btn ${on ? '' : 'btn-primary'}" style="margin-bottom:10px;" onclick="${on ? 'disablePush()' : 'enablePush()'}">${on ? '🔕 새 공지 알림 끄기' : '🔔 새 공지·행사 알림 받기'}</button>`;
+    }
+    function notifyNewNotices() {
+      if (!pushEnabled()) return;
+      const pushed = new Set(getPushedIds());
+      const fresh = NOTICES.items.filter(n => !pushed.has(n.id));
+      if (!fresh.length) return;
+      localStorage.setItem("uldaemo_notice_pushed", JSON.stringify(NOTICES.items.map(n => n.id)));
+      const top = fresh[0];
+      showSystemNotification(
+        fresh.length > 1 ? `📢 울산대 새 공지·행사 ${fresh.length}건` : "📢 울산대 새 공지·행사",
+        top.title,
+        top.link || "/"
+      );
+    }
+    setInterval(() => { if (state.user_id && pushEnabled()) loadNotices(true); }, 10 * 60 * 1000);
+    if (pushSupported() && localStorage.getItem("uldaemo_push_on") === "1") getSwReg();
+
     async function loadNotices(force) {
       if (NOTICES.loading) return;
       if (!force && Date.now() - NOTICES.loadedAt < 5 * 60 * 1000) return;
@@ -1407,6 +1466,7 @@
           NOTICES.items = data.items;
           NOTICES.failed = false;
           localStorage.setItem("uldaemo_notices", JSON.stringify(data.items));
+          notifyNewNotices();
         } else {
           NOTICES.failed = true;
         }
@@ -1927,6 +1987,7 @@
         <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 이전 화면으로 돌아가기</button>
         <h3 style="margin-bottom:10px;">🔔 알림 센터</h3>
         ${tabsHtml}
+        ${pushBtnHtml()}
         ${renderUlsanNoticeList()}
       `;
       }
@@ -1934,6 +1995,7 @@
         <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 이전 화면으로 돌아가기</button>
         <h3 style="margin-bottom:10px;">🔔 실시간 알림 센터</h3>
         ${tabsHtml}
+        ${pushBtnHtml()}
         <div class="row-3" style="margin-bottom:12px;">
           <button class="btn btn-primary" ${unreadCnt === 0 ? "disabled" : ""} onclick="markAllNotifsRead()">✅ 모두 읽음</button>
           <button class="btn" onclick="markAllNotifsRead(); switchTab('채팅');">💬 채팅/신청 관리</button>

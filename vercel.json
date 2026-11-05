@@ -2,10 +2,12 @@
   "version": 2,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
+    { "src": "sw.js", "use": "@vercel/static" },
     { "src": "api/index.py", "use": "@vercel/python" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "api/index.py" },
+    { "src": "/sw.js", "dest": "/sw.js", "headers": { "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" } },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
