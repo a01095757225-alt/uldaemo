@@ -740,6 +740,74 @@
       animation: goldAuraPulse 2.2s infinite ease-in-out;
     }
 
+    /* ===== 👑 운영진 공식 번개 전용 골드 뱃지 & 프리미엄 테두리 ===== */
+    .official-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: linear-gradient(135deg, #FFF3BF 0%, #FFE066 100%);
+      color: #7A4B00;
+      border: 1px solid #F59E0B;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
+    }
+    .card-official {
+      background: linear-gradient(180deg, #FFFFFF 0%, #FFFDF5 100%) !important;
+      border: 2px solid #F59E0B !important;
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.16) !important;
+      position: relative;
+    }
+    .card-official::before {
+      content: '👑 운영진 공식 번개';
+      position: absolute;
+      top: -11px;
+      left: 16px;
+      background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+      color: #FFFFFF;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 10px;
+      border-radius: 999px;
+      box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35);
+      letter-spacing: -0.2px;
+    }
+
+    /* ===== 💥 번개 취소/폭파 시 산산조각 파티클 폭파 애니메이션 ===== */
+    @keyframes cardPoofBurst {
+      0% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+        filter: blur(0px);
+      }
+      25% {
+        transform: scale(1.04) rotate(-1.5deg);
+        border-color: #EF4444 !important;
+        box-shadow: 0 0 25px rgba(239, 68, 68, 0.5) !important;
+      }
+      50% {
+        transform: scale(0.94) rotate(2deg);
+        filter: blur(1px);
+      }
+      100% {
+        transform: scale(0.65) translateY(40px) rotate(-6deg);
+        opacity: 0;
+        filter: blur(6px);
+      }
+    }
+    .card-bursting {
+      animation: cardPoofBurst 0.65s cubic-bezier(0.36, 0, 0.66, -0.56) forwards !important;
+      pointer-events: none !important;
+    }
+    .burst-smoke-screen {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
     /* ===== 🔥 캠퍼스 광장 (밸런스 게임 & 24시간 한줄 잔디톡) ===== */
     .plaza-hero {
       background: linear-gradient(135deg, #1E634C 0%, #287D62 60%, #40916C 100%);
@@ -980,6 +1048,59 @@
       if (!el) return;
       el.style.opacity = "1";
       setTimeout(() => { el.style.opacity = "0"; }, 320);
+    }
+
+    // 번개 폭파/취소 시 펑! 하고 터지는 연기·파편 폭발 애니메이션
+    function fireBurstExplosion(x, y) {
+      const canvas = document.getElementById("confetti-canvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const originX = x || (canvas.width * 0.5);
+      const originY = y || (canvas.height * 0.45);
+      const colors = ["#EF4444", "#F59E0B", "#6B7280", "#9CA3AF", "#DC2626", "#FBBF24", "#1F2937"];
+      const particles = Array.from({ length: 65 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 16 + 4;
+        return {
+          x: originX,
+          y: originY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,
+          size: Math.random() * 9 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          isSmoke: Math.random() > 0.4,
+          alpha: 1
+        };
+      });
+      let frame = 0;
+      function tick() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.94;
+          p.vy = p.vy * 0.94 + (p.isSmoke ? -0.1 : 0.35); // 연기는 위로 피어오르고 파편은 떨어짐
+          p.size += p.isSmoke ? 0.35 : 0;
+          p.alpha -= p.isSmoke ? 0.022 : 0.028;
+          if (p.alpha > 0) {
+            alive = true;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.alpha);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        });
+        if (alive && frame < 70) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      requestAnimationFrame(tick);
     }
 
     const DEFAULT_POLLS = [
@@ -2182,6 +2303,7 @@
       const myApp = DB.applications.find(a => a.post_id === post.id && a.applicant_id === state.user_id);
       const isAuthor = post.author_id === state.user_id;
       const isFull = acceptedCnt >= post.max_participants || post.status !== "모집중";
+      const isOfficial = Boolean(post.is_official);
 
       const coords = getBuildingCoords(post.location);
       const distM = calcDistanceMeters(state.my_lat, state.my_lng, coords[0], coords[1]);
@@ -2202,29 +2324,33 @@
       } else if (isFull) {
         actionBtn = `<button class="btn" disabled>모집 마감</button>`;
       } else {
-        actionBtn = `<button class="btn btn-primary" onclick="applyToPost(${post.id})">참여 신청</button>`;
+        actionBtn = `<button class="btn btn-primary" onclick="applyToPost(${post.id})">${isOfficial ? "🎁 공식 번개 참여 신청" : "참여 신청"}</button>`;
       }
 
       const isJustCreated = (window._justCreatedPostId === post.id);
       return `
-        <div class="uldaemo-card ${isJustCreated ? 'card-pop-new' : ''}">
+        <div id="post-card-${post.id}" class="uldaemo-card ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}" style="${isOfficial ? 'margin-top:14px;' : ''}">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
             <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+              ${isOfficial ? `<span class="official-badge">👑 운영진 공식 번개</span>` : ""}
               <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
               ${distHtml}
               <span class="privacy-pill-mini">🛡️ 익명 보장</span>
             </div>
             <span style="font-size:11px; color:#8B95A1; font-weight:600;">${post.meeting_style}</span>
           </div>
-          <div style="font-size:17px; font-weight:800; margin-bottom:6px;">${post.title}</div>
+          <div style="font-size:17px; font-weight:800; margin-bottom:6px; ${isOfficial ? 'color:#1E3A8A;' : ''}">
+            ${isOfficial ? '⭐ ' : ''}${post.title}
+          </div>
           <div style="font-size:12.5px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
             <span>📍 <b>${post.location}</b></span>
             <span>🕒 <b>${post.meet_date} ${post.meet_time}</b></span>
             <span>👥 <b>${acceptedCnt} / ${post.max_participants}명</b></span>
+            ${isOfficial ? `<span style="color:#D97706; font-weight:700;">🎁 참가시 매너온도 +1.0°C 보너스</span>` : ""}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:6px;">
             <div>
-              <div style="font-size:13.5px; font-weight:700;">${author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</div>
+              <div style="font-size:13.5px; font-weight:700;">${isOfficial ? '👑' : author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</div>
               <div style="font-size:11.5px; color:#6B7684;">${author.department} · ${author.mbti}</div>
             </div>
             <div style="width:135px;">${renderTempGauge(author.manner_temp, false)}</div>
@@ -2263,6 +2389,9 @@
       } else if (state.sort_opt === "🌡️ 방장 매너온도 높은 순") {
         list.sort((a, b) => ((DB.users[b.author_id]?.manner_temp || 36.5) - (DB.users[a.author_id]?.manner_temp || 36.5)));
       }
+
+      // 운영진 공식 번개(is_official: true)는 피드 최상단에 고정 노출
+      list.sort((a, b) => (b.is_official ? 1 : 0) - (a.is_official ? 1 : 0));
       return list;
     }
 
@@ -2404,6 +2533,16 @@
             <option value="밥만 빠르게 먹고 헤어져요"></option>
           </datalist>
 
+          <div style="background:#FFFDF5; border:1px solid #F59E0B; border-radius:12px; padding:10px 12px; margin:10px 0 12px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7A4B00; cursor:pointer;">
+              <input id="c_official" type="checkbox" style="width:16px; height:16px; accent-color:#F59E0B;" />
+              👑 운영진 공식 번개로 등록 (피드 최상단 고정 + 골드 강조 뱃지)
+            </label>
+            <div style="font-size:11px; color:#92400E; margin-top:3px; padding-left:24px;">
+              * 학우들의 참여를 유도하기 위해 운영진이 주최하는 공식 밥약·카공·이벤트 모임에 체크하세요.
+            </div>
+          </div>
+
           <button class="btn btn-primary" style="margin-top:6px;" onclick="submitCreatePost()">⚡ 번개 모집 등록하기</button>
         </div>
       `;
@@ -2417,6 +2556,7 @@
       const location = document.getElementById("c_loc").value.trim();
       const max_p = parseInt(document.getElementById("c_max").value || "3", 10);
       const style = document.getElementById("c_style").value.trim();
+      const is_official = document.getElementById("c_official") ? document.getElementById("c_official").checked : false;
 
       if (title.length < 2) return showToast("모집 제목은 최소 2글자 이상 입력해주세요.");
       if (meet_date < getTodayStr()) return showToast("과거 날짜로는 번개 모임을 등록할 수 없습니다.");
@@ -2433,6 +2573,7 @@
         location,
         max_participants: max_p,
         meeting_style: style,
+        is_official: is_official,
         status: "모집중"
       });
       notifyFavCategory(DB.posts[0]);
@@ -2485,12 +2626,15 @@
 
       return `
         <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; render();">← 목록으로 돌아가기</button>
-        <div class="uldaemo-card">
-          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
-            <span class="privacy-pill-mini">🛡️ 블라인드 프로필 적용중</span>
+        <div class="uldaemo-card ${post.is_official ? 'card-official' : ''}" style="${post.is_official ? 'margin-top:14px;' : ''}">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
+            <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+              ${post.is_official ? `<span class="official-badge">👑 운영진 공식 번개</span>` : ""}
+              <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
+              <span class="privacy-pill-mini">🛡️ 블라인드 프로필 적용중</span>
+            </div>
           </div>
-          <h3 style="font-size:20px; margin-bottom:12px;">${post.title}</h3>
+          <h3 style="font-size:20px; margin-bottom:12px; ${post.is_official ? 'color:#1E3A8A;' : ''}">${post.is_official ? '⭐ ' : ''}${post.title}</h3>
           <div style="background:#F7F8F4; border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:12px;">
             <div style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
               <span>📍 <b>만날 장소:</b> ${post.location}</span>
@@ -2786,13 +2930,40 @@
     }
 
     function deletePost(postId) {
-      if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
-      DB.posts = DB.posts.filter(p => p.id !== postId);
-      DB.applications = DB.applications.filter(a => a.post_id !== postId);
-      saveDB(true);
-      state.active_modal = null;
-      showToast("모임 게시글이 삭제되었습니다.");
-      render();
+      const p = (DB.posts || []).find(x => x.id === postId);
+      const postTitle = p ? p.title : "모임";
+
+      // 💥 모임에 참여 신청했던 학우들에게 '모임 폭파' 알림 전송
+      (DB.applications || []).filter(a => a.post_id === postId).forEach(a => {
+        if (a.applicant_id !== state.user_id) {
+          notifyUser(a.applicant_id, `💨 [${postTitle}] 번개 모임이 방장에 의해 취소(폭파)되었습니다.`);
+        }
+      });
+
+      // 상세 모달 내 카드나 피드 내 카드 엘리먼트 찾기
+      const cardEl = document.getElementById(`post-card-${postId}`);
+      let burstX = window.innerWidth * 0.5;
+      let burstY = window.innerHeight * 0.45;
+      if (cardEl) {
+        const rect = cardEl.getBoundingClientRect();
+        burstX = rect.left + rect.width * 0.5;
+        burstY = rect.top + rect.height * 0.5;
+        cardEl.classList.add("card-bursting");
+      }
+
+      // 💥 펑! 연기·파편 폭발 파티클 실행
+      fireBurstExplosion(burstX, burstY);
+      showToast("💥 펑! 번개 모임이 폭파(취소)되었습니다.");
+
+      // 카드 산산조각 애니메이션(0.4초) 후 실제 데이터 삭제 및 화면 갱신
+      setTimeout(() => {
+        if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
+        DB.posts = DB.posts.filter(p => p.id !== postId);
+        DB.applications = DB.applications.filter(a => a.post_id !== postId);
+        saveDB(true);
+        state.active_modal = null;
+        render();
+      }, 420);
     }
 
     // =========================================================
