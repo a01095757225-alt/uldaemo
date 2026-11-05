@@ -283,13 +283,21 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         merged_posts.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["posts"] = merged_posts
 
-        # 3. Applications, Messages, Notifications, Reviews 병합
+        # 3. Applications, Messages, Notifications, Reviews, Polls, Plaza Talks 병합
         current["applications"] = _merge_list_by_id(current.get("applications"), client_db.get("applications"))
         current["messages"] = _merge_list_by_id(current.get("messages"), client_db.get("messages"))
         merged_notifs = _merge_list_by_id(current.get("notifications"), client_db.get("notifications"))
         merged_notifs.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["notifications"] = merged_notifs[:200]
         current["reviews"] = _merge_list_by_id(current.get("reviews"), client_db.get("reviews"))
+
+        merged_polls = _merge_list_by_id(current.get("polls"), client_db.get("polls"))
+        merged_polls.sort(key=lambda x: x.get("id", 0), reverse=True)
+        current["polls"] = merged_polls[:50]
+
+        merged_talks = _merge_list_by_id(current.get("plaza_talks"), client_db.get("plaza_talks"))
+        merged_talks.sort(key=lambda x: x.get("id", 0), reverse=True)
+        current["plaza_talks"] = merged_talks[:100]
 
     try:
         url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
