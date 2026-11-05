@@ -1350,6 +1350,16 @@
 
     let DB = loadDB();
 
+    // 운영진(관리자) 권한 판별: 20261275, 20241001, admin 또는 is_admin 플래그를 가진 계정만 공식 번개 개설 가능
+    const ADMIN_STUDENT_IDS = ["20261275", "20241001", "admin"];
+    function isCurrentUserAdmin() {
+      if (!state || !state.user_id) return false;
+      const u = (DB && DB.users) ? DB.users[state.user_id] : null;
+      if (ADMIN_STUDENT_IDS.includes(String(state.user_id))) return true;
+      if (u && (u.is_admin || u.role === "admin" || (u.email && u.email.toLowerCase().startsWith("admin@")))) return true;
+      return false;
+    }
+
     const state = {
       user_id: localStorage.getItem("uldaemo_uid") || "",
       login_tab: "login",
@@ -1799,12 +1809,15 @@
               </button>
             `).join("")}
           </nav>
-          <button class="btn btn-primary" style="margin-top:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
           <div class="side-user">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
               <div class="${currentUser.manner_temp >= 40 ? 'aura-40' : ''}" style="width:40px; height:40px; border-radius:50%; background:#EEF8F3; border:2px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:22px;">${currentUser.avatar.split(" ")[0]}</div>
               <div>
-                <div style="font-weight:800; font-size:14px;">${currentUser.nickname} ${currentUser.manner_temp >= 40 ? "👑" : ""}</div>
+                <div style="font-weight:800; font-size:14px; display:flex; align-items:center; gap:4px;">
+                  <span>${currentUser.nickname}</span>
+                  ${currentUser.manner_temp >= 40 ? "👑" : ""}
+                  ${isCurrentUserAdmin() ? `<span style="font-size:10px; background:#FEF3C7; color:#92400E; font-weight:800; padding:1px 5px; border-radius:4px;">👑 운영진</span>` : ""}
+                </div>
                 <div style="font-size:11.5px; color:#6B7684;">${currentUser.department} · ${currentUser.mbti}</div>
               </div>
             </div>
@@ -2533,15 +2546,17 @@
             <option value="밥만 빠르게 먹고 헤어져요"></option>
           </datalist>
 
+          ${isCurrentUserAdmin() ? `
           <div style="background:#FFFDF5; border:1px solid #F59E0B; border-radius:12px; padding:10px 12px; margin:10px 0 12px;">
             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7A4B00; cursor:pointer;">
               <input id="c_official" type="checkbox" style="width:16px; height:16px; accent-color:#F59E0B;" />
               👑 운영진 공식 번개로 등록 (피드 최상단 고정 + 골드 강조 뱃지)
             </label>
             <div style="font-size:11px; color:#92400E; margin-top:3px; padding-left:24px;">
-              * 학우들의 참여를 유도하기 위해 운영진이 주최하는 공식 밥약·카공·이벤트 모임에 체크하세요.
+              * 학우들의 참여를 유도하기 위해 운영진이 주최하는 공식 밥약·카공·이벤트 모임에 체크하세요. (운영진 계정에만 표시됨)
             </div>
           </div>
+          ` : ''}
 
           <button class="btn btn-primary" style="margin-top:6px;" onclick="submitCreatePost()">⚡ 번개 모집 등록하기</button>
         </div>
@@ -2556,7 +2571,7 @@
       const location = document.getElementById("c_loc").value.trim();
       const max_p = parseInt(document.getElementById("c_max").value || "3", 10);
       const style = document.getElementById("c_style").value.trim();
-      const is_official = document.getElementById("c_official") ? document.getElementById("c_official").checked : false;
+      const is_official = (isCurrentUserAdmin() && document.getElementById("c_official")) ? document.getElementById("c_official").checked : false;
 
       if (title.length < 2) return showToast("모집 제목은 최소 2글자 이상 입력해주세요.");
       if (meet_date < getTodayStr()) return showToast("과거 날짜로는 번개 모임을 등록할 수 없습니다.");
@@ -3257,7 +3272,11 @@
               ${user.avatar.split(" ")[0]}
             </div>
             <div>
-              <div style="font-size:20px; font-weight:800;">${user.nickname} ${user.manner_temp >= 40 ? "✅" : ""}</div>
+              <div style="font-size:20px; font-weight:800; display:flex; align-items:center; gap:6px;">
+                <span>${user.nickname}</span>
+                ${user.manner_temp >= 40 ? "✅" : ""}
+                ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:#FEF3C7; color:#92400E; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #FDE68A;">👑 운영진</span>` : ""}
+              </div>
               <div style="font-size:13px; color:#6B7684; margin-top:2px;">울산대학교 · ${user.department} · ${user.mbti}</div>
               <div style="margin-top:4px;"><span class="privacy-pill-mini">🛡️ 이메일·실명 비공개 보호중</span></div>
             </div>
