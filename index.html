@@ -1543,6 +1543,27 @@
     // 3. 메인 렌더링 함수
     // =========================================================
     // PC(데스크톱) 레이아웃 기준 폭: 1024px 이상이면 3단(사이드바/피드/우측패널) 레이아웃 적용
+    // 가입 폼 임시 저장/복원 (이메일 인증 등으로 화면이 다시 그려져도 입력값 유지)
+    const SIGNUP_FIELDS = ["signup_sid", "signup_nick", "signup_avatar", "signup_gender", "signup_dept", "signup_mbti"];
+    function saveSignupDraft() {
+      try {
+        state.signup_draft = state.signup_draft || {};
+        SIGNUP_FIELDS.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) state.signup_draft[id] = el.value;
+        });
+      } catch (e) {}
+    }
+    function restoreSignupDraft() {
+      try {
+        const d = state.signup_draft || {};
+        SIGNUP_FIELDS.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && d[id] !== undefined && d[id] !== "") el.value = d[id];
+        });
+      } catch (e) {}
+    }
+
     function isPC() {
       return window.innerWidth >= 1024;
     }
@@ -1553,8 +1574,10 @@
 
       // 로그인 전 화면
       if (!state.user_id || !currentUser) {
+        saveSignupDraft();
         root.className = "app-shell";
         root.innerHTML = renderLoginView();
+        restoreSignupDraft();
         return;
       }
 
