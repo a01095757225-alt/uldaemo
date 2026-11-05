@@ -813,8 +813,116 @@
       return initial;
     }
 
-    function saveDB() {
+    let _deletedPostIds = [];
+    let _syncTimer = null;
+
+    function mergeCloudDBIntoLocal(cloudDb) {
+      if (!cloudDb || typeof cloudDb !== "object") return false;
+      let changed = false;
+
+      // 1. Users 병합 (PC/폰 어느 쪽에서 가입한 학번이든 모두 보존)
+      if (cloudDb.users && typeof cloudDb.users === "object") {
+        DB.users = Object.assign({}, cloudDb.users, DB.users || {});
+        // 클라우드의 최신 프로필/온도 정보도 반영
+        for (const [uid, uObj] of Object.entries(cloudDb.users)) {
+          if (uObj && typeof uObj === "object") {
+            DB.users[uid] = Object.assign({}, DB.users[uid] || {}, uObj);
+          }
+        }
+        changed = true;
+      }
+
+      const mergeList = (localArr, cloudArr) => {
+        const deletedSet = new Set(_deletedPostIds);
+        const map = new Map();
+        (cloudArr || []).forEach(it => { if (it && it.id && !deletedSet.has(it.id)) map.set(it.id, it); });
+        (localArr || []).forEach(it => { if (it && it.id && !deletedSet.has(it.id)) map.set(it.id, it); });
+        return Array.from(map.values());
+      };
+
+      if (Array.isArray(cloudDb.posts)) {
+        DB.posts = mergeList(DB.posts, cloudDb.posts).sort((a, b) => (b.id || 0) - (a.id || 0));
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.applications)) {
+        DB.applications = mergeList(DB.applications, cloudDb.applications);
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.messages)) {
+        DB.messages = mergeList(DB.messages, cloudDb.messages).sort((a, b) => (a.id || 0) - (b.id || 0));
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.notifications)) {
+        DB.notifications = mergeList(DB.notifications, cloudDb.notifications).sort((a, b) => (b.id || 0) - (a.id || 0));
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.reviews)) {
+        DB.reviews = mergeList(DB.reviews, cloudDb.reviews);
+        changed = true;
+      }
+
+      if (changed) {
+        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+      }
+      return changed;
+    }
+
+    async function syncToCloud(immediate = false) {
+      const runSync = async () => {
+        try {
+          const res = await fetch("/api/index", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "sync_db",
+              db: DB,
+              deleted_post_ids: _deletedPostIds
+            })
+          });
+          const data = await res.json();
+          if (data && data.ok && data.db) {
+            mergeCloudDBIntoLocal(data.db);
+          }
+        } catch (e) {}
+      };
+      if (immediate) {
+        clearTimeout(_syncTimer);
+        await runSync();
+      } else {
+        clearTimeout(_syncTimer);
+        _syncTimer = setTimeout(runSync, 250);
+      }
+    }
+
+    async function pullFromCloud(force = false) {
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "load_db", force })
+        });
+        const data = await res.json();
+        if (data && data.ok && data.db) {
+          const localUserCountBefore = Object.keys(DB.users || {}).length;
+          mergeCloudDBIntoLocal(data.db);
+          // 만약 이 기기에만 있던 기존 가입 계정이 클라우드에 아직 안 올라가 있었다면 즉시 클라우드로도 업로드
+          const cloudUsers = data.db.users || {};
+          const hasLocalOnlyUser = Object.keys(DB.users || {}).some(uid => !cloudUsers[uid]);
+          if (hasLocalOnlyUser || localUserCountBefore > Object.keys(cloudUsers).length) {
+            syncToCloud(true);
+          }
+          const ae = document.activeElement;
+          const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
+          if (!typing) render();
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    function saveDB(immediate = false) {
       localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+      syncToCloud(immediate);
     }
 
     let DB = loadDB();
@@ -1416,11 +1524,21 @@
       `;
     }
 
-    function handleLoginSubmit() {
+    async function handleLoginSubmit() {
       const sid = document.getElementById("login_sid").value.trim();
       if (!sid) return showToast("학번을 입력해주세요.");
-      if (!DB.users[sid]) return showToast("등록되지 않은 학번입니다. [신규 학우 가입] 탭에서 가입해주세요!");
-      persistLogin(sid);
+      if (DB.users[sid]) {
+        persistLogin(sid);
+        return;
+      }
+      showToast("☁️ 클라우드 서버에서 학번 정보를 확인하는 중입니다...");
+      await pullFromCloud(true);
+      if (DB.users[sid]) {
+        showToast("🎉 학번 인증 성공! 반갑습니다.");
+        persistLogin(sid);
+      } else {
+        showToast("등록되지 않은 학번입니다. [신규 학우 가입] 탭에서 가입해주세요!");
+      }
     }
 
     function saveSmtpSettings() {
@@ -1474,7 +1592,7 @@
       }
     }
 
-    function handleSignupSubmit() {
+    async function handleSignupSubmit() {
       const sid = document.getElementById("signup_sid").value.trim();
       const nick = document.getElementById("signup_nick").value.trim();
       const avatar = document.getElementById("signup_avatar").value;
@@ -1499,8 +1617,8 @@
         bio: "반갑습니다! 공강 시간에 같이 소통해요 🌱",
         keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊"]
       };
-      saveDB();
-      showToast("🎉 가입 완료! 울대모에 오신 것을 환영합니다.");
+      saveDB(true);
+      showToast("🎉 가입 완료! PC와 스마트폰 어디서나 이 학번으로 로그인됩니다.");
       persistLogin(sid);
     }
 
@@ -1984,9 +2102,10 @@
     }
 
     function deletePost(postId) {
+      if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
       DB.posts = DB.posts.filter(p => p.id !== postId);
       DB.applications = DB.applications.filter(a => a.post_id !== postId);
-      saveDB();
+      saveDB(true);
       state.active_modal = null;
       showToast("모임 게시글이 삭제되었습니다.");
       render();
@@ -2336,6 +2455,8 @@
     }
 
     render();
+    pullFromCloud(false);
+    setInterval(() => { pullFromCloud(false); }, 15000);
   </script>
 </body>
 </html>

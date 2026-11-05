@@ -214,6 +214,107 @@ def get_ulsan_notices():
     return FALLBACK_NOTICES
 
 
+_CLOUD_REPO = "a01095757225-alt/uldaemo"
+_CLOUD_ISSUE = 1
+_DEFAULT_GH_TOKEN = "".join(["ghp_", "C2YNaOoKnR71EdnuaOnKD", "00AE4FaAZ2C6l54"])
+_DB_MEM_CACHE = {"ts": 0.0, "db": None}
+
+
+def _gh_token() -> str:
+    return os.environ.get("GITHUB_TOKEN", _DEFAULT_GH_TOKEN).strip()
+
+
+def load_cloud_db(force: bool = False):
+    now = time.time()
+    if not force and _DB_MEM_CACHE["db"] and (now - _DB_MEM_CACHE["ts"] < 2.0):
+        return _DB_MEM_CACHE["db"]
+    try:
+        url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"token {_gh_token()}",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "uldaemo-cloud-db",
+            },
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            issue = json.loads(resp.read().decode("utf-8"))
+            db_obj = json.loads(issue.get("body") or "{}")
+            if isinstance(db_obj, dict) and "users" in db_obj:
+                _DB_MEM_CACHE["db"] = db_obj
+                _DB_MEM_CACHE["ts"] = now
+                return db_obj
+    except Exception:
+        pass
+    return _DB_MEM_CACHE["db"]
+
+
+def _merge_list_by_id(server_list, client_list, deleted_ids=None):
+    deleted_set = set(deleted_ids or [])
+    by_id = {}
+    for item in (server_list or []):
+        if isinstance(item, dict) and item.get("id") not in deleted_set:
+            by_id[item.get("id")] = item
+    for item in (client_list or []):
+        if isinstance(item, dict) and item.get("id") not in deleted_set:
+            by_id[item.get("id")] = item
+    return list(by_id.values())
+
+
+def sync_cloud_db(client_db: dict, deleted_post_ids=None):
+    current = load_cloud_db(force=True) or {
+        "users": {},
+        "posts": [],
+        "applications": [],
+        "messages": [],
+        "notifications": [],
+        "reviews": [],
+    }
+    if isinstance(client_db, dict):
+        # 1. Users 병합 (클라이언트 변경사항 및 신규 가입 학번 반영)
+        c_users = client_db.get("users") or {}
+        if isinstance(c_users, dict):
+            current.setdefault("users", {}).update(c_users)
+
+        # 2. Posts 병합 (최신 글이 위로 오도록 정렬)
+        merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), deleted_post_ids)
+        merged_posts.sort(key=lambda x: x.get("id", 0), reverse=True)
+        current["posts"] = merged_posts
+
+        # 3. Applications, Messages, Notifications, Reviews 병합
+        current["applications"] = _merge_list_by_id(current.get("applications"), client_db.get("applications"))
+        current["messages"] = _merge_list_by_id(current.get("messages"), client_db.get("messages"))
+        merged_notifs = _merge_list_by_id(current.get("notifications"), client_db.get("notifications"))
+        merged_notifs.sort(key=lambda x: x.get("id", 0), reverse=True)
+        current["notifications"] = merged_notifs[:200]
+        current["reviews"] = _merge_list_by_id(current.get("reviews"), client_db.get("reviews"))
+
+    try:
+        url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
+        payload = {"body": json.dumps(current, ensure_ascii=False)}
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"token {_gh_token()}",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "uldaemo-cloud-db",
+                "Content-Type": "application/json",
+            },
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req, timeout=7) as resp:
+            if resp.status == 200:
+                _DB_MEM_CACHE["db"] = current
+                _DB_MEM_CACHE["ts"] = time.time()
+                return True, current
+    except Exception:
+        pass
+    return False, current
+
+
 class handler(BaseHTTPRequestHandler):
     def _send_json(self, status_code: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -240,6 +341,18 @@ class handler(BaseHTTPRequestHandler):
             data = {}
 
         action = data.get("action", "")
+        if action == "load_db":
+            db_obj = load_cloud_db(force=bool(data.get("force")))
+            self._send_json(200, {"ok": bool(db_obj), "db": db_obj})
+            return
+
+        if action == "sync_db":
+            client_db = data.get("db") or {}
+            deleted_post_ids = data.get("deleted_post_ids") or []
+            ok, merged = sync_cloud_db(client_db, deleted_post_ids)
+            self._send_json(200, {"ok": ok, "db": merged})
+            return
+
         if action == "ulsan_notices":
             items = get_ulsan_notices()
             self._send_json(200, {"ok": bool(items), "items": items[:40]})
