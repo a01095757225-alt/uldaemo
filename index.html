@@ -1650,6 +1650,22 @@
       }
     }
 
+    function getDbStateSignature() {
+      try {
+        return JSON.stringify({
+          u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, v.coffee_tickets, v.streak_days]),
+          p: (DB.posts || []).map(p => [p.id, p.status, p.title]),
+          a: (DB.applications || []).map(a => [a.id, a.status]),
+          m: (DB.messages || []).map(m => [m.id, m.is_read, m.text]),
+          n: (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => [n.id, n.is_read]),
+          pl: (DB.polls || []).map(p => [p.id, (p.votes_a || []).length, (p.votes_b || []).length]),
+          t: (DB.plaza_talks || []).map(t => [t.id, (t.likes || []).length])
+        });
+      } catch (e) {
+        return "";
+      }
+    }
+
     async function pullFromCloud(force = false) {
       try {
         const res = await fetch("/api/index", {
@@ -1659,6 +1675,7 @@
         });
         const data = await res.json();
         if (data && data.ok && data.db) {
+          const sigBefore = getDbStateSignature();
           const localUserCountBefore = Object.keys(DB.users || {}).length;
           const prevNotifIds = new Set((DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => n.id));
           const prevApprovedIds = new Set(
@@ -1667,6 +1684,7 @@
               .map(a => a.id)
           );
           mergeCloudDBIntoLocal(data.db);
+          const sigAfter = getDbStateSignature();
 
           // 내 참여 신청이 방금 '승인됨'으로 바뀌었다면 즉시 토스트 안내
           if (state.user_id) {
@@ -1690,19 +1708,22 @@
           if (hasLocalOnlyUser || localUserCountBefore > Object.keys(cloudUsers).length) {
             syncToCloud(true);
           }
-          const ae = document.activeElement;
-          const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
-          if (!typing) {
-            render();
-          } else if (ae && ae.id && ae.id.startsWith("chat_in_")) {
-            // 채팅 입력창에 커서가 있더라도 입력 중인 텍스트를 보존하면서 새 메시지/채팅방 갱신
-            const activeId = ae.id;
-            const savedVal = ae.value;
-            render();
-            const restored = document.getElementById(activeId);
-            if (restored) {
-              restored.value = savedVal;
-              restored.focus();
+
+          // 데이터가 실제로 바뀐 경우에만 화면 갱신 (지도 깜빡임 원천 방지)
+          if (sigBefore !== sigAfter) {
+            const ae = document.activeElement;
+            const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
+            if (!typing) {
+              renderWithoutMapFlicker();
+            } else if (ae && ae.id && ae.id.startsWith("chat_in_")) {
+              const activeId = ae.id;
+              const savedVal = ae.value;
+              renderWithoutMapFlicker();
+              const restored = document.getElementById(activeId);
+              if (restored) {
+                restored.value = savedVal;
+                restored.focus();
+              }
             }
           }
           return true;
@@ -2171,6 +2192,8 @@
       if (NOTICES.loading) return;
       if (!force && Date.now() - NOTICES.loadedAt < 5 * 60 * 1000) return;
       NOTICES.loading = true;
+      const prevIds = (NOTICES.items || []).map(x => x.id).join(",");
+      let changed = false;
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -2179,6 +2202,8 @@
         });
         const data = await res.json();
         if (data.ok && Array.isArray(data.items) && data.items.length) {
+          const nextIds = data.items.map(x => x.id).join(",");
+          if (nextIds !== prevIds) changed = true;
           NOTICES.items = data.items;
           NOTICES.failed = false;
           localStorage.setItem("uldaemo_notices", JSON.stringify(data.items));
@@ -2191,10 +2216,11 @@
       }
       NOTICES.loading = false;
       NOTICES.loadedAt = Date.now();
-      // 입력 중이 아닐 때만 화면 갱신 (검색창 포커스 보호)
       const ae = document.activeElement;
       const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
-      if (state.user_id && !typing && (state.active_modal === "notifications" || (state.nav_tab === "홈" && !state.active_modal))) render();
+      if (state.user_id && !typing && (force || changed) && (state.active_modal === "notifications" || (state.nav_tab === "홈" && !state.active_modal))) {
+        renderWithoutMapFlicker();
+      }
     }
 
     function importantNotices() {
@@ -2276,6 +2302,7 @@
       if (CAFETERIA.loading) return;
       if (!force && Date.now() - CAFETERIA.loadedAt < 10 * 60 * 1000 && CAFETERIA.data) return;
       CAFETERIA.loading = true;
+      let changed = false;
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -2284,15 +2311,20 @@
         });
         const json = await res.json();
         if (json.ok && json.data && Array.isArray(json.data.days) && json.data.days.length) {
+          const prevStr = JSON.stringify((CAFETERIA.data && CAFETERIA.data.days) || []);
+          const nextStr = JSON.stringify(json.data.days);
+          if (prevStr !== nextStr) changed = true;
           CAFETERIA.data = json.data;
           localStorage.setItem("uldaemo_cafeteria", JSON.stringify(json.data));
         }
       } catch (e) {}
       CAFETERIA.loading = false;
       CAFETERIA.loadedAt = Date.now();
-      const ae = document.activeElement;
-      const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
-      if (state.user_id && !typing) render();
+      if (state.user_id && (force || changed)) {
+        const wrap = document.getElementById("cafeteria-card-wrap");
+        if (wrap) wrap.outerHTML = renderCafeteriaCard();
+        if (state.active_modal === "cafeteria") renderWithoutMapFlicker();
+      }
     }
 
     function getCafeteriaTodayIdx() {
@@ -2641,21 +2673,24 @@
 
       const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id).slice(0, 4);
       const activeCnt = DB.posts.filter(p => p.status === "모집중").length;
+      const rightNotifHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-weight:800; font-size:14px;">🔔 내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
+          <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">🏫 울산대 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›</span>
+        </div>
+        ${myNotifs.length === 0
+          ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
+          : myNotifs.map(n => `
+            <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
+              <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
+              <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+            </div>
+          `).join("")}
+      `;
       const rightHtml = `
         <aside class="pc-right">
-          <div class="uldaemo-card" style="padding:14px 16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <span style="font-weight:800; font-size:14px;">🔔 내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
-              <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">🏫 울산대 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›</span>
-            </div>
-            ${myNotifs.length === 0
-              ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
-              : myNotifs.map(n => `
-                <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
-                  <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
-                  <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
-                </div>
-              `).join("")}
+          <div id="pc-right-notifs" class="uldaemo-card" style="padding:14px 16px;">
+            ${rightNotifHtml}
           </div>
           ${(state.nav_tab !== "지도" && state.active_modal !== "detail") ? `
             <div class="uldaemo-card" style="padding:14px 16px;">
@@ -2664,7 +2699,7 @@
                 <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="switchTab('지도')">크게 보기 ›</span>
               </div>
               <div id="side-map"></div>
-              <div style="font-size:11.5px; color:#6B7684; margin-top:6px;">현재 모집 중인 번개 <b style="color:#287D62;">${activeCnt}건</b></div>
+              <div id="side-map-cnt" style="font-size:11.5px; color:#6B7684; margin-top:6px;">현재 모집 중인 번개 <b style="color:#287D62;">${activeCnt}건</b></div>
             </div>
           ` : ""}
           ${renderCafeteriaCard()}
@@ -2685,11 +2720,11 @@
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
                 <span class="campus-pill" onclick="switchTab('지도')">📍 울산대학교 ▾</span>
-                <span class="campus-pill ${notifActive}" onclick="toggleNotificationsModal()">${notifBadge}</span>
+                <span id="header-notif-pill" class="campus-pill ${notifActive}" onclick="toggleNotificationsModal()">${notifBadge}</span>
               </div>
             </div>
 
-            ${bodyHtml}
+            <div id="main-body-content">${bodyHtml}</div>
           </main>
           ${rightHtml}
         </div>
@@ -2715,6 +2750,55 @@
       }
       if (isPC() && document.getElementById("side-map")) {
         setTimeout(initSideMap, 80);
+      }
+    }
+
+    // 백그라운드 동기화 시 지도를 파괴하지 않고 본문/알림 영역만 부드럽게 갱신
+    function renderWithoutMapFlicker() {
+      const mainBody = document.getElementById("main-body-content");
+      const currentUser = DB.users[state.user_id];
+      if (!mainBody || !currentUser || state.nav_tab === "지도" || state.active_modal === "detail") {
+        // 지도 탭이나 상세 모달이 아닌 일반 상황에서 mainBody가 없으면 전체 렌더
+        if (!mainBody) render();
+        return;
+      }
+      const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
+      const newNoticeCnt = unseenNoticeCnt();
+      let bodyHtml = "";
+      if (state.active_modal === "cafeteria") {
+        bodyHtml = renderCafeteriaModal();
+      } else if (state.active_modal === "notifications") {
+        bodyHtml = renderNotificationsModal(unreadCnt);
+      } else if (state.active_modal === "create") {
+        bodyHtml = renderCreateModal();
+      } else if (state.nav_tab === "홈") {
+        bodyHtml = renderHomeTab();
+      } else if (state.nav_tab === "광장") {
+        bodyHtml = renderPlazaTab();
+      } else if (state.nav_tab === "채팅") {
+        bodyHtml = renderChatTab();
+      } else if (state.nav_tab === "마이") {
+        bodyHtml = renderProfileTab(currentUser);
+      }
+      mainBody.innerHTML = bodyHtml;
+
+      const rightNotifs = document.getElementById("pc-right-notifs");
+      if (rightNotifs) {
+        const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id).slice(0, 4);
+        rightNotifs.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:800; font-size:14px;">🔔 내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
+            <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">🏫 울산대 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›</span>
+          </div>
+          ${myNotifs.length === 0
+            ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
+            : myNotifs.map(n => `
+              <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
+                <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
+                <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+              </div>
+            `).join("")}
+        `;
       }
     }
 
