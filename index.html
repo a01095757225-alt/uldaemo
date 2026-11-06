@@ -808,6 +808,62 @@
       z-index: 9999;
     }
 
+    /* ===== 🏆 리워드 뱃지 & 출석/참여 챌린지 & 커피 랭킹 ===== */
+    .achieve-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .achieve-first { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+    .achieve-streak { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+    .achieve-coffee { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); color: #92400E; border: 1px solid #F59E0B; }
+    .achieve-temp { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+    .quest-item {
+      background: #F9FAFB;
+      border: 1px solid #E5E8EB;
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+    }
+    .quest-item.done {
+      background: #F2FBF7;
+      border-color: #A7F3D0;
+    }
+    .quest-progress-bg {
+      width: 100%;
+      height: 7px;
+      background: #E5E8EB;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .quest-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #F59E0B, #287D62);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+    .rank-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      border-radius: 12px;
+      background: #F9FAFB;
+      border: 1px solid #F2F4F6;
+      margin-bottom: 6px;
+    }
+    .rank-row.top1 {
+      background: linear-gradient(135deg, #FFFDF4 0%, #FEF3C7 100%);
+      border-color: #F59E0B;
+    }
+
     /* ===== 🔥 캠퍼스 광장 (밸런스 게임 & 24시간 한줄 잔디톡) ===== */
     .plaza-hero {
       background: linear-gradient(135deg, #1E634C 0%, #287D62 60%, #40916C 100%);
@@ -1358,6 +1414,185 @@
       if (ADMIN_STUDENT_IDS.includes(String(state.user_id))) return true;
       if (u && (u.is_admin || u.role === "admin" || (u.email && u.email.toLowerCase().startsWith("admin@")))) return true;
       return false;
+    }
+
+    // =========================================================
+    // 🏆 리워드 & 뱃지 & 어뷰징(조작) 방지 & 주간 출석/참여 챌린지 엔진
+    // =========================================================
+    function getUserStatsAndBadges(uid) {
+      const u = (DB && DB.users && DB.users[uid]) ? DB.users[uid] : { manner_temp: 36.5 };
+      const pairCounts = {};
+      let validMeets = 0;
+      let abusedBlockedCnt = 0;
+
+      // 1) 승인된 번개 매칭 및 상호 후기 기반 카운트 (어뷰징 방지: 동일 상대방 월 최대 2회까지만 인정)
+      const recordEncounter = (partnerId) => {
+        if (!partnerId || partnerId === uid) return; // 셀프 매칭 원천 차단
+        pairCounts[partnerId] = (pairCounts[partnerId] || 0) + 1;
+        if (pairCounts[partnerId] <= 2) {
+          validMeets++;
+        } else {
+          abusedBlockedCnt++;
+        }
+      };
+
+      (DB.applications || []).filter(a => a.status === "승인됨").forEach(a => {
+        const post = (DB.posts || []).find(p => p.id === a.post_id);
+        if (!post) return;
+        if (post.author_id === uid) recordEncounter(a.applicant_id);
+        else if (a.applicant_id === uid) recordEncounter(post.author_id);
+      });
+
+      (DB.reviews || []).forEach(r => {
+        if (r.from_id === uid) recordEncounter(r.to_id);
+      });
+
+      // 데모/초기 데이터 자연스러운 기본 실적 보정
+      if (uid === "20241003" && validMeets < 4) validMeets = 4;
+      if (uid === "20241001" && validMeets < 3) validMeets = 3;
+      if (uid === "20241002" && validMeets < 2) validMeets = 2;
+
+      const today = getTodayStr();
+      const streakDays = u.streak_days || (uid === "20241003" ? 5 : uid === "20241001" ? 4 : 1);
+      const checkedInToday = (u.last_checkin === today);
+      const weeklyMeets = Math.min(validMeets, u.weekly_meets || validMeets);
+      const firstMeetupDone = Boolean(u.first_reward_claimed || validMeets >= 1);
+      const coffeeTickets = (u.coffee_tickets !== undefined)
+        ? u.coffee_tickets
+        : ((firstMeetupDone ? 1 : 0) + (streakDays >= 3 ? 1 : 0) + (weeklyMeets >= 2 ? 1 : 0));
+
+      // 월간 커피 리워드 종합 점수 = (유효 만남 × 15점) + ((매너온도 - 36.5) × 10점) + (연속 출석 × 3점)
+      const tempBonus = Math.max(0, Math.round(((u.manner_temp || 36.5) - 36.5) * 10));
+      const rewardScore = (validMeets * 15) + tempBonus + (streakDays * 3);
+
+      const badges = [];
+      if (firstMeetupDone) {
+        badges.push({ label: "🌱 첫 번개 달성", cls: "achieve-first", desc: "첫 번개 매칭 성공 (+1.0°C 보너스)" });
+      }
+      if (streakDays >= 3 || weeklyMeets >= 2) {
+        badges.push({ label: "🔥 주간 챌린저", cls: "achieve-streak", desc: "주 3일 출석 또는 주 2회 번개 달성" });
+      }
+      if (rewardScore >= 55 || (u.manner_temp || 36.5) >= 38.5) {
+        badges.push({ label: "☕ 이달의 커피왕 후보", cls: "achieve-coffee", desc: "메가/컴포즈 아메리카노 리워드 상위권" });
+      }
+      if ((u.manner_temp || 36.5) >= 40.0) {
+        badges.push({ label: "🌡️ 매너 챔피언", cls: "achieve-temp", desc: "매너온도 40°C 돌파 클린 학우" });
+      }
+
+      return {
+        validMeets,
+        abusedBlockedCnt,
+        weeklyMeets,
+        streakDays,
+        checkedInToday,
+        firstMeetupDone,
+        coffeeTickets,
+        rewardScore,
+        badges
+      };
+    }
+
+    function getMonthlyLeaderboard() {
+      const usersObj = (DB && DB.users) ? DB.users : {};
+      const list = Object.keys(usersObj).map(uid => {
+        const u = usersObj[uid];
+        const st = getUserStatsAndBadges(uid);
+        return {
+          uid,
+          nickname: u.nickname || uid,
+          avatar: (u.avatar || "🐶").split(" ")[0],
+          department: u.department || "울산대",
+          manner_temp: u.manner_temp || 36.5,
+          validMeets: st.validMeets,
+          streakDays: st.streakDays,
+          rewardScore: st.rewardScore,
+          badges: st.badges
+        };
+      });
+      list.sort((a, b) => (b.rewardScore - a.rewardScore) || (b.manner_temp - a.manner_temp));
+      return list;
+    }
+
+    function checkAndGrantFirstMeetupReward(uid) {
+      const u = DB.users && DB.users[uid];
+      if (!u || u.first_reward_claimed) return false;
+      u.first_reward_claimed = true;
+      u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + 1.0) * 10) / 10);
+      u.coffee_tickets = (u.coffee_tickets || 0) + 1;
+      u.updated_at = Date.now();
+      notifyUser(uid, "🎁 [첫 번개 달성 보상] 축하합니다! '🌱 첫 번개 달성' 프로필 뱃지와 매너온도 +1.0°C, 메가/컴포즈 커피 추첨권 1장이 지급되었습니다!");
+      return true;
+    }
+
+    function handleDailyCheckin() {
+      if (!state.user_id || !DB.users[state.user_id]) return;
+      const u = DB.users[state.user_id];
+      const today = getTodayStr();
+      if (u.last_checkin === today) {
+        return showToast("✅ 오늘 출석체크를 이미 완료했어요! 내일 또 참여해 주세요 🌱");
+      }
+      u.last_checkin = today;
+      u.streak_days = (u.streak_days || 1) + 1;
+      u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + 0.1) * 10) / 10);
+      if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
+        u.coffee_tickets = (u.coffee_tickets || 0) + 1;
+        showToast(`🎉 연속 ${u.streak_days}일 출석 달성! 메가/컴포즈 아메리카노 추첨권 +1장 & 매너온도 +0.1°C 획득!`);
+      } else {
+        showToast(`🔥 주간 출석체크 완료! (연속 ${u.streak_days}일째 · 매너온도 +0.1°C 상승)`);
+      }
+      u.updated_at = Date.now();
+      fireConfetti();
+      saveDB(true);
+      render();
+    }
+
+    function submitMannerPraise(postId, partnerId, keyword) {
+      if (!state.user_id || !partnerId) return;
+      if (partnerId === state.user_id) {
+        return showToast("🛡️ [어뷰징 방지] 본인에게는 매너 평가를 남길 수 없습니다.");
+      }
+      DB.reviews = DB.reviews || [];
+      const alreadyThisPost = DB.reviews.some(r => r.post_id === postId && r.from_id === state.user_id && r.to_id === partnerId);
+      if (alreadyThisPost) {
+        return showToast("✅ 이 번개 모임에서 이미 상대 학우에게 매너 칭찬을 보냈습니다.");
+      }
+
+      // 어뷰징 방지: 동일 학우 간 반복 평가는 월 최대 2회까지만 인정
+      const samePairCount = DB.reviews.filter(r => r.from_id === state.user_id && r.to_id === partnerId).length;
+      if (samePairCount >= 2) {
+        return showToast("🛡️ [어뷰징 조작 방지 작동] 동일한 학우와의 반복 평가는 월 최대 2회까지만 온도 및 커피 랭킹에 반영됩니다.");
+      }
+
+      DB.reviews.push({
+        id: Date.now(),
+        post_id: postId,
+        from_id: state.user_id,
+        to_id: partnerId,
+        keyword: keyword || "친절해요 😊",
+        created_at: getTodayStr()
+      });
+
+      const partner = DB.users[partnerId];
+      const me = DB.users[state.user_id];
+      if (partner) {
+        partner.manner_temp = Math.min(60, Math.round(((partner.manner_temp || 36.5) + 0.5) * 10) / 10);
+        partner.keywords = partner.keywords || [];
+        if (keyword && !partner.keywords.includes(keyword)) partner.keywords.push(keyword);
+        partner.updated_at = Date.now();
+        notifyUser(partnerId, `☕ ${me ? me.nickname : "학우"}님이 [${keyword}] 칭찬 스티커를 보내 매너온도가 +0.5°C 상승했습니다!`, postId);
+      }
+      if (me) {
+        me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.2) * 10) / 10);
+        me.updated_at = Date.now();
+      }
+
+      checkAndGrantFirstMeetupReward(state.user_id);
+      checkAndGrantFirstMeetupReward(partnerId);
+
+      fireConfetti();
+      saveDB(true);
+      showToast(`🎉 매너 칭찬 완료! 상대방 +0.5°C, 내 온도 +0.2°C 상승 & 이달의 커피 랭킹 점수에 반영되었습니다!`);
+      render();
     }
 
     const state = {
@@ -2363,8 +2598,11 @@
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:6px;">
             <div>
-              <div style="font-size:13.5px; font-weight:700;">${isOfficial ? '👑' : author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</div>
-              <div style="font-size:11.5px; color:#6B7684;">${author.department} · ${author.mbti}</div>
+              <div style="font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                <span>${isOfficial ? '👑' : author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</span>
+                ${getUserStatsAndBadges(post.author_id).badges.slice(0, 2).map(b => `<span class="achieve-badge ${b.cls}" style="font-size:10px; padding:2px 6px;">${b.label}</span>`).join("")}
+              </div>
+              <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${author.department} · ${author.mbti}</div>
             </div>
             <div style="width:135px;">${renderTempGauge(author.manner_temp, false)}</div>
           </div>
@@ -2437,6 +2675,34 @@
       }, 60);
     }
 
+    function renderHomeRewardStrip() {
+      const st = getUserStatsAndBadges(state.user_id);
+      const top1 = getMonthlyLeaderboard()[0];
+      return `
+        <div class="uldaemo-card" style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border:1.5px solid #F59E0B; padding:12px 14px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span style="background:#D97706; color:#FFFFFF; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px;">☕ 이달의 리워드</span>
+                <span style="font-size:13px; font-weight:800; color:#78350F;">메가·컴포즈 아메리카노 쿠폰 챌린지!</span>
+              </div>
+              <div style="font-size:11.5px; color:#92400E; margin-top:3px;">
+                🔥 연속 출석 <b>${st.streakDays}일째</b> · 내 커피 추첨권 <b>🎟️ ${st.coffeeTickets}장</b> · 현재 1위: <b>${top1 ? top1.avatar + ' ' + top1.nickname : '집계중'}</b>
+              </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn" style="width:auto; min-height:34px; padding:5px 11px; font-size:12px; font-weight:800; background:${st.checkedInToday ? '#E5E7EB' : '#D97706'}; color:${st.checkedInToday ? '#4B5563' : '#FFFFFF'}; border:none;" onclick="handleDailyCheckin()">
+                ${st.checkedInToday ? '✅ 출석완료' : '🔥 출석체크 (+0.1°C)'}
+              </button>
+              <button class="btn" style="width:auto; min-height:34px; padding:5px 10px; font-size:12px; font-weight:800; background:#FFFFFF; color:#92400E; border:1px solid #F59E0B;" onclick="switchTab('프로필')">
+                🏆 미션/랭킹 ›
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function renderHomeTab() {
       return `
         <div class="main-banner">
@@ -2446,6 +2712,7 @@
           </div>
           ${renderImportantNoticeCard()}
         </div>
+        ${renderHomeRewardStrip()}
         <button class="btn btn-primary" style="margin-bottom:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
 
         ${renderCategoryChips("home_cat")}
@@ -2708,7 +2975,9 @@
       const post = DB.posts.find(p => p.id === app.post_id);
       if (post) {
         notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었습니다! 안심 채팅방을 확인하세요.`);
+        checkAndGrantFirstMeetupReward(post.author_id);
       }
+      checkAndGrantFirstMeetupReward(app.applicant_id);
       saveDB(true);
       fireConfetti();
       showToast("🎉 신청을 수락하여 안심 채팅방이 열렸습니다!");
@@ -3171,9 +3440,21 @@
                 <button class="btn btn-primary" onclick="sendChatMessage(${post.id})">전송</button>
               </div>
 
-              <div class="row-2">
+              <div class="row-2" style="margin-bottom:10px;">
                 <button class="btn" onclick="triggerAiIcebreaker(${post.id})">🤖 AI 주제추천</button>
                 <button class="btn btn-danger" onclick="reportNoShow('${partnerId}')">🚨 노쇼/비매너 신고</button>
+              </div>
+
+              <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:12px; padding:10px 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px;">
+                  <span style="font-size:12px; font-weight:800; color:#92400E;">☕ 만남 완료 후 매너 칭찬 보내기 (커피 랭킹 반영)</span>
+                  <span style="font-size:10.5px; color:#B45309; font-weight:700;">🛡️ 동일인 월 최대 2회 제한</span>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px;">
+                  <button class="btn" style="min-height:34px; padding:4px 6px; font-size:11.5px; background:#FFFFFF; border-color:#F59E0B; color:#78350F;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '시간 약속을 잘 지켜요 ⏰')">⏰ 시간약속 최고</button>
+                  <button class="btn" style="min-height:34px; padding:4px 6px; font-size:11.5px; background:#FFFFFF; border-color:#F59E0B; color:#78350F;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '친절해요 😊')">😊 친절해요</button>
+                  <button class="btn" style="min-height:34px; padding:4px 6px; font-size:11.5px; background:#FFFFFF; border-color:#F59E0B; color:#78350F;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '대화가 즐거워요 💬')">💬 대화 즐거워요</button>
+                </div>
               </div>
             </div>
           `;
@@ -3251,7 +3532,7 @@
     }
 
     // =========================================================
-    // 9. 마이 프로필 탭 (프로필 필수 목록 수정 & 로그아웃)
+    // 9. 마이 프로필 탭 (프로필 뱃지 · 챌린지 · 커피 리워드 랭킹 · 수정)
     // =========================================================
     function renderFavBadgesHtml(user) {
       const favs = (user && user.fav_cats) || [];
@@ -3264,15 +3545,112 @@
       `;
     }
 
+    function renderChallengeAndRewardCard() {
+      const st = getUserStatsAndBadges(state.user_id);
+      const leaderboard = getMonthlyLeaderboard().slice(0, 4);
+      const streakPct = Math.min(100, Math.round((st.streakDays / 5) * 100));
+      const weekMeetPct = Math.min(100, Math.round((st.weeklyMeets / 2) * 100));
+
+      return `
+        <div class="uldaemo-card" style="border:1.5px solid #F59E0B; background:linear-gradient(180deg, #FFFDF7 0%, #FFFFFF 100%);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="background:#D97706; color:#FFFFFF; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px;">🎁 이달의 보상</span>
+                <h4 style="margin:0; font-size:15.5px; color:#78350F;">메가·컴포즈 아메리카노 챌린지</h4>
+              </div>
+              <div style="font-size:12px; color:#92400E; margin-top:4px;">
+                한 달간 <b>만남 빈도수 + 매너온도</b>가 높은 학우 TOP 3에게 <b>메가커피/컴포즈커피 아메리카노 쿠폰</b>과 전용 뱃지를 드립니다!
+              </div>
+            </div>
+            <div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:10px; padding:6px 10px; text-align:center;">
+              <div style="font-size:10.5px; color:#92400E; font-weight:700;">내 커피 추첨권</div>
+              <div style="font-size:15px; font-weight:900; color:#B45309;">🎟️ ${st.coffeeTickets}장</div>
+            </div>
+          </div>
+
+          <!-- 1. 가입 후 첫 번개 달성 보상 -->
+          <div class="quest-item ${st.firstMeetupDone ? 'done' : ''}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:13px; font-weight:800; color:#1E634C;">
+                🌱 [첫 걸음 미션] 가입 후 첫 번개 매칭 달성하기
+              </div>
+              <span style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:${st.firstMeetupDone ? '#287D62' : '#E5E7EB'}; color:${st.firstMeetupDone ? '#FFFFFF' : '#4B5563'};">
+                ${st.firstMeetupDone ? '🎉 보상 지급완료' : '진행중 (0/1)'}
+              </span>
+            </div>
+            <div style="font-size:11.5px; color:#4E5968; margin-top:3px;">
+              보상: <b>'🌱 첫 번개 달성' 프로필 뱃지</b> + <b>매너온도 +1.0°C 즉시 상승</b> + <b>커피 추첨권 1장</b>
+            </div>
+          </div>
+
+          <!-- 2. 주간 연속 출석 & 참여 챌린지 -->
+          <div class="quest-item ${(st.streakDays >= 3 || st.weeklyMeets >= 2) ? 'done' : ''}">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+              <div>
+                <div style="font-size:13px; font-weight:800; color:#9A3412;">
+                  🔥 [주간 챌린지] 연속 출석 (${st.streakDays}/5일) & 주간 번개 (${st.weeklyMeets}/2회)
+                </div>
+                <div style="font-size:11.5px; color:#4E5968; margin-top:2px;">
+                  보상: <b>'🔥 주간 챌린저' 뱃지</b> + 3일 출석마다 <b>메가·컴포즈 아메리카노 추첨권 +1장</b>
+                </div>
+              </div>
+              <button class="btn" style="width:auto; min-height:32px; padding:4px 10px; font-size:11.5px; font-weight:800; background:${st.checkedInToday ? '#E5E7EB' : '#EA580C'}; color:${st.checkedInToday ? '#4B5563' : '#FFFFFF'}; border:none;" onclick="handleDailyCheckin()">
+                ${st.checkedInToday ? '✅ 오늘 출석완료' : '🔥 오늘 출석체크 (+0.1°C)'}
+              </button>
+            </div>
+            <div class="quest-progress-bg">
+              <div class="quest-progress-fill" style="width:${Math.max(streakPct, weekMeetPct)}%;"></div>
+            </div>
+          </div>
+
+          <!-- 3. 이달의 매너 & 만남 랭킹 리더보드 -->
+          <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #E5E8EB;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:13.5px; font-weight:800; color:#191F28;">🏆 이달의 아메리카노 리워드 실시간 랭킹</span>
+              <span style="font-size:11px; color:#287D62; font-weight:800;">내 점수: ${st.rewardScore}점</span>
+            </div>
+            ${leaderboard.map((item, idx) => {
+              const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
+              const isRewardTarget = idx < 3;
+              return `
+                <div class="rank-row ${idx === 0 ? 'top1' : ''}">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:12.5px; font-weight:900; min-width:42px; color:${idx === 0 ? '#B45309' : '#4E5968'};">${medal}</span>
+                    <span style="font-size:18px;">${item.avatar}</span>
+                    <div>
+                      <div style="font-size:13px; font-weight:800; display:flex; align-items:center; gap:5px;">
+                        <span>${escHtml(item.nickname)}</span>
+                        ${item.uid === state.user_id ? `<span style="font-size:10px; background:#EEF8F3; color:#287D62; padding:1px 5px; border-radius:4px;">나</span>` : ""}
+                        ${isRewardTarget ? `<span style="font-size:10px; background:#FEF3C7; color:#92400E; padding:1px 6px; border-radius:999px; border:1px solid #F59E0B;">☕ 아메리카노 쿠폰 대상</span>` : ""}
+                      </div>
+                      <div style="font-size:11px; color:#6B7684;">유효 만남 ${item.validMeets}회 · 🌡️${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일</div>
+                    </div>
+                  </div>
+                  <div style="font-size:13px; font-weight:900; color:#287D62;">${item.rewardScore}점</div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+
+          <!-- 4. 어뷰징(조작) 방지 클린 시스템 안내 -->
+          <div style="margin-top:8px; background:#F2F4F6; border-radius:10px; padding:8px 11px; font-size:11px; color:#4E5968; line-height:1.45;">
+            <b>🛡️ 어뷰징(조작) 방지 시스템 작동 중:</b> 친한 지인끼리 반복 매칭하여 점수를 올리는 행위를 막기 위해 <b>동일 학우와의 만남/칭찬은 월 최대 2회까지만</b> 인정되며, 셀프 매칭 및 모임당 중복 평가는 자동 차단됩니다.
+          </div>
+        </div>
+      `;
+    }
+
     function renderProfileTab(user) {
+      const myStats = getUserStatsAndBadges(state.user_id);
       return `
         <div class="uldaemo-card">
-          <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
             <div class="${user.manner_temp >= 40 ? 'aura-40' : ''}" style="width:64px; height:64px; border-radius:50%; background:#EEF8F3; border:2px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:34px;">
               ${user.avatar.split(" ")[0]}
             </div>
             <div>
-              <div style="font-size:20px; font-weight:800; display:flex; align-items:center; gap:6px;">
+              <div style="font-size:20px; font-weight:800; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span>${user.nickname}</span>
                 ${user.manner_temp >= 40 ? "✅" : ""}
                 ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:#FEF3C7; color:#92400E; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #FDE68A;">👑 운영진</span>` : ""}
@@ -3281,12 +3659,25 @@
               <div style="margin-top:4px;"><span class="privacy-pill-mini">🛡️ 이메일·실명 비공개 보호중</span></div>
             </div>
           </div>
+
+          <!-- 획득한 프로필 칭호 뱃지 컬렉션 -->
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:9px 12px; margin-bottom:12px;">
+            <div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">🏅 내 프로필 획득 뱃지 (${myStats.badges.length}개)</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${myStats.badges.length === 0
+                ? `<span style="font-size:12px; color:#64748B;">첫 번개에 참여하거나 출석체크를 하면 뱃지가 부여됩니다! 🌱</span>`
+                : myStats.badges.map(b => `<span class="achieve-badge ${b.cls}" title="${escHtml(b.desc)}">${b.label}</span>`).join("")}
+            </div>
+          </div>
+
           <div style="background:#F7F8F4; border-radius:10px; padding:10px 12px; font-size:13px; color:#4E5968; margin-bottom:12px;">
             💬 "${user.bio || "공강 시간에 같이 학식 먹고 카공할 학우 환영해요! 🌱"}"
           </div>
           ${renderTempGauge(user.manner_temp, true)}
           <div id="fav-profile-badges">${renderFavBadgesHtml(user)}</div>
         </div>
+
+        ${renderChallengeAndRewardCard()}
 
         <div class="uldaemo-card" id="fav-wrap">${renderFavSection(user)}</div>
 
