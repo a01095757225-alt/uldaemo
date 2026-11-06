@@ -399,6 +399,7 @@
       }
       .app-shell.wide .app-header { display: none; }
       .app-shell.wide .floating-dock-wrap { display: none; }
+      .app-shell.wide .only-mobile { display: none !important; }
 
       .pc-sidebar {
         background: var(--surface);
@@ -3182,27 +3183,22 @@
 
     function renderHomeRewardStrip() {
       const st = getUserStatsAndBadges(state.user_id);
-      const top1 = getMonthlyLeaderboard()[0];
       return `
-        <div class="uldaemo-card" style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border:1.5px solid #F59E0B; padding:12px 14px; margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <div>
-              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span style="background:#D97706; color:#FFFFFF; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px;">☕ 이달의 리워드</span>
-                <span style="font-size:13px; font-weight:800; color:#78350F;">메가·컴포즈 아메리카노 쿠폰 챌린지!</span>
-              </div>
-              <div style="font-size:11.5px; color:#92400E; margin-top:3px;">
-                🔥 연속 출석 <b>${st.streakDays}일째</b> · 내 커피 추첨권 <b>🎟️ ${st.coffeeTickets}장</b> · 현재 1위: <b>${top1 ? top1.avatar + ' ' + top1.nickname : '집계중'}</b>
-              </div>
-            </div>
-            <div style="display:flex; gap:6px;">
-              <button class="btn" style="width:auto; min-height:34px; padding:5px 11px; font-size:12px; font-weight:800; background:${st.checkedInToday ? '#E5E7EB' : '#D97706'}; color:${st.checkedInToday ? '#4B5563' : '#FFFFFF'}; border:none;" onclick="handleDailyCheckin()">
-                ${st.checkedInToday ? '✅ 출석완료' : '🔥 출석체크 (+0.1°C)'}
-              </button>
-              <button class="btn" style="width:auto; min-height:34px; padding:5px 10px; font-size:12px; font-weight:800; background:#FFFFFF; color:#92400E; border:1px solid #F59E0B;" onclick="switchTab('마이')">
-                🏆 미션/랭킹 ›
-              </button>
-            </div>
+        <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:12px; padding:7px 11px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#78350F; font-weight:700;">
+            <span style="background:#D97706; color:#FFFFFF; font-size:10px; font-weight:800; padding:2px 6px; border-radius:999px;">☕ 리워드</span>
+            <span>출석 <b>${st.streakDays}일째</b> · 추첨권 <b>🎟️ ${st.coffeeTickets}장</b></span>
+          </div>
+          <div style="display:flex; align-items:center; gap:5px;">
+            <button type="button" style="border:none; border-radius:8px; padding:4px 9px; font-size:11.5px; font-weight:800; cursor:pointer; background:${st.checkedInToday ? '#E5E7EB' : '#D97706'}; color:${st.checkedInToday ? '#4B5563' : '#FFFFFF'};" onclick="handleDailyCheckin()">
+              ${st.checkedInToday ? '✅ 출석완료' : '🔥 출석 (+0.1°C)'}
+            </button>
+            <button type="button" style="border:1px solid #F59E0B; border-radius:8px; padding:4px 8px; font-size:11.5px; font-weight:800; cursor:pointer; background:#FFFFFF; color:#92400E;" onclick="switchTab('마이')">
+              🏆 랭킹 ›
+            </button>
+            <button type="button" class="only-mobile" style="border:1px solid #287D62; border-radius:8px; padding:4px 8px; font-size:11.5px; font-weight:800; cursor:pointer; background:#EEF8F3; color:#1E634C;" onclick="openCafeteriaModal()">
+              🍱 학식 ›
+            </button>
           </div>
         </div>
       `;
@@ -3217,18 +3213,8 @@
           </div>
           ${renderImportantNoticeCard()}
         </div>
-        <div class="m-cafeteria-strip uldaemo-card" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; margin-bottom:12px; background:#F7FBF9; border:1px solid #287D62; cursor:pointer;" onclick="openCafeteriaModal()">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:20px;">🍱</span>
-            <div>
-              <div style="font-size:13px; font-weight:800; color:#1E634C;">오늘의 울산대 학식 메뉴 보기</div>
-              <div style="font-size:11px; color:#6B7684;">청운학사 무거관 기숙사식당 식단표 실시간 확인 ›</div>
-            </div>
-          </div>
-          <span style="font-size:12px; font-weight:800; color:#287D62;">보러가기 ›</span>
-        </div>
         ${renderHomeRewardStrip()}
-        <button class="btn btn-primary" style="margin-bottom:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
+        <button class="btn btn-primary" style="margin-bottom:10px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
 
         ${renderCategoryChips("home_cat")}
 
