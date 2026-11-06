@@ -2548,9 +2548,17 @@
         return;
       }
 
+      // 20261275 및 운영진 계정은 테스트/악의적 신고 누적 정지에서 항상 해제 보장
+      if (ADMIN_STUDENT_IDS.includes(String(state.user_id)) && currentUser.report_count > 0) {
+        currentUser.report_count = 0;
+        currentUser.reported_by = [];
+        if ((currentUser.manner_temp || 36.5) < 36.5) currentUser.manner_temp = 36.5;
+        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+      }
+
       if (currentUser.report_count >= 3) {
         root.className = "app-shell";
-        root.innerHTML = `<div class="uldaemo-card" style="text-align:center; padding:30px;"><h3>🚨 계정 이용 정지</h3><p style="margin:10px 0; color:#6B7684;">누적 신고 3회 이상으로 계정이 일시 정지되었습니다.</p><button class="btn" onclick="clearLogin()">로그아웃</button></div>`;
+        root.innerHTML = `<div class="uldaemo-card" style="text-align:center; padding:30px;"><h3>🚨 계정 이용 정지</h3><p style="margin:10px 0; color:#6B7684;">서로 다른 학우 3명 이상의 누적 신고로 계정이 일시 정지되었습니다.</p><div class="row-2" style="margin-top:12px;"><button class="btn btn-primary" onclick="pullFromCloud(true)">🔄 정지 해제 확인</button><button class="btn" onclick="clearLogin()">로그아웃</button></div></div>`;
         return;
       }
 
@@ -4487,12 +4495,29 @@
     }
 
     function reportNoShow(partnerId) {
-      const target = DB.users[partnerId];
+      if (!state.user_id || !partnerId) return;
+      const myId = String(state.user_id);
+      const targetId = String(partnerId);
+      if (myId === targetId) {
+        return showToast("🛡️ 본인 계정은 신고할 수 없습니다.");
+      }
+      if (ADMIN_STUDENT_IDS.includes(targetId)) {
+        return showToast("🛡️ 운영진 공식 계정은 신고 대상에서 제외됩니다.");
+      }
+      const target = DB.users[targetId];
       if (!target) return;
-      target.manner_temp = Math.max(0, (target.manner_temp || 36.5) - 3.0);
-      target.report_count = (target.report_count || 0) + 1;
-      saveDB();
-      showToast(`🚨 신고가 접수되어 상대방 매너온도 차감(-3.0°C) 및 보호 조치가 적용되었습니다.`);
+
+      target.reported_by = Array.isArray(target.reported_by) ? target.reported_by.map(String) : [];
+      if (target.reported_by.includes(myId)) {
+        return showToast("🛡️ [중복 신고 제한] 한 계정이 동일한 상대방에게 신고할 수 있는 횟수는 최대 1회입니다. (이미 신고 접수됨)");
+      }
+
+      target.reported_by.push(myId);
+      target.report_count = target.reported_by.length;
+      target.manner_temp = Math.max(0, Math.round(((target.manner_temp || 36.5) - 3.0) * 10) / 10);
+      target.updated_at = Date.now();
+      saveDB(true);
+      showToast(`🚨 신고가 접수되었습니다 (1계정당 동일 상대 1회 제한 · 현재 누적 ${target.report_count}/3회, 매너온도 -3.0°C 차감).`);
       render();
     }
 

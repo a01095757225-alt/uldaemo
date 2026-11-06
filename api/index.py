@@ -366,16 +366,33 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
                     continue
                 s_u = s_users.get(uid)
                 if not isinstance(s_u, dict):
-                    s_users[uid] = c_u
+                    merged_u = dict(c_u)
                 else:
                     if (c_u.get("updated_at") or 0) >= (s_u.get("updated_at") or 0):
                         merged_u = dict(s_u)
                         merged_u.update(c_u)
-                        s_users[uid] = merged_u
                     else:
                         merged_u = dict(c_u)
                         merged_u.update(s_u)
-                        s_users[uid] = merged_u
+
+                # 동일 계정의 중복 신고 방지 (reported_by 기준 1인 1회만 인정) 및 운영진 계정(20261275 등) 정지 해제 보장
+                if str(uid) in ("20261275", "20241001", "admin"):
+                    merged_u["report_count"] = 0
+                    merged_u["reported_by"] = []
+                    if (merged_u.get("manner_temp") or 36.5) < 36.5:
+                        merged_u["manner_temp"] = 36.5
+                else:
+                    rep_list = []
+                    for r_uid in (s_u.get("reported_by") if isinstance(s_u, dict) else []) or []:
+                        if str(r_uid) not in rep_list and str(r_uid) != str(uid):
+                            rep_list.append(str(r_uid))
+                    for r_uid in (c_u.get("reported_by") or []):
+                        if str(r_uid) not in rep_list and str(r_uid) != str(uid):
+                            rep_list.append(str(r_uid))
+                    merged_u["reported_by"] = rep_list
+                    merged_u["report_count"] = len(rep_list)
+
+                s_users[uid] = merged_u
 
         # 2. Posts 병합 (최신 글이 위로 오도록 정렬)
         prev_post_ids = {p.get("id") for p in (current.get("posts") or []) if isinstance(p, dict)}
