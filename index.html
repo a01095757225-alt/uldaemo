@@ -1550,11 +1550,39 @@
         changed = true;
       }
 
+      const mergeItem = (localIt, cloudIt) => {
+        if (!localIt) return Object.assign({}, cloudIt);
+        if (!cloudIt) return Object.assign({}, localIt);
+        const lTs = localIt.updated_at || 0;
+        const cTs = cloudIt.updated_at || 0;
+        const merged = (lTs > cTs)
+          ? Object.assign({}, cloudIt, localIt)
+          : Object.assign({}, localIt, cloudIt);
+        // 한 번 '승인됨' 또는 '매칭완료'가 된 상태는 로컬의 이전 '대기중'/'모집중' 캐시로 절대 되돌아가지 않도록 보호
+        if (localIt.status === "승인됨" || cloudIt.status === "승인됨") {
+          merged.status = "승인됨";
+        } else if (localIt.status === "매칭완료" || cloudIt.status === "매칭완료") {
+          merged.status = "매칭완료";
+        }
+        if (localIt.is_read === 1 || cloudIt.is_read === 1) {
+          merged.is_read = 1;
+        }
+        return merged;
+      };
+
       const mergeList = (localArr, cloudArr) => {
         const deletedSet = new Set(_deletedPostIds);
         const map = new Map();
-        (cloudArr || []).forEach(it => { if (it && it.id && !deletedSet.has(it.id)) map.set(it.id, it); });
         (localArr || []).forEach(it => { if (it && it.id && !deletedSet.has(it.id)) map.set(it.id, it); });
+        (cloudArr || []).forEach(it => {
+          if (it && it.id && !deletedSet.has(it.id)) {
+            if (map.has(it.id)) {
+              map.set(it.id, mergeItem(map.get(it.id), it));
+            } else {
+              map.set(it.id, it);
+            }
+          }
+        });
         return Array.from(map.values());
       };
 
@@ -1632,12 +1660,24 @@
         const data = await res.json();
         if (data && data.ok && data.db) {
           const localUserCountBefore = Object.keys(DB.users || {}).length;
-          const prevNotifIds = new Set((DB.notifications || []).filter(n => n.user_id === state.user_id).map(n => n.id));
+          const prevNotifIds = new Set((DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => n.id));
+          const prevApprovedIds = new Set(
+            (DB.applications || [])
+              .filter(a => String(a.applicant_id) === String(state.user_id) && a.status === "승인됨")
+              .map(a => a.id)
+          );
           mergeCloudDBIntoLocal(data.db);
-          // 새로 도착한 내 알림이 있으면 토스트 및 브라우저 알림 표시
+
+          // 내 참여 신청이 방금 '승인됨'으로 바뀌었다면 즉시 토스트 안내
           if (state.user_id) {
-            const newlyArrived = (DB.notifications || []).filter(n => n.user_id === state.user_id && !n.is_read && !prevNotifIds.has(n.id));
-            if (newlyArrived.length > 0) {
+            const newlyApproved = (DB.applications || []).filter(
+              a => String(a.applicant_id) === String(state.user_id) && a.status === "승인됨" && !prevApprovedIds.has(a.id)
+            );
+            if (newlyApproved.length > 0) {
+              showToast("🎉 방장이 참여 신청을 수락하여 안심 채팅방이 열렸습니다!");
+            }
+            const newlyArrived = (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id) && !n.is_read && !prevNotifIds.has(n.id));
+            if (newlyArrived.length > 0 && newlyApproved.length === 0) {
               showToast(newlyArrived[0].message);
               if (typeof pushEnabled === "function" && pushEnabled()) {
                 showSystemNotification("⚡ 울대모 새 알림", newlyArrived[0].message, "/");
@@ -1652,7 +1692,19 @@
           }
           const ae = document.activeElement;
           const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
-          if (!typing) render();
+          if (!typing) {
+            render();
+          } else if (ae && ae.id && ae.id.startsWith("chat_in_")) {
+            // 채팅 입력창에 커서가 있더라도 입력 중인 텍스트를 보존하면서 새 메시지/채팅방 갱신
+            const activeId = ae.id;
+            const savedVal = ae.value;
+            render();
+            const restored = document.getElementById(activeId);
+            if (restored) {
+              restored.value = savedVal;
+              restored.focus();
+            }
+          }
           return true;
         }
       } catch (e) {}
@@ -1950,6 +2002,10 @@
       if (!n) return;
       n.is_read = 1;
       saveDB();
+      if (n.message && (n.message.includes("채팅방") || n.message.includes("수락되었습니다"))) {
+        switchTab("채팅");
+        return;
+      }
       if (n.post_id && (DB.posts || []).some(p => p.id === n.post_id)) {
         openDetailModal(n.post_id);
       } else {
@@ -2992,6 +3048,9 @@
       state.nav_tab = tab;
       state.active_modal = null;
       render();
+      if (tab === "채팅" || tab === "홈") {
+        pullFromCloud(true);
+      }
     }
 
     function renderCategoryChips(targetKey) {
@@ -3473,9 +3532,10 @@
       const app = DB.applications.find(a => a.id === appId);
       if (!app) return;
       app.status = "승인됨";
-      const post = DB.posts.find(p => p.id === app.post_id);
+      app.updated_at = Date.now();
+      const post = DB.posts.find(p => Number(p.id) === Number(app.post_id));
       if (post) {
-        notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었습니다! 안심 채팅방을 확인하세요.`);
+        notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었습니다! 안심 채팅방을 확인하세요.`, post.id);
         checkAndGrantFirstMeetupReward(post.author_id);
       }
       checkAndGrantFirstMeetupReward(app.applicant_id);
@@ -3486,8 +3546,8 @@
     }
 
     function closePostEarly(postId) {
-      const post = DB.posts.find(p => p.id === postId);
-      if (post) { post.status = "매칭완료"; saveDB(true); showToast("모집이 마감 처리되었습니다."); render(); }
+      const post = DB.posts.find(p => Number(p.id) === Number(postId));
+      if (post) { post.status = "매칭완료"; post.updated_at = Date.now(); saveDB(true); showToast("모집이 마감 처리되었습니다."); render(); }
     }
 
     // =========================================================
@@ -4137,34 +4197,36 @@
     // 8. 안심 채팅 탭 (정규식 + Gemini AI 경찰 + AI 주제추천 + 매너평가)
     // =========================================================
     function renderChatTab() {
-      const myHostedApps = DB.applications.filter(a => {
-        const p = DB.posts.find(post => post.id === a.post_id);
-        return p && p.author_id === state.user_id;
+      const myId = String(state.user_id);
+      const myHostedApps = (DB.applications || []).filter(a => {
+        const p = (DB.posts || []).find(post => Number(post.id) === Number(a.post_id));
+        return p && String(p.author_id) === myId;
       });
-      const myAppliedApps = DB.applications.filter(a => a.applicant_id === state.user_id);
+      const myAppliedApps = (DB.applications || []).filter(a => String(a.applicant_id) === myId);
 
       const pendingHost = myHostedApps.filter(a => a.status === "대기중");
-      const rawActiveChats = [
-        ...myHostedApps.filter(a => a.status === "승인됨").map(a => ({ app: a, post: DB.posts.find(p => p.id === a.post_id), partnerId: a.applicant_id })),
-        ...myAppliedApps.filter(a => a.status === "승인됨").map(a => {
-          const p = DB.posts.find(post => post.id === a.post_id);
-          return { app: a, post: p, partnerId: p ? p.author_id : "" };
-        })
-      ].filter(x => x.post && x.partnerId);
 
-      // 동일한 post_id와 partnerId를 가진 중복 채팅방 방지
-      const seenChatKey = new Set();
+      // 내가 방장으로서 승인한 모임 또는 내가 참여자로서 승인된 모임의 post_id 수집
+      const activePostIds = new Set();
+      myHostedApps.filter(a => a.status === "승인됨").forEach(a => activePostIds.add(Number(a.post_id)));
+      myAppliedApps.filter(a => a.status === "승인됨").forEach(a => activePostIds.add(Number(a.post_id)));
+
       const activeChats = [];
-      for (const c of rawActiveChats) {
-        const k = `${c.post.id}_${c.partnerId}`;
-        if (!seenChatKey.has(k)) {
-          seenChatKey.add(k);
-          activeChats.push(c);
-        }
-      }
+      activePostIds.forEach(pid => {
+        const post = (DB.posts || []).find(p => Number(p.id) === Number(pid));
+        if (!post) return;
+        const approvedApps = (DB.applications || []).filter(a => Number(a.post_id) === Number(pid) && a.status === "승인됨");
+        const allMemberIds = [String(post.author_id), ...approvedApps.map(a => String(a.applicant_id))];
+        const uniqueOthers = Array.from(new Set(allMemberIds.filter(uid => uid && uid !== myId)));
+        const partnerId = uniqueOthers[0] || String(post.author_id);
+        activeChats.push({ post, partnerId, otherIds: uniqueOthers, totalMembers: new Set(allMemberIds).size });
+      });
 
       return `
-        <h3 style="margin-bottom:6px;">💬 인앱 안심 채팅</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <h3 style="margin:0;">💬 인앱 안심 채팅</h3>
+          <button type="button" class="btn" style="width:auto; min-height:28px; padding:3px 10px; font-size:11.5px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3;" onclick="pullFromCloud(true)">🔄 채팅 새로고침</button>
+        </div>
         <div class="privacy-badge"><span>🛡️</span><span>개인 카톡이나 전화번호 교환 없이 앱 내에서 안전하게 대화하세요.</span></div>
 
         ${pendingHost.length > 0 ? `
@@ -4172,10 +4234,10 @@
             <h4 style="margin-bottom:8px;">🔔 방장 수락 대기 중인 신청자</h4>
             ${pendingHost.map(a => {
               const u = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, mbti: "INFP", manner_temp: 36.5 };
-              const p = DB.posts.find(post => post.id === a.post_id);
+              const p = DB.posts.find(post => Number(post.id) === Number(a.post_id));
               return `
                 <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #F2F4F6;">
-                  <div style="font-size:13.5px; margin-bottom:6px;"><b>${u.avatar.split(" ")[0]} ${u.nickname}</b> (${u.mbti} · 🌡️${u.manner_temp.toFixed(1)}°C) → 📌 <b>${p ? p.title : ""}</b></div>
+                  <div style="font-size:13.5px; margin-bottom:6px;"><b>${u.avatar.split(" ")[0]} ${u.nickname}</b> (${u.mbti} · 🌡️${(u.manner_temp || 36.5).toFixed(1)}°C) → 📌 <b>${p ? p.title : ""}</b></div>
                   <button class="btn btn-primary" onclick="acceptApplicant(${a.id})">✅ 수락하고 안심 채팅 열기</button>
                 </div>
               `;
@@ -4189,18 +4251,27 @@
             <div style="font-weight:800;">열려 있는 안심 채팅방이 없습니다</div>
             <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">모집글에 참여 신청 후 방장이 수락하면 안전한 채팅방이 열립니다!</div>
           </div>
-        ` : activeChats.map(({ app, post, partnerId }) => {
+        ` : activeChats.map(({ post, partnerId, otherIds, totalMembers }) => {
           const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
-          const msgs = DB.messages.filter(m => m.post_id === post.id);
+          const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+          const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(post.id));
 
-          // 상대방이 내가 보낸 메시지를 읽었는지 표시 (상대방이 보낸 최신 메시지가 있거나 시간이 지났으면 읽음 처리)
-          const lastPartnerMsg = msgs.filter(m => m.sender_id === partnerId).slice(-1)[0];
+          // 상대방이 내가 보낸 메시지를 읽었는지 표시 (상대방이 보낸 최신 메시지가 있거나 is_read=1이면 읽음 처리)
+          const lastPartnerMsg = msgs.filter(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT").slice(-1)[0];
           const lastPartnerTime = lastPartnerMsg ? (lastPartnerMsg.time || lastPartnerMsg.id || 0) : 0;
 
-          // 상대방이 보낸 안 읽은 메시지가 있다면 내 화면 렌더링 시 읽음 상태로 업데이트
+          // 상대방이 보낸 안 읽은 메시지가 있다면 내 화면 렌더링 시 읽음 상태로 업데이트하고 클라우드 반영
+          let markedRead = false;
           msgs.forEach(m => {
-            if (m.sender_id === partnerId && !m.is_read) m.is_read = 1;
+            if (String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
+              m.is_read = 1;
+              m.updated_at = Date.now();
+              markedRead = true;
+            }
           });
+          if (markedRead) {
+            setTimeout(() => saveDB(false), 100);
+          }
 
           const isActionOpen = Boolean(state[`chat_action_open_${post.id}`]);
 
@@ -4213,9 +4284,10 @@
                     ${partner.avatar.split(" ")[0]}
                   </div>
                   <div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                      <span style="font-weight:800; font-size:14.5px; color:#191F28;">${escHtml(partner.nickname)}</span>
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <span style="font-weight:800; font-size:14.5px; color:#191F28;">${escHtml(otherNames || partner.nickname)}</span>
                       <span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:1px 6px; border-radius:4px;">🌡️ ${(partner.manner_temp || 36.5).toFixed(1)}°C</span>
+                      ${totalMembers > 2 ? `<span style="font-size:10.5px; font-weight:800; color:#1E40AF; background:#DBEAFE; padding:1px 6px; border-radius:999px;">👥 ${totalMembers}명 단톡</span>` : ""}
                     </div>
                     <div style="font-size:11.5px; color:#6B7684; margin-top:2px; display:flex; align-items:center; gap:4px; cursor:pointer;" onclick="openDetailModal(${post.id})">
                       <span style="font-weight:700; color:#333D4B;">📌 ${escHtml(post.title)}</span>
@@ -4240,16 +4312,17 @@
                 ${msgs.length === 0 ? `
                   <div style="text-align:center; color:#8B95A1; font-size:12.5px; padding:40px 0;">
                     <div style="font-size:26px; margin-bottom:6px;">👋</div>
-                    <b>${escHtml(partner.nickname)}</b>님과의 첫 대화를 시작해 보세요!
+                    <b>${escHtml(otherNames || partner.nickname)}</b>님과의 첫 대화를 시작해 보세요!
                   </div>
                 ` : msgs.map(m => {
                   if (m.sender_id === "AI_BOT") {
                     return `<div class="chat-bubble-ai">${m.text}</div>`;
                   }
 
-                  const isMe = m.sender_id === state.user_id;
-                  const timeStr = m.created_at ? m.created_at.split(" ")[1] || m.created_at : formatMsgTime(m.id);
-                  const isRead = isMe ? (m.is_read || (m.id <= lastPartnerTime)) : true;
+                  const isMe = String(m.sender_id) === myId;
+                  const senderUser = DB.users[m.sender_id] || partner;
+                  const timeStr = m.created_at ? (m.created_at.includes("오전") || m.created_at.includes("오후") ? m.created_at : (m.created_at.split(" ")[1] || m.created_at)) : formatMsgTime(m.id);
+                  const isRead = isMe ? Boolean(m.is_read || (m.id <= lastPartnerTime)) : true;
 
                   if (isMe) {
                     return `
@@ -4268,9 +4341,9 @@
                   } else {
                     return `
                       <div class="chat-msg-row other">
-                        <div class="chat-avatar-mini">${partner.avatar.split(" ")[0]}</div>
+                        <div class="chat-avatar-mini">${(senderUser.avatar || "🐶").split(" ")[0]}</div>
                         <div class="chat-bubble-col other">
-                          <div class="chat-sender-name">${escHtml(partner.nickname)}</div>
+                          <div class="chat-sender-name">${escHtml(senderUser.nickname || m.sender_id)}</div>
                           <div class="chat-bubble-wrap other">
                             <div class="chat-bubble-other">${escHtml(m.text)}</div>
                             <div class="chat-meta other">
@@ -4780,8 +4853,8 @@
     }
 
     render();
-    pullFromCloud(false);
-    setInterval(() => { pullFromCloud(false); }, 15000);
+    pullFromCloud(true);
+    setInterval(() => { pullFromCloud(false); }, 4000);
   </script>
 </body>
 </html>

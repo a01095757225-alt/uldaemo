@@ -312,6 +312,25 @@ def load_cloud_db(force: bool = False):
     return _DB_MEM_CACHE["db"]
 
 
+def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
+    s_ts = s_item.get("updated_at") or 0
+    c_ts = c_item.get("updated_at") or 0
+    if c_ts >= s_ts:
+        merged = dict(s_item)
+        merged.update(c_item)
+    else:
+        merged = dict(c_item)
+        merged.update(s_item)
+    # 한 번 '승인됨' 또는 '매칭완료'가 된 상태는 이전 기기의 '대기중'/'모집중' 캐시로 절대 되돌아가지 않도록 보호
+    if s_item.get("status") == "승인됨" or c_item.get("status") == "승인됨":
+        merged["status"] = "승인됨"
+    elif s_item.get("status") == "매칭완료" or c_item.get("status") == "매칭완료":
+        merged["status"] = "매칭완료"
+    if s_item.get("is_read") == 1 or c_item.get("is_read") == 1:
+        merged["is_read"] = 1
+    return merged
+
+
 def _merge_list_by_id(server_list, client_list, deleted_ids=None):
     deleted_set = set(deleted_ids or [])
     by_id = {}
@@ -320,7 +339,11 @@ def _merge_list_by_id(server_list, client_list, deleted_ids=None):
             by_id[item.get("id")] = item
     for item in (client_list or []):
         if isinstance(item, dict) and item.get("id") not in deleted_set:
-            by_id[item.get("id")] = item
+            iid = item.get("id")
+            if iid in by_id:
+                by_id[iid] = _merge_item_dict(by_id[iid], item)
+            else:
+                by_id[iid] = item
     return list(by_id.values())
 
 
