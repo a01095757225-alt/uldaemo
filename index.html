@@ -2201,6 +2201,17 @@
       render();
     }
 
+    function switchCafeteriaTab(dayIdx, mealKey) {
+      if (dayIdx !== undefined && dayIdx !== null) CAFETERIA.activeDayIdx = dayIdx;
+      if (mealKey) CAFETERIA.activeMeal = mealKey;
+      const wrap = document.getElementById("cafeteria-card-wrap");
+      if (wrap) {
+        wrap.outerHTML = renderCafeteriaCard();
+      } else {
+        render();
+      }
+    }
+
     function renderCafeteriaCard() {
       loadCafeteriaMenu(false);
       const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
@@ -2229,7 +2240,7 @@
       const previewText = mainDishes.slice(0, 2).map(s => s.replace(/\([^)]*\)/g, "").trim()).join(", ") || (mealList[0] ? mealList[0].replace(/\([^)]*\)/g, "").trim() : "학식");
 
       return `
-        <div class="uldaemo-card" style="padding:14px 16px; border:1.5px solid #287D62; background:#FFFFFF; position:relative;">
+        <div id="cafeteria-card-wrap" class="uldaemo-card" style="padding:14px 16px; border:1.5px solid #287D62; background:#FFFFFF; position:relative;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div style="display:flex; align-items:center; gap:6px;">
               <span style="font-weight:800; font-size:14px; color:#1E634C;">🍱 오늘 학식 메뉴</span>
@@ -2248,7 +2259,7 @@
               const isToday = idx === todayIdx;
               const shortDay = d.day.replace("요일", "");
               return `
-                <button type="button" style="flex:1; min-width:32px; padding:4px 2px; font-size:11px; font-weight:${isSelected ? '800' : '600'}; border-radius:6px; border:${isSelected ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${isSelected ? '#287D62' : '#F9FAFB'}; color:${isSelected ? '#FFFFFF' : '#4E5968'}; cursor:pointer; position:relative;" onclick="CAFETERIA.activeDayIdx=${idx}; render();">
+                <button type="button" style="flex:1; min-width:32px; padding:4px 2px; font-size:11px; font-weight:${isSelected ? '800' : '600'}; border-radius:6px; border:${isSelected ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${isSelected ? '#287D62' : '#F9FAFB'}; color:${isSelected ? '#FFFFFF' : '#4E5968'}; cursor:pointer; position:relative;" onclick="switchCafeteriaTab(${idx}, null)">
                   ${shortDay}
                   ${isToday ? `<span style="position:absolute; top:-2px; right:-2px; width:5px; height:5px; border-radius:50%; background:#EF4444;"></span>` : ''}
                 </button>
@@ -2258,13 +2269,13 @@
 
           <!-- 끼니 선택 탭 (조식 / 중식 / 석식) -->
           <div style="display:flex; gap:4px; margin-bottom:10px;">
-            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'breakfast' ? '#EEF8F3' : '#F2F4F6'}; color:${meal === 'breakfast' ? '#287D62' : '#6B7684'};" onclick="CAFETERIA.activeMeal='breakfast'; render();">
+            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'breakfast' ? '#287D62' : '#F2F4F6'}; color:${meal === 'breakfast' ? '#FFFFFF' : '#6B7684'};" onclick="switchCafeteriaTab(null, 'breakfast')">
               🌅 조식
             </button>
-            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'lunch' ? '#EEF8F3' : '#287D62'}; color:${meal === 'lunch' ? '#287D62' : '#6B7684'}; background:${meal === 'lunch' ? '#287D62' : '#F2F4F6'}; color:${meal === 'lunch' ? '#FFFFFF' : '#6B7684'};" onclick="CAFETERIA.activeMeal='lunch'; render();">
+            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'lunch' ? '#287D62' : '#F2F4F6'}; color:${meal === 'lunch' ? '#FFFFFF' : '#6B7684'};" onclick="switchCafeteriaTab(null, 'lunch')">
               ☀️ 중식
             </button>
-            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'dinner' ? '#EEF8F3' : '#F2F4F6'}; color:${meal === 'dinner' ? '#287D62' : '#6B7684'};" onclick="CAFETERIA.activeMeal='dinner'; render();">
+            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'dinner' ? '#287D62' : '#F2F4F6'}; color:${meal === 'dinner' ? '#FFFFFF' : '#6B7684'};" onclick="switchCafeteriaTab(null, 'dinner')">
               🌙 석식
             </button>
           </div>
