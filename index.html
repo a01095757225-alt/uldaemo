@@ -864,6 +864,110 @@
       border-color: #F59E0B;
     }
 
+    /* ===== 📅 7일 출석 스탬프 & 🎡 행운의 돌림판 (룰렛) ===== */
+    .stamp-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .stamp-day {
+      background: #F8FAFC;
+      border: 1.5px dashed #CBD5E1;
+      border-radius: 12px;
+      padding: 7px 2px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748B;
+      transition: all 0.2s ease;
+    }
+    .stamp-day.stamped {
+      background: #ECFDF5;
+      border: 1.5px solid #10B981;
+      color: #047857;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.14);
+    }
+    .stamp-day.today-target {
+      background: #FFFBEB;
+      border: 1.5px solid #F59E0B;
+      color: #B45309;
+      animation: pulseToday 1.6s infinite;
+    }
+    @keyframes pulseToday {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35); }
+      50% { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
+    }
+    .roulette-stage {
+      position: relative;
+      width: 210px;
+      height: 210px;
+      margin: 12px auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .roulette-pin {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      font-size: 24px;
+      color: #E11D48;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+    }
+    .roulette-wheel {
+      width: 196px;
+      height: 196px;
+      border-radius: 50%;
+      border: 5px solid #1E293B;
+      box-shadow: 0 8px 22px rgba(25, 31, 40, 0.16), inset 0 0 12px rgba(0,0,0,0.12);
+      background: conic-gradient(
+        #FEF3C7 0deg 60deg,
+        #D1FAE5 60deg 120deg,
+        #DBEAFE 120deg 180deg,
+        #FCE7F3 180deg 240deg,
+        #FFEDD5 240deg 300deg,
+        #E0E7FF 300deg 360deg
+      );
+      position: relative;
+      transition: transform 2.8s cubic-bezier(0.15, 0.85, 0.25, 1);
+    }
+    .roulette-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: 0 0;
+      font-size: 11px;
+      font-weight: 900;
+      color: #1E293B;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .roulette-center-btn {
+      position: absolute;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #287D62 0%, #1E634C 100%);
+      color: #FFFFFF;
+      border: 3px solid #FFFFFF;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+    }
+    .roulette-center-btn:hover {
+      transform: scale(1.06);
+    }
+
     /* ===== 🔥 캠퍼스 광장 (밸런스 게임 & 24시간 한줄 잔디톡) ===== */
     .plaza-hero {
       background: linear-gradient(135deg, #1E634C 0%, #287D62 60%, #40916C 100%);
@@ -3200,6 +3304,200 @@
       render();
     }
 
+    const REWARD_WHEEL_ITEMS = [
+      { label: "☕ 응모권+2", full: "☕ 아메리카노 응모권 +2장 대박!", type: "ticket", val: 2 },
+      { label: "🌡️ +0.5°C", full: "🌡️ 매너온도 +0.5°C 급상승!", type: "temp", val: 0.5 },
+      { label: "🍀 +0.2°C", full: "🍀 매너온도 +0.2°C 상승!", type: "temp", val: 0.2 },
+      { label: "🎟️ 티켓+1", full: "🎟️ 보너스 티켓 +1장 (한 번 더!)", type: "ticket", val: 1 },
+      { label: "⚡ +0.3°C", full: "⚡ 매너온도 +0.3°C 보너스!", type: "temp", val: 0.3 },
+      { label: "🌱 +0.1°C", full: "🌱 오늘의 행운 온도 +0.1°C!", type: "temp", val: 0.1 }
+    ];
+
+    const MENU_WHEEL_ITEMS = [
+      { label: "🍚 학생회관 학식", full: "🍚 22호관 학생회관 가성비 학식", loc: "22호관 학생회관" },
+      { label: "🍖 바사 국밥", full: "🍖 바보사거리 뜨끈한 돼지국밥", loc: "22호관 학생회관" },
+      { label: "🍕 피자·파스타", full: "🍕 바보사거리 화덕피자 & 파스타", loc: "22호관 학생회관" },
+      { label: "🍗 치킨·치밥", full: "🍗 바삭한 치킨 & 치밥 세트", loc: "22호관 학생회관" },
+      { label: "🍜 마라탕", full: "🍜 얼큰한 마라탕 & 꿔바로우", loc: "22호관 학생회관" },
+      { label: "🍔 수제버거", full: "🍔 육즙 가득 수제버거 & 감튀", loc: "22호관 학생회관" }
+    ];
+
+    let _isSpinningRoulette = false;
+    let _currentWheelDeg = 0;
+
+    function spinRouletteWheel() {
+      if (_isSpinningRoulette) return;
+      const mode = state.roulette_mode || "reward";
+      const u = DB.users[state.user_id];
+      if (!u) return;
+
+      const st = getUserStatsAndBadges(state.user_id);
+      if (mode === "reward") {
+        const curTickets = (u.coffee_tickets !== undefined) ? u.coffee_tickets : st.coffeeTickets;
+        if (curTickets <= 0) {
+          return showToast("🎟️ 보유한 돌림판 티켓이 없습니다! 출석 도장을 찍거나 번개에 참여해 티켓을 모아보세요.");
+        }
+        u.coffee_tickets = Math.max(0, curTickets - 1);
+      }
+
+      const items = mode === "reward" ? REWARD_WHEEL_ITEMS : MENU_WHEEL_ITEMS;
+      const winIdx = Math.floor(Math.random() * items.length);
+      const sliceDeg = 360 / items.length;
+      // 각 섹션의 중심 각도가 상단 핀(0도)에 오도록 회전 각도 계산
+      const targetSectorCenter = winIdx * sliceDeg + (sliceDeg / 2);
+      const extraSpins = 360 * 5;
+      _currentWheelDeg = _currentWheelDeg + extraSpins + (360 - (_currentWheelDeg % 360)) + (360 - targetSectorCenter);
+
+      const wheelEl = document.getElementById("uldaemo-roulette-wheel");
+      if (wheelEl) {
+        _isSpinningRoulette = true;
+        wheelEl.style.transform = `rotate(${_currentWheelDeg}deg)`;
+      }
+
+      setTimeout(() => {
+        _isSpinningRoulette = false;
+        const won = items[winIdx];
+        if (mode === "reward") {
+          if (won.type === "temp") {
+            u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + won.val) * 10) / 10);
+          } else if (won.type === "ticket") {
+            u.coffee_tickets = (u.coffee_tickets || 0) + won.val;
+          }
+          u.updated_at = Date.now();
+          state.last_roulette_result = `🎉 [리워드 당첨] ${won.full}`;
+          showToast(`🎉 돌림판 당첨! ${won.full}`);
+        } else {
+          state.last_roulette_result = `🍽️ [오늘의 추천 메뉴] ${won.full}`;
+          state.last_roulette_menu = won;
+          showToast(`🍽️ 오늘의 공강 메뉴 추천: ${won.full}!`);
+        }
+        fireConfetti();
+        saveDB(true);
+        render();
+      }, 2850);
+    }
+
+    function openMeetupFromRouletteMenu() {
+      const m = state.last_roulette_menu;
+      if (!m) return;
+      state.prefill_title = `같이 ${m.label.replace(/^[^\s]+\s/, "")} 드실 분! (돌림판 추천 🎯)`;
+      state.prefill_cat = "🍚 밥약";
+      state.active_modal = "create";
+      render();
+    }
+
+    function renderStampAndRouletteCard() {
+      const st = getUserStatsAndBadges(state.user_id);
+      const stampedCnt = Math.min(7, st.streakDays);
+      const mode = state.roulette_mode || "reward";
+      const items = mode === "reward" ? REWARD_WHEEL_ITEMS : MENU_WHEEL_ITEMS;
+
+      return `
+        <div class="uldaemo-card" style="border:1.5px solid #287D62; background:linear-gradient(180deg, #F4FBF7 0%, #FFFFFF 100%); margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:18px;">📅</span>
+              <span style="font-size:15px; font-weight:900; color:#1E634C;">일일 출석 스탬프 & 행운의 돌림판</span>
+            </div>
+            <button class="btn" style="width:auto; min-height:28px; padding:3px 9px; font-size:11px; color:#4E5968;" onclick="state.roulette_collapsed=!state.roulette_collapsed; render();">
+              ${state.roulette_collapsed ? "📂 출석·돌림판 펼치기" : "📁 접어두기"}
+            </button>
+          </div>
+
+          ${state.roulette_collapsed ? `
+            <div style="font-size:12px; color:#4E5968; display:flex; justify-content:space-between; align-items:center; padding-top:4px;">
+              <span>🔥 현재 연속 <b>${st.streakDays}일</b> 출석 중 · 보유 티켓 <b>🎟️ ${st.coffeeTickets}장</b></span>
+              <span style="color:#287D62; font-weight:800; cursor:pointer;" onclick="state.roulette_collapsed=false; render();">돌림판 열기 ›</span>
+            </div>
+          ` : `
+            <!-- 7일 출석 스탬프 도장판 -->
+            <div style="font-size:12px; color:#4E5968; margin-bottom:4px;">
+              매일 출석 도장을 찍으면 <b>매너온도 +0.1°C</b>와 <b>돌림판 티켓 🎟️</b>을 드립니다! (현재 연속 <b>${st.streakDays}일째</b>)
+            </div>
+            <div class="stamp-grid">
+              ${[1, 2, 3, 4, 5, 6, 7].map(d => {
+                const isStamped = d <= stampedCnt;
+                const isNext = (!st.checkedInToday && d === stampedCnt + 1);
+                const bonusTxt = (d === 3 || d === 6) ? "🎟️+1" : (d === 7 ? "☕+2" : "+0.1°C");
+                return `
+                  <div class="stamp-day ${isStamped ? 'stamped' : ''} ${isNext ? 'today-target' : ''}" onclick="handleDailyCheckin()" style="cursor:pointer;">
+                    <div style="font-size:10px;">${d}일차</div>
+                    <div style="font-size:16px; margin:2px 0;">${isStamped ? "✅" : (isNext ? "👆" : "⚪")}</div>
+                    <div style="font-size:9.5px; color:${isStamped ? '#047857' : '#94A3B8'};">${isStamped ? "도장쾅!" : bonusTxt}</div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+            <button class="btn ${st.checkedInToday ? '' : 'btn-primary'}" style="min-height:38px; font-size:12.5px; margin-bottom:12px;" onclick="handleDailyCheckin()">
+              ${st.checkedInToday ? "✅ 오늘 출석 도장 완료! (내일 또 찍어주세요 🌱)" : "📅 오늘 출석 도장 쾅! 찍기 (+0.1°C & 티켓 보상)"}
+            </button>
+
+            <!-- 돌림판 모드 전환 탭 -->
+            <div style="border-top:1px dashed #CBD5E1; padding-top:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                <div style="display:flex; gap:6px;">
+                  <button class="btn" style="width:auto; min-height:32px; padding:4px 11px; font-size:12px; font-weight:800; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#4E5968'}; border-color:#287D62;" onclick="state.roulette_mode='reward'; render();">
+                    🎁 리워드·온도 돌림판 (🎟️ ${st.coffeeTickets}장)
+                  </button>
+                  <button class="btn" style="width:auto; min-height:32px; padding:4px 11px; font-size:12px; font-weight:800; background:${mode === 'menu' ? '#D97706' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#4E5968'}; border-color:#F59E0B;" onclick="state.roulette_mode='menu'; render();">
+                    🍽️ 오늘 공강 메뉴 돌림판 (무료)
+                  </button>
+                </div>
+                <span style="font-size:11px; color:#64748B; font-weight:700;">
+                  ${mode === 'reward' ? '티켓 1장으로 온도·아메리카노 응모권 뽑기!' : '오늘 점심/저녁 뭐 먹을지 고민될 때 돌려보세요!'}
+                </span>
+              </div>
+
+              <!-- 원형 룰렛 휠 + 당첨 안내 -->
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); align-items:center; gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:16px; padding:12px;">
+                <div class="roulette-stage">
+                  <div class="roulette-pin">▼</div>
+                  <div id="uldaemo-roulette-wheel" class="roulette-wheel" style="transform:rotate(${_currentWheelDeg}deg);">
+                    ${items.map((it, idx) => {
+                      const angle = idx * 60 + 30 - 90;
+                      return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(26px, -6px);">${it.label}</div>`;
+                    }).join("")}
+                  </div>
+                  <button class="roulette-center-btn" onclick="spinRouletteWheel()">
+                    <span>SPIN</span>
+                    <span style="font-size:14px;">🎡</span>
+                  </button>
+                </div>
+
+                <div>
+                  <div style="font-size:13px; font-weight:800; color:#1E293B; margin-bottom:6px;">
+                    ${mode === 'reward' ? '🎯 100% 당첨! 행운의 리워드 룰렛' : '🍴 결정장애 해결! 울대 공강 메뉴 룰렛'}
+                  </div>
+                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; margin-bottom:10px;">
+                    ${items.map((it, i) => `
+                      <div style="font-size:11px; font-weight:700; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:5px 8px; color:#334155;">
+                        ${i + 1}. ${it.label}
+                      </div>
+                    `).join("")}
+                  </div>
+                  ${state.last_roulette_result ? `
+                    <div style="background:#FFFBEB; border:1px solid #F59E0B; border-radius:10px; padding:8px 10px; margin-bottom:8px; font-size:12px; font-weight:800; color:#92400E;">
+                      ${escHtml(state.last_roulette_result)}
+                      ${mode === 'menu' && state.last_roulette_menu ? `
+                        <div style="margin-top:6px;">
+                          <button class="btn btn-primary" style="min-height:30px; padding:4px 10px; font-size:11.5px;" onclick="openMeetupFromRouletteMenu()">
+                            ⚡ 이 메뉴로 바로 밥약 번개 열기 ›
+                          </button>
+                        </div>
+                      ` : ""}
+                    </div>
+                  ` : ""}
+                  <button class="btn btn-primary" style="min-height:40px; font-size:13px; background:${mode === 'reward' ? '#287D62' : '#D97706'}; border:none;" onclick="spinRouletteWheel()">
+                    ${mode === 'reward' ? `🎡 티켓 1장으로 행운 돌림판 돌리기 (보유 ${st.coffeeTickets}장)` : `🍽️ 무료로 오늘 메뉴 돌림판 돌리기!`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
     function renderPlazaTab() {
       ensurePlazaDefaults(DB);
       const allPolls = DB.polls || [];
@@ -3210,91 +3508,114 @@
       const talks = DB.plaza_talks || [];
       const pollCats = ["전체", "💘 연애 레전드", "🍜 음식 난제", "💸 인생·만약에", "🎓 대학 공감"];
 
+      const isCollapsed = Boolean(state.polls_collapsed);
+      const showAll = Boolean(state.polls_show_all);
+      const visiblePolls = showAll ? polls : polls.slice(0, 2);
+      const hiddenCount = Math.max(0, polls.length - visiblePolls.length);
+
       return `
         <div class="plaza-hero">
           <div>
             <div style="display:inline-block; background:rgba(255,255,255,0.2); font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; margin-bottom:6px;">
-              🔥 네이버·에타·SNS 레전드 논쟁 · 투표하면 매너온도 +0.1°C
+              🔥 출석체크 · 행운의 돌림판 · 세기의 밸런스 게임
             </div>
             <div style="font-size:18px; font-weight:900; line-height:1.35;">
-              세기의 밸런스 게임 &<br>24시간 한줄 잔디톡 🌱
+              울대 캠퍼스 광장 &<br>24시간 한줄 잔디톡 🌱
             </div>
           </div>
-          <div style="font-size:40px;">⚖️</div>
+          <div style="font-size:40px;">🎡</div>
         </div>
+
+        ${renderStampAndRouletteCard()}
 
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
           <span style="font-size:15px; font-weight:800;">⚖️ 화제의 레전드 밸런스 게임 (${polls.length})</span>
-          <div style="display:flex; gap:6px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn" style="width:auto; min-height:32px; padding:4px 10px; font-size:11.5px; font-weight:800; background:#FFFBEB; color:#B45309; border-color:#F59E0B;" onclick="drawRandomViralPoll()">
               🎲 인기 레전드 질문 뽑기
             </button>
             <button class="btn" style="width:auto; min-height:32px; padding:4px 11px; font-size:11.5px;" onclick="state.show_poll_form=!state.show_poll_form; render();">
               ${state.show_poll_form ? "닫기" : "➕ 직접 만들기"}
             </button>
+            <button class="btn" style="width:auto; min-height:32px; padding:4px 10px; font-size:11.5px; color:#4E5968;" onclick="state.polls_collapsed=!state.polls_collapsed; render();">
+              ${isCollapsed ? "📂 펼치기" : "📁 접어두기"}
+            </button>
           </div>
         </div>
 
-        <div class="cat-scroll-wrap" style="margin-bottom:10px;">
-          <div class="cat-grid">
-            ${pollCats.map(c => `
-              <button class="cat-btn ${curPollCat === c ? 'active' : ''}" onclick="state.plaza_poll_cat='${c}'; render();">
-                <span>${c === '전체' ? '🔥 전체' : c}</span>
-              </button>
-            `).join("")}
+        ${isCollapsed ? `
+          <div class="uldaemo-card" style="padding:12px 16px; display:flex; justify-content:space-between; align-items:center; background:#F8FAFC; border:1px dashed #CBD5E1; cursor:pointer;" onclick="state.polls_collapsed=false; render();">
+            <span style="font-size:13px; font-weight:700; color:#475569;">⚖️ 현재 ${polls.length}개의 레전드 밸런스 게임이 깔끔하게 접혀 있습니다.</span>
+            <span style="font-size:12px; font-weight:800; color:#287D62;">📂 펼쳐서 투표하기 ›</span>
           </div>
-        </div>
-
-        ${state.show_poll_form ? `
-          <div class="uldaemo-card" style="border-color:var(--primary); background:#F7FBF9;">
-            <div style="font-size:13.5px; font-weight:800; margin-bottom:8px; color:var(--primary-dark);">⚖️ 내가 만드는 과몰입 밸런스 게임</div>
-            <select id="plaza_poll_tag" class="select">
-              <option value="💘 연애 레전드">💘 연애 레전드</option>
-              <option value="🍜 음식 난제">🍜 음식 난제</option>
-              <option value="💸 인생·만약에">💸 인생·만약에</option>
-              <option value="🎓 대학 공감">🎓 대학 공감</option>
-            </select>
-            <input id="plaza_poll_q" class="input" placeholder="질문 (예: 내 애인이 내 절친에게 해줘도 되는 마지노선은?)" />
-            <div class="row-2">
-              <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 🦐 새우 껍질 까주기)" />
-              <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 🧥 패딩 지퍼 올려주기)" />
+        ` : `
+          <div class="cat-scroll-wrap" style="margin-bottom:10px;">
+            <div class="cat-grid">
+              ${pollCats.map(c => `
+                <button class="cat-btn ${curPollCat === c ? 'active' : ''}" onclick="state.plaza_poll_cat='${c}'; render();">
+                  <span>${c === '전체' ? '🔥 전체' : c}</span>
+                </button>
+              `).join("")}
             </div>
-            <button class="btn btn-primary" onclick="createNewBalancePoll()">🚀 밸런스 투표 올리기</button>
           </div>
-        ` : ""}
 
-        ${polls.map(p => {
-          const va = (p.votes_a || []).length;
-          const vb = (p.votes_b || []).length;
-          const total = va + vb;
-          const pctA = total === 0 ? 50 : Math.round((va / total) * 100);
-          const pctB = total === 0 ? 50 : (100 - pctA);
-          const myPick = (p.votes_a || []).includes(state.user_id) ? "A" : ((p.votes_b || []).includes(state.user_id) ? "B" : null);
-
-          return `
-            <div class="balance-card">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; flex-wrap:wrap; gap:4px;">
-                <span class="cat-badge" style="background:#FEF3C7; color:#92400E; font-size:10.5px; padding:2px 8px; border:1px solid #FDE68A;">${escHtml(p.tag || "🔥 인기 밸런스")}</span>
-                <span style="font-size:11.5px; color:#6B7684; font-weight:700;">👥 ${total}명 과몰입 투표중</span>
+          ${state.show_poll_form ? `
+            <div class="uldaemo-card" style="border-color:var(--primary); background:#F7FBF9;">
+              <div style="font-size:13.5px; font-weight:800; margin-bottom:8px; color:var(--primary-dark);">⚖️ 내가 만드는 과몰입 밸런스 게임</div>
+              <select id="plaza_poll_tag" class="select">
+                <option value="💘 연애 레전드">💘 연애 레전드</option>
+                <option value="🍜 음식 난제">🍜 음식 난제</option>
+                <option value="💸 인생·만약에">💸 인생·만약에</option>
+                <option value="🎓 대학 공감">🎓 대학 공감</option>
+              </select>
+              <input id="plaza_poll_q" class="input" placeholder="질문 (예: 내 애인이 내 절친에게 해줘도 되는 마지노선은?)" />
+              <div class="row-2">
+                <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 🦐 새우 껍질 까주기)" />
+                <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 🧥 패딩 지퍼 올려주기)" />
               </div>
-              <div style="font-size:14.5px; font-weight:800; margin-bottom:4px; line-height:1.4;">${escHtml(p.question)}</div>
-              <div class="vs-grid">
-                <button class="vs-btn ${myPick === 'A' ? 'picked-a' : ''}" onclick="voteBalancePoll(${p.id}, 'A')">
-                  <span>${escHtml(p.opt_a)}</span>
-                  <span style="font-size:15px; font-weight:900; color:var(--primary);">${pctA}% (${va}표)</span>
-                </button>
-                <div class="vs-badge">VS</div>
-                <button class="vs-btn ${myPick === 'B' ? 'picked-b' : ''}" onclick="voteBalancePoll(${p.id}, 'B')">
-                  <span>${escHtml(p.opt_b)}</span>
-                  <span style="font-size:15px; font-weight:900; color:#E03131;">${pctB}% (${vb}표)</span>
-                </button>
-              </div>
-              <div class="vs-bar-wrap">
-                <div class="vs-bar-a" style="width:${pctA}%;"></div>
-              </div>
+              <button class="btn btn-primary" onclick="createNewBalancePoll()">🚀 밸런스 투표 올리기</button>
             </div>
-          `;
-        }).join("")}
+          ` : ""}
+
+          ${visiblePolls.map(p => {
+            const va = (p.votes_a || []).length;
+            const vb = (p.votes_b || []).length;
+            const total = va + vb;
+            const pctA = total === 0 ? 50 : Math.round((va / total) * 100);
+            const pctB = total === 0 ? 50 : (100 - pctA);
+            const myPick = (p.votes_a || []).includes(state.user_id) ? "A" : ((p.votes_b || []).includes(state.user_id) ? "B" : null);
+
+            return `
+              <div class="balance-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; flex-wrap:wrap; gap:4px;">
+                  <span class="cat-badge" style="background:#FEF3C7; color:#92400E; font-size:10.5px; padding:2px 8px; border:1px solid #FDE68A;">${escHtml(p.tag || "🔥 인기 밸런스")}</span>
+                  <span style="font-size:11.5px; color:#6B7684; font-weight:700;">👥 ${total}명 과몰입 투표중</span>
+                </div>
+                <div style="font-size:14.5px; font-weight:800; margin-bottom:4px; line-height:1.4;">${escHtml(p.question)}</div>
+                <div class="vs-grid">
+                  <button class="vs-btn ${myPick === 'A' ? 'picked-a' : ''}" onclick="voteBalancePoll(${p.id}, 'A')">
+                    <span>${escHtml(p.opt_a)}</span>
+                    <span style="font-size:15px; font-weight:900; color:var(--primary);">${pctA}% (${va}표)</span>
+                  </button>
+                  <div class="vs-badge">VS</div>
+                  <button class="vs-btn ${myPick === 'B' ? 'picked-b' : ''}" onclick="voteBalancePoll(${p.id}, 'B')">
+                    <span>${escHtml(p.opt_b)}</span>
+                    <span style="font-size:15px; font-weight:900; color:#E03131;">${pctB}% (${vb}표)</span>
+                  </button>
+                </div>
+                <div class="vs-bar-wrap">
+                  <div class="vs-bar-a" style="width:${pctA}%;"></div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+
+          ${polls.length > 2 ? `
+            <button class="btn" style="margin-bottom:10px; background:#F8FAFC; border:1px dashed #CBD5E1; color:#334155; font-size:13px; font-weight:800;" onclick="state.polls_show_all=!state.polls_show_all; render();">
+              ${showAll ? `🔼 밸런스 게임 2개만 남기고 접어두기` : `🔽 나머지 레전드 밸런스 게임 ${hiddenCount}개 더보기`}
+            </button>
+          ` : ""}
+        `}
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin:18px 0 8px;">
           <span style="font-size:15px; font-weight:800;">🌱 24시간 실시간 한줄 잔디톡 (${talks.length})</span>
