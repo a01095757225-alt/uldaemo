@@ -215,6 +215,66 @@ def get_ulsan_notices():
     return FALLBACK_NOTICES
 
 
+_CAFETERIA_CACHE = {"ts": 0.0, "data": None}
+
+
+def get_ulsan_cafeteria_menu():
+    """울산대학교 학생식당 (청운학사 무거관 기숙사식당) 실시간 주간 식단표 파싱 (10분 캐시)"""
+    now = time.time()
+    if _CAFETERIA_CACHE["data"] and now - _CAFETERIA_CACHE["ts"] < 600:
+        return _CAFETERIA_CACHE["data"]
+
+    url = f"{ULSAN_BASE}/kor/CMS/DietMenuMgr/list.do?mCode=MN132"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            raw = resp.read()
+            html_text = raw.decode("utf-8", "ignore")
+
+        tbody = re.search(r"<tbody>(.*?)</tbody>", html_text, re.DOTALL)
+        if tbody:
+            days = []
+            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", tbody.group(1), re.DOTALL)
+            for r in rows:
+                day_m = re.search(r'<div class="mon">([^<]+)</div>\s*<div class="date">([^<]+)</div>\s*<div class="day">([^<]+)</div>', r)
+                if not day_m:
+                    continue
+                mon, date, day_name = day_m.groups()
+                date_str = f"{mon}.{date}"
+                tds = re.findall(r"<td[^>]*>(.*?)</td>", r, re.DOTALL)
+                meals = {"breakfast": [], "lunch": [], "dinner": []}
+                meal_keys = ["breakfast", "lunch", "dinner"]
+                for idx, td in enumerate(tds):
+                    if idx >= len(meal_keys):
+                        break
+                    k = meal_keys[idx]
+                    clean = re.sub(r"<[^>]+>", "\n", td)
+                    items = [re.sub(r"\s+", " ", l).strip() for l in clean.splitlines() if l.strip() and l.strip() != "-"]
+                    meals[k] = items
+
+                days.append({
+                    "date": date_str,
+                    "day": day_name.strip(),
+                    "breakfast": meals["breakfast"],
+                    "lunch": meals["lunch"],
+                    "dinner": meals["dinner"],
+                })
+
+            if days:
+                res = {
+                    "title": "울산대 학생식당 (청운학사 무거관)",
+                    "days": days,
+                    "updated_at": time.strftime("%Y-%m-%d %H:%M"),
+                }
+                _CAFETERIA_CACHE.update({"ts": now, "data": res})
+                return res
+    except Exception:
+        pass
+
+    # fallback cache return or None
+    return _CAFETERIA_CACHE.get("data")
+
+
 _CLOUD_REPO = "a01095757225-alt/uldaemo"
 _CLOUD_ISSUE = 1
 _DEFAULT_GH_TOKEN = "".join(["ghp_", "C2YNaOoKnR71EdnuaOnKD", "00AE4FaAZ2C6l54"])
@@ -411,6 +471,11 @@ class handler(BaseHTTPRequestHandler):
         if action == "ulsan_notices":
             items = get_ulsan_notices()
             self._send_json(200, {"ok": bool(items), "items": items[:40]})
+            return
+
+        if action == "ulsan_cafeteria":
+            menu_data = get_ulsan_cafeteria_menu()
+            self._send_json(200, {"ok": bool(menu_data), "data": menu_data})
             return
 
         if action == "send_otp":

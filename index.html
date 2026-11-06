@@ -2125,6 +2125,246 @@
         </a>`).join("");
     }
 
+    const DEFAULT_CAFETERIA_DATA = {"title": "울산대학교 학생식당 (청운학사 무거관)", "days": [{"date": "2026.11.02", "day": "월요일", "breakfast": ["생선까스&타르S(대두, 밀)", "쌀밥", "경상도식소고기뭇국(대두, 밀, 닭고기, 쇠고기)", "호박볶음(대두)", "마늘쫑절임(대두, 밀)", "무맛김치(대두, 밀, 새우)"], "lunch": ["[ 중식 - 코너1 ]", "묵은지닭볶음탕(대두, 밀, 새우, 닭고기)", "쌀밥", "시원한바지락국(대두, 밀, 조개류(굴, 전복, 홍합))", "햄마늘쫑볶음(우유, 대두, 밀, 돼지고기, 닭고기, 잣)", "청경채겉절이(대두, 밀, 새우)", "깍두기(대두, 밀, 새우)", "[ 중식 - 코너2 ]", "돈코츠라멘(난류, 대두, 밀, 돼지고기)", "쌀밥", "새우튀김&칠리S(대두, 밀, 새우)", "꼬들단무지무침(아황산류)"], "dinner": ["[ 석식 ]", "마제덮밥(대두, 밀, 돼지고기)", "유부장국(대두, 밀)", "꼬치어묵강정(대두, 밀, 토마토)", "오이탕탕이(대두, 밀)", "무맛김치(대두, 밀, 새우)"]}, {"date": "2026.11.03", "day": "화요일", "breakfast": ["고기산적조림(대두, 밀)", "쌀밥", "감자고추장찌개(대두, 밀)", "햄야채볶음(우유, 대두, 밀, 돼지고기, 닭고기, 잣)", "치커리유자청무침(대두, 밀)", "깍두기(대두, 밀, 새우)"], "lunch": ["[ 중식 - 코너1 ]", "수원왕갈비맛바싹불고기(난류, 우유, 대두, 밀, 돼지고기, 토마토, 닭고기, 쇠고기)", "쌀밥", "순두부찌개(난류, 우유, 대두, 밀, 게, 새우, 돼지고기, 닭고기, 쇠고기, 오징어, 조개류(굴, 전복, 홍합))", "닭살겨자냉채(닭고기)", "돌산갓절임(대두, 밀)", "무맛김치(대두, 밀, 새우)", "[ 중식 - 코너2 ]", "불고기크림파스타(난류, 우유, 대두, 밀, 돼지고기, 닭고기, 쇠고기)", "우동국(난류, 대두, 밀, 쇠고기)", "웨지감자*케찹(대두, 토마토)", "오이피클&할라피뇨(아황산류)"], "dinner": ["[ 석식 ]", "순살감자탕(대두, 밀, 돼지고기, 쇠고기)", "쌀밥", "연유옥수수전(우유, 대두, 밀)", "결과류멸치볶음(대두, 밀)", "고추양파장아찌(대두)", "깍두기(대두, 밀, 새우)"]}, {"date": "2026.11.04", "day": "수요일", "breakfast": ["매콤순대볶음(우유, 대두, 밀, 돼지고기, 쇠고기)", "쌀밥", "유부된장국(대두, 밀, 쇠고기, 조개류(굴, 전복, 홍합))", "미니새송이버섯볶음(대두)", "콩나물무침(대두, 밀)", "무맛김치(대두, 밀, 새우)"], "lunch": ["[ 중식 - 코너1 ]", "나주곰탕&당면(난류, 우유, 대두, 밀, 닭고기, 쇠고기, 조개류(굴, 전복, 홍합))", "쌀밥", "소시지떡칠리조림(땅콩, 대두, 밀, 돼지고기, 토마토, 닭고기, 쇠고기)", "톳두부무침(대두, 밀)", "오징어젓무말랭이(우유, 대두, 밀, 쇠고기, 오징어 )", "총각김치(대두, 밀, 새우)", "[ 중식 - 코너2 ]", "비벼주는참치마요(난류, 대두, 밀, 닭고기, 조개류(굴, 전복, 홍합))", "우동국(난류, 대두, 밀)", "통가래떡떡볶이(대두, 밀, 잣)", "김말이튀김*초간장(대두, 밀, 쇠고기)", "단무지(아황산류)"], "dinner": ["[ 석식 ]", "안동찜닭(대두, 밀, 닭고기, 오징어, 조개류(굴, 전복, 홍합))", "쌀밥", "참깨달걀수제비국(대두, 밀, 새우)", "시즈닝연근튀김(대두, 밀)", "열무겉절이(대두, 밀)", "무맛김치(대두, 밀, 새우)"]}, {"date": "2026.11.05", "day": "목요일", "breakfast": ["돈육메란장조림(난류, 우유, 대두, 밀, 돼지고기, 쇠고기)", "쌀밥", "미역국(대두, 밀)", "실곤약야채무침(대두, 밀)", "샐러리장아찌(대두, 밀)", "무맛김치(대두, 밀, 새우)"], "lunch": ["[ 중식 - 코너1 ]", "통마늘간장불고기(메밀, 대두, 밀, 돼지고기)", "쌀밥", "청양된장찌개(대두, 밀, 쇠고기, 조개류(굴, 전복, 홍합))", "중화풍알어묵볶음(대두, 밀)", "양배추쌈&쌈장(땅콩, 대두, 밀)", "무맛김치(대두, 밀, 새우)", "[ 중식 - 코너2 ]", "고깃집마무리볶음밥(대두, 밀, 새우, 돼지고기)", "두부장국(대두, 밀, 쇠고기, 조개류(굴, 전복, 홍합))", "철판군만두*초간장(난류, 대두, 밀, 돼지고기)", "단무지(아황산류)", "요구르트(우유)"], "dinner": ["[ 석식 ]", "스팸김치덮밥(대두, 밀, 새우, 돼지고기)", "콩나물국(대두)", "멘치까스&데미S(우유, 대두, 밀, 돼지고기, 토마토. 아황산류, 쇠고기, 조개류(굴, 전복, 홍합))", "오복지절임(땅콩, 대두)"]}, {"date": "2026.11.06", "day": "금요일", "breakfast": ["닭가슴살데리야끼볶음(대두, 밀, 닭고기)", "쌀밥", "콩나물국(대두)", "꼬시래기초무침(대두, 밀)", "무말랭이무침(대두, 밀)", "무맛김치(대두, 밀, 새우)"], "lunch": ["[ 중식 - 코너1 ]", "벌교식미나리꼬막비빔밥(대두, 밀, 조개류(굴, 전복, 홍합))", "달걀파국(난류, 대두, 밀)", "어니언링튀김&타르S(난류, 우유, 대두, 밀)", "풀무원도시락김", "백김치", "[ 중식 - 코너2 ]", "중화제육덮밥(대두, 밀, 돼지고기, 오징어, 조개류(굴, 전복, 홍합))", "달걀파국(난류, 대두, 밀)", "생크림카스테라꽈배기(난류, 우유, 대두, 밀)", "단무지(아황산류)"], "dinner": ["[ 석식 ]", "누룽지닭곰탕(난류, 우유, 대두, 밀, 돼지고기, 닭고기, 쇠고기, 조개류(굴, 전복, 홍합))", "쌀밥", "미니돈까스&케찹(대두, 밀, 돼지고기, 토마토, 닭고기)", "명엽채조림(대두, 밀)", "도토리묵무침(우유, 대두, 밀)", "깍두기(대두, 밀, 새우)"]}, {"date": "2026.11.07", "day": "토요일", "breakfast": ["치킨너겟&머스타드S(난류, 우유, 대두, 밀, 닭고기, 잣)", "쌀밥", "들깨무채국(대두, 밀)", "매콤어묵볶음(대두, 밀)", "연근조림(대두, 밀)", "무맛김치(대두, 밀, 새우)"], "lunch": ["[ 중식 ]", "통등심돈까스(대두, 밀, 돼지고기, 토마토, 아황산류, 쇠고기, 조개류(굴, 전복, 홍합))", "후리가케밥(난류, 우유, 대두, 밀)", "양송이스프(우유, 대두, 밀, 토마토, 쇠고기, 조개류(굴, 전복, 홍합))", "살사푸실리샐러드(대두, 밀)", "깍두기(대두, 밀, 새우)"], "dinner": ["[ 석식 ]", "돈육김치찌개(우유, 대두, 밀, 새우, 돼지고기, 닭고기, 쇠고기, 조개류(굴, 전복, 홍합))", "쌀밥", "야채달걀찜(난류, 대두, 밀)", "부추전*초간장(난류, 대두, 밀, 새우, 오징어)", "된장깻잎지(대두, 밀)", "깍두기(대두, 밀, 새우)"]}, {"date": "2026.11.08", "day": "일요일", "breakfast": [], "lunch": [], "dinner": []}], "updated_at": "2026-11-06 14:39"};
+
+    const CAFETERIA = {
+      data: null,
+      loading: false,
+      loadedAt: 0,
+      activeDayIdx: -1, // -1 means auto-select today
+      activeMeal: "lunch" // 'lunch' | 'dinner' | 'breakfast'
+    };
+
+    try {
+      const savedCafeteria = JSON.parse(localStorage.getItem("uldaemo_cafeteria") || "null");
+      CAFETERIA.data = (savedCafeteria && Array.isArray(savedCafeteria.days)) ? savedCafeteria : DEFAULT_CAFETERIA_DATA;
+    } catch (e) {
+      CAFETERIA.data = DEFAULT_CAFETERIA_DATA;
+    }
+
+    async function loadCafeteriaMenu(force) {
+      if (CAFETERIA.loading) return;
+      if (!force && Date.now() - CAFETERIA.loadedAt < 10 * 60 * 1000 && CAFETERIA.data) return;
+      CAFETERIA.loading = true;
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "ulsan_cafeteria" })
+        });
+        const json = await res.json();
+        if (json.ok && json.data && Array.isArray(json.data.days) && json.data.days.length) {
+          CAFETERIA.data = json.data;
+          localStorage.setItem("uldaemo_cafeteria", JSON.stringify(json.data));
+        }
+      } catch (e) {}
+      CAFETERIA.loading = false;
+      CAFETERIA.loadedAt = Date.now();
+      const ae = document.activeElement;
+      const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
+      if (state.user_id && !typing) render();
+    }
+
+    function getCafeteriaTodayIdx() {
+      if (!CAFETERIA.data || !Array.isArray(CAFETERIA.data.days)) return 0;
+      const days = CAFETERIA.data.days;
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      const todayStr = `${y}.${m}.${d}`;
+      const found = days.findIndex(item => item.date === todayStr);
+      if (found !== -1) return found;
+      // If today is Sunday (0) or Saturday (6), try to find today's day of week
+      const dowMap = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+      const dowName = dowMap[now.getDay()];
+      const dowFound = days.findIndex(item => item.day.includes(dowName) || dowName.includes(item.day));
+      return dowFound !== -1 ? dowFound : 0;
+    }
+
+    function openMeetupFromCafeteria(mealName, dishPreview) {
+      state.active_modal = "create";
+      setTimeout(() => {
+        const titleEl = document.getElementById("new_title");
+        const locEl = document.getElementById("new_location");
+        const catEl = document.getElementById("new_category");
+        if (titleEl) {
+          titleEl.value = `[학식 밥약] 오늘 ${mealName} 같이 먹을 사람! (${dishPreview || '학식'})`;
+        }
+        if (locEl) {
+          locEl.value = "기숙사식당(무거관)";
+        }
+        if (catEl) {
+          catEl.value = "🍚 밥약";
+        }
+      }, 50);
+      render();
+    }
+
+    function renderCafeteriaCard() {
+      loadCafeteriaMenu(false);
+      const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
+      const days = data.days || [];
+      const todayIdx = getCafeteriaTodayIdx();
+      const curIdx = (CAFETERIA.activeDayIdx >= 0 && CAFETERIA.activeDayIdx < days.length)
+        ? CAFETERIA.activeDayIdx
+        : todayIdx;
+      const dayData = days[curIdx] || { date: "", day: "오늘", breakfast: [], lunch: [], dinner: [] };
+
+      // Determine current meal by hour if not explicitly set
+      let meal = CAFETERIA.activeMeal;
+      const hour = new Date().getHours();
+      if (!meal) {
+        if (hour < 10) meal = "breakfast";
+        else if (hour < 14) meal = "lunch";
+        else meal = "dinner";
+      }
+
+      const mealList = dayData[meal] || [];
+      const mealNames = { breakfast: "아침 (조식)", lunch: "점심 (중식)", dinner: "저녁 (석식)" };
+      const curMealName = mealNames[meal] || "점심";
+
+      // Dish summary for quick preview
+      const mainDishes = mealList.filter(item => !item.startsWith("[") && item !== "쌀밥" && !item.includes("김치") && !item.includes("단무지"));
+      const previewText = mainDishes.slice(0, 2).map(s => s.replace(/\([^)]*\)/g, "").trim()).join(", ") || (mealList[0] ? mealList[0].replace(/\([^)]*\)/g, "").trim() : "학식");
+
+      return `
+        <div class="uldaemo-card" style="padding:14px 16px; border:1.5px solid #287D62; background:#FFFFFF; position:relative;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight:800; font-size:14px; color:#1E634C;">🍱 오늘 학식 메뉴</span>
+              <span style="font-size:10px; background:#EEF8F3; color:#287D62; font-weight:800; padding:1px 6px; border-radius:4px;">청운학사 무거관</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11.5px; font-weight:700; color:#287D62; cursor:pointer;" onclick="loadCafeteriaMenu(true)">🔄</span>
+              <span style="font-size:11.5px; font-weight:700; color:#287D62; cursor:pointer;" onclick="openCafeteriaModal()">전체 식단 ›</span>
+            </div>
+          </div>
+
+          <!-- 요일 탭 (월~금 + 토) -->
+          <div style="display:flex; gap:3px; margin-bottom:8px; overflow-x:auto; padding-bottom:2px;">
+            ${days.slice(0, 6).map((d, idx) => {
+              const isSelected = idx === curIdx;
+              const isToday = idx === todayIdx;
+              const shortDay = d.day.replace("요일", "");
+              return `
+                <button type="button" style="flex:1; min-width:32px; padding:4px 2px; font-size:11px; font-weight:${isSelected ? '800' : '600'}; border-radius:6px; border:${isSelected ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${isSelected ? '#287D62' : '#F9FAFB'}; color:${isSelected ? '#FFFFFF' : '#4E5968'}; cursor:pointer; position:relative;" onclick="CAFETERIA.activeDayIdx=${idx}; render();">
+                  ${shortDay}
+                  ${isToday ? `<span style="position:absolute; top:-2px; right:-2px; width:5px; height:5px; border-radius:50%; background:#EF4444;"></span>` : ''}
+                </button>
+              `;
+            }).join("")}
+          </div>
+
+          <!-- 끼니 선택 탭 (조식 / 중식 / 석식) -->
+          <div style="display:flex; gap:4px; margin-bottom:10px;">
+            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'breakfast' ? '#EEF8F3' : '#F2F4F6'}; color:${meal === 'breakfast' ? '#287D62' : '#6B7684'};" onclick="CAFETERIA.activeMeal='breakfast'; render();">
+              🌅 조식
+            </button>
+            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'lunch' ? '#EEF8F3' : '#287D62'}; color:${meal === 'lunch' ? '#287D62' : '#6B7684'}; background:${meal === 'lunch' ? '#287D62' : '#F2F4F6'}; color:${meal === 'lunch' ? '#FFFFFF' : '#6B7684'};" onclick="CAFETERIA.activeMeal='lunch'; render();">
+              ☀️ 중식
+            </button>
+            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'dinner' ? '#EEF8F3' : '#F2F4F6'}; color:${meal === 'dinner' ? '#287D62' : '#6B7684'};" onclick="CAFETERIA.activeMeal='dinner'; render();">
+              🌙 석식
+            </button>
+          </div>
+
+          <!-- 식단 메뉴 리스트 -->
+          <div style="background:#F9FAFB; border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.6; max-height:160px; overflow-y:auto; border:1px solid #F2F4F6;">
+            ${mealList.length === 0 ? `
+              <div style="color:#8B95A1; text-align:center; padding:12px 0;">운영 정보가 없거나 미운영 시간입니다.</div>
+            ` : mealList.map(item => {
+              const isCorner = item.startsWith("[");
+              if (isCorner) {
+                return `<div style="font-weight:800; color:#287D62; margin-top:4px; margin-bottom:2px; font-size:11.5px;">${escHtml(item)}</div>`;
+              }
+              return `<div style="color:#333D4B; display:flex; align-items:baseline; gap:5px;"><span style="color:#287D62; font-size:9px;">•</span><span>${escHtml(item)}</span></div>`;
+            }).join("")}
+          </div>
+
+          <!-- 번개 열기 바로가기 버튼 -->
+          <button class="btn btn-primary" style="width:100%; min-height:34px; margin-top:10px; font-size:12px; font-weight:800; padding:6px 10px;" onclick="openMeetupFromCafeteria('${curMealName}', '${escHtml(previewText)}')">
+            ⚡ 이 메뉴로 바로 밥약 번개 열기 ›
+          </button>
+        </div>
+      `;
+    }
+
+    function openCafeteriaModal() {
+      state.active_modal = "cafeteria";
+      render();
+    }
+
+    function renderCafeteriaModal() {
+      const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
+      const days = data.days || [];
+      const todayIdx = getCafeteriaTodayIdx();
+
+      return `
+        <button class="btn" style="margin-bottom:12px;" onclick="state.active_modal=null; render();">← 이전 화면으로 돌아가기</button>
+        <div class="uldaemo-card" style="padding:18px 20px; border:1.5px solid #287D62; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="font-size:18px; font-weight:800; color:#1E634C;">🍱 울산대학교 학생식당 주간 식단표</div>
+            <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="loadCafeteriaMenu(true)">🔄 새로고침</span>
+          </div>
+          <div style="font-size:12px; color:#6B7684; line-height:1.5;">
+            📍 위치: <b>청운학사 무거관 1층 기숙사 식당</b> (학생·교직원 공용 운영)<br>
+            🕒 운영시간: <b>조식</b> 07:30~09:00 · <b>중식</b> 11:30~13:00 · <b>석식</b> 17:00~18:30
+          </div>
+        </div>
+
+        ${days.map((d, idx) => {
+          const isToday = idx === todayIdx;
+          return `
+            <div class="uldaemo-card" style="margin-bottom:12px; padding:16px 18px; ${isToday ? 'border:2px solid #287D62; background:#F7FBF9;' : ''}">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #E5E8EB;">
+                <div style="font-weight:800; font-size:15px; color:#191F28; display:flex; align-items:center; gap:6px;">
+                  <span>📅 ${d.date} (${d.day})</span>
+                  ${isToday ? `<span style="background:#287D62; color:#FFFFFF; font-size:11px; font-weight:800; padding:2px 7px; border-radius:999px;">오늘</span>` : ''}
+                </div>
+                <button class="btn" style="width:auto; min-height:28px; padding:3px 8px; font-size:11.5px; font-weight:700;" onclick="openMeetupFromCafeteria('${d.day} 점심', '')">
+                  🍚 이날 밥약 열기
+                </button>
+              </div>
+
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                <!-- 조식 -->
+                <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:8px; padding:10px 12px;">
+                  <div style="font-weight:800; font-size:12.5px; color:#D97706; margin-bottom:5px;">🌅 조식 (07:30~09:00)</div>
+                  <div style="font-size:12px; color:#4E5968; line-height:1.55;">
+                    ${(d.breakfast || []).length ? d.breakfast.map(it => `<div>• ${escHtml(it)}</div>`).join("") : '<span style="color:#8B95A1;">미운영</span>'}
+                  </div>
+                </div>
+
+                <!-- 중식 -->
+                <div style="background:#FFFFFF; border:1px solid #287D62; border-radius:8px; padding:10px 12px;">
+                  <div style="font-weight:800; font-size:12.5px; color:#287D62; margin-bottom:5px;">☀️ 중식 (11:30~13:00)</div>
+                  <div style="font-size:12px; color:#333D4B; line-height:1.55;">
+                    ${(d.lunch || []).length ? d.lunch.map(it => {
+                      if (it.startsWith("[")) return `<div style="font-weight:800; color:#287D62; margin-top:4px;">${escHtml(it)}</div>`;
+                      return `<div>• ${escHtml(it)}</div>`;
+                    }).join("") : '<span style="color:#8B95A1;">미운영</span>'}
+                  </div>
+                </div>
+
+                <!-- 석식 -->
+                <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:8px; padding:10px 12px;">
+                  <div style="font-weight:800; font-size:12.5px; color:#4F46E5; margin-bottom:5px;">🌙 석식 (17:00~18:30)</div>
+                  <div style="font-size:12px; color:#4E5968; line-height:1.55;">
+                    ${(d.dinner || []).length ? d.dinner.map(it => {
+                      if (it.startsWith("[")) return `<div style="font-weight:800; color:#4F46E5; margin-top:4px;">${escHtml(it)}</div>`;
+                      return `<div>• ${escHtml(it)}</div>`;
+                    }).join("") : '<span style="color:#8B95A1;">미운영</span>'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      `;
+    }
+
+
     // =========================================================
     // 3. 메인 렌더링 함수
     // =========================================================
@@ -2185,7 +2425,9 @@
       loadNotices(false);
 
       let bodyHtml = "";
-      if (state.active_modal === "notifications") {
+      if (state.active_modal === "cafeteria") {
+        bodyHtml = renderCafeteriaModal();
+      } else if (state.active_modal === "notifications") {
         bodyHtml = renderNotificationsModal(unreadCnt);
       } else if (state.active_modal === "create") {
         bodyHtml = renderCreateModal();
@@ -2276,14 +2518,7 @@
               <div style="font-size:11.5px; color:#6B7684; margin-top:6px;">현재 모집 중인 번개 <b style="color:#287D62;">${activeCnt}건</b></div>
             </div>
           ` : ""}
-          <div class="uldaemo-card" style="padding:14px 16px;">
-            <div style="font-weight:800; font-size:14px; margin-bottom:6px;">🛡️ 안심 가이드</div>
-            <div style="font-size:12px; color:#4E5968; line-height:1.55;">
-              · 방장 수락 전까지 실명·이메일은 비공개예요.<br>
-              · 카톡/전화번호는 AI 경찰이 차단해요.<br>
-              · 노쇼 신고가 3회 누적되면 이용이 정지돼요.
-            </div>
-          </div>
+          ${renderCafeteriaCard()}
         </aside>
       `;
 
@@ -2897,6 +3132,16 @@
             <p class="main-banner-title">공강 시간,<br>같이 보낼 학우를<br>찾아봐요!</p>
           </div>
           ${renderImportantNoticeCard()}
+        </div>
+        <div class="m-cafeteria-strip uldaemo-card" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; margin-bottom:12px; background:#F7FBF9; border:1px solid #287D62; cursor:pointer;" onclick="openCafeteriaModal()">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:20px;">🍱</span>
+            <div>
+              <div style="font-size:13px; font-weight:800; color:#1E634C;">오늘의 울산대 학식 메뉴 보기</div>
+              <div style="font-size:11px; color:#6B7684;">청운학사 무거관 기숙사식당 식단표 실시간 확인 ›</div>
+            </div>
+          </div>
+          <span style="font-size:12px; font-weight:800; color:#287D62;">보러가기 ›</span>
         </div>
         ${renderHomeRewardStrip()}
         <button class="btn btn-primary" style="margin-bottom:12px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
