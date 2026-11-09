@@ -7,7 +7,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "api/index.py" },
-    { "src": "/sw.js", "dest": "/sw.js", "headers": { "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" } },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/sw.js", "dest": "/sw.js", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate", "Service-Worker-Allowed": "/" } },
+    { "src": "/(.*)", "dest": "/index.html", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" } }
   ]
 }
