@@ -2539,9 +2539,20 @@
       render();
     }
 
+    function togglePcAccordion(key) {
+      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
+      state.pc_accordions[key] = !state.pc_accordions[key];
+      render();
+      if (key === "map" && state.pc_accordions.map) {
+        setTimeout(initSideMap, 80);
+      }
+    }
+
     function switchCafeteriaTab(dayIdx, mealKey) {
       if (dayIdx !== undefined && dayIdx !== null) CAFETERIA.activeDayIdx = dayIdx;
       if (mealKey) CAFETERIA.activeMeal = mealKey;
+      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: true };
+      state.pc_accordions.cafeteria = true;
       const wrap = document.getElementById("cafeteria-card-wrap");
       if (wrap) {
         wrap.outerHTML = renderCafeteriaCard();
@@ -2552,6 +2563,9 @@
 
     function renderCafeteriaCard() {
       loadCafeteriaMenu(false);
+      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
+      const isExpanded = Boolean(state.pc_accordions.cafeteria);
+
       const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
       const days = data.days || [];
       const todayIdx = getCafeteriaTodayIdx();
@@ -2575,66 +2589,87 @@
 
       // Dish summary for quick preview
       const mainDishes = mealList.filter(item => !item.startsWith("[") && item !== "쌀밥" && !item.includes("김치") && !item.includes("단무지"));
-      const previewText = mainDishes.slice(0, 2).map(s => s.replace(/\([^)]*\)/g, "").trim()).join(", ") || (mealList[0] ? mealList[0].replace(/\([^)]*\)/g, "").trim() : "학식");
+      const previewText = mainDishes.slice(0, 2).map(s => s.replace(/\([^)]*\)/g, "").trim()).join(", ") || (mealList[0] ? mealList[0].replace(/\([^)]*\)/g, "").trim() : "학식 메뉴");
 
       return `
-        <div id="cafeteria-card-wrap" class="uldaemo-card" style="padding:14px 16px; border:1.5px solid #287D62; background:#FFFFFF; position:relative;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-weight:800; font-size:14px; color:#1E634C;">🍱 오늘 학식 메뉴</span>
-              <span style="font-size:10px; background:#EEF8F3; color:#287D62; font-weight:800; padding:1px 6px; border-radius:4px;">청운학사 무거관</span>
+        <div id="cafeteria-card-wrap" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''}" style="margin-bottom:12px;">
+          <!-- 아코디언 헤더 -->
+          <div class="accordion-header" onclick="togglePcAccordion('cafeteria')">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
+                ${getSvgIcon('meal', 15, '#287D62')}
+              </span>
+              <div style="min-width:0; flex:1;">
+                <div style="font-weight:800; font-size:13.5px; color:#191F28; display:flex; align-items:center; gap:5px;">
+                  <span>오늘 학식</span>
+                  <span style="font-size:10px; background:#EEF8F3; color:#287D62; font-weight:800; padding:1px 5px; border-radius:4px; flex-shrink:0;">청운학사</span>
+                </div>
+                ${!isExpanded ? `
+                  <div style="font-size:11px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    ${curMealName.split(" ")[0]}: ${previewText}
+                  </div>
+                ` : ''}
+              </div>
             </div>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11.5px; font-weight:700; color:#287D62; cursor:pointer;" onclick="loadCafeteriaMenu(true)">🔄</span>
-              <span style="font-size:11.5px; font-weight:700; color:#287D62; cursor:pointer;" onclick="openCafeteriaModal()">전체 식단 ›</span>
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+              ${isExpanded ? `
+                <span style="font-size:11px; font-weight:700; color:#287D62; cursor:pointer;" onclick="event.stopPropagation(); loadCafeteriaMenu(true)">🔄</span>
+                <span style="font-size:11px; font-weight:700; color:#287D62; cursor:pointer;" onclick="event.stopPropagation(); openCafeteriaModal()">전체 ›</span>
+              ` : ''}
+              <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
             </div>
           </div>
 
-          <!-- 요일 탭 (월~금 + 토) -->
-          <div style="display:flex; gap:3px; margin-bottom:8px; overflow-x:auto; padding-bottom:2px;">
-            ${days.slice(0, 6).map((d, idx) => {
-              const isSelected = idx === curIdx;
-              const isToday = idx === todayIdx;
-              const shortDay = d.day.replace("요일", "");
-              return `
-                <button type="button" style="flex:1; min-width:32px; padding:4px 2px; font-size:11px; font-weight:${isSelected ? '800' : '600'}; border-radius:6px; border:${isSelected ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${isSelected ? '#287D62' : '#F9FAFB'}; color:${isSelected ? '#FFFFFF' : '#4E5968'}; cursor:pointer; position:relative;" onclick="switchCafeteriaTab(${idx}, null)">
-                  ${shortDay}
-                  ${isToday ? `<span style="position:absolute; top:-2px; right:-2px; width:5px; height:5px; border-radius:50%; background:#EF4444;"></span>` : ''}
+          <!-- 아코디언 바디 (펼쳐졌을 때만 노출) -->
+          ${isExpanded ? `
+            <div class="accordion-body" style="padding:10px 14px 14px;">
+              <!-- 요일 탭 (월~금 + 토) -->
+              <div style="display:flex; gap:3px; margin-bottom:8px; overflow-x:auto; padding-bottom:2px;">
+                ${days.slice(0, 6).map((d, idx) => {
+                  const isSelected = idx === curIdx;
+                  const isToday = idx === todayIdx;
+                  const shortDay = d.day.replace("요일", "");
+                  return `
+                    <button type="button" style="flex:1; min-width:30px; padding:4px 2px; font-size:11px; font-weight:${isSelected ? '800' : '600'}; border-radius:6px; border:${isSelected ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${isSelected ? '#287D62' : '#F9FAFB'}; color:${isSelected ? '#FFFFFF' : '#4E5968'}; cursor:pointer; position:relative;" onclick="event.stopPropagation(); switchCafeteriaTab(${idx}, null)">
+                      ${shortDay}
+                      ${isToday ? `<span style="position:absolute; top:-2px; right:-2px; width:5px; height:5px; border-radius:50%; background:#EF4444;"></span>` : ''}
+                    </button>
+                  `;
+                }).join("")}
+              </div>
+
+              <!-- 끼니 선택 탭 (조식 / 중식 / 석식) -->
+              <div style="display:flex; gap:4px; margin-bottom:8px;">
+                <button type="button" style="flex:1; padding:5px 0; font-size:11px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'breakfast' ? '#287D62' : '#F2F4F6'}; color:${meal === 'breakfast' ? '#FFFFFF' : '#6B7684'};" onclick="event.stopPropagation(); switchCafeteriaTab(null, 'breakfast')">
+                  조식
                 </button>
-              `;
-            }).join("")}
-          </div>
+                <button type="button" style="flex:1; padding:5px 0; font-size:11px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'lunch' ? '#287D62' : '#F2F4F6'}; color:${meal === 'lunch' ? '#FFFFFF' : '#6B7684'};" onclick="event.stopPropagation(); switchCafeteriaTab(null, 'lunch')">
+                  중식
+                </button>
+                <button type="button" style="flex:1; padding:5px 0; font-size:11px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'dinner' ? '#287D62' : '#F2F4F6'}; color:${meal === 'dinner' ? '#FFFFFF' : '#6B7684'};" onclick="event.stopPropagation(); switchCafeteriaTab(null, 'dinner')">
+                  석식
+                </button>
+              </div>
 
-          <!-- 끼니 선택 탭 (조식 / 중식 / 석식) -->
-          <div style="display:flex; gap:4px; margin-bottom:10px;">
-            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'breakfast' ? '#287D62' : '#F2F4F6'}; color:${meal === 'breakfast' ? '#FFFFFF' : '#6B7684'};" onclick="switchCafeteriaTab(null, 'breakfast')">
-              🌅 조식
-            </button>
-            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'lunch' ? '#287D62' : '#F2F4F6'}; color:${meal === 'lunch' ? '#FFFFFF' : '#6B7684'};" onclick="switchCafeteriaTab(null, 'lunch')">
-              ☀️ 중식
-            </button>
-            <button type="button" style="flex:1; padding:5px 0; font-size:11.5px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:${meal === 'dinner' ? '#287D62' : '#F2F4F6'}; color:${meal === 'dinner' ? '#FFFFFF' : '#6B7684'};" onclick="switchCafeteriaTab(null, 'dinner')">
-              🌙 석식
-            </button>
-          </div>
+              <!-- 식단 메뉴 리스트 -->
+              <div style="background:#F9FAFB; border-radius:8px; padding:9px 11px; font-size:11.5px; line-height:1.55; max-height:140px; overflow-y:auto; border:1px solid #F2F4F6;">
+                ${mealList.length === 0 ? `
+                  <div style="color:#8B95A1; text-align:center; padding:10px 0;">운영 정보가 없거나 미운영 시간입니다.</div>
+                ` : mealList.map(item => {
+                  const isCorner = item.startsWith("[");
+                  if (isCorner) {
+                    return `<div style="font-weight:800; color:#287D62; margin-top:4px; margin-bottom:2px; font-size:11px;">${escHtml(item)}</div>`;
+                  }
+                  return `<div style="color:#333D4B; display:flex; align-items:baseline; gap:5px;"><span style="color:#287D62; font-size:9px;">•</span><span>${escHtml(item)}</span></div>`;
+                }).join("")}
+              </div>
 
-          <!-- 식단 메뉴 리스트 -->
-          <div style="background:#F9FAFB; border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.6; max-height:160px; overflow-y:auto; border:1px solid #F2F4F6;">
-            ${mealList.length === 0 ? `
-              <div style="color:#8B95A1; text-align:center; padding:12px 0;">운영 정보가 없거나 미운영 시간입니다.</div>
-            ` : mealList.map(item => {
-              const isCorner = item.startsWith("[");
-              if (isCorner) {
-                return `<div style="font-weight:800; color:#287D62; margin-top:4px; margin-bottom:2px; font-size:11.5px;">${escHtml(item)}</div>`;
-              }
-              return `<div style="color:#333D4B; display:flex; align-items:baseline; gap:5px;"><span style="color:#287D62; font-size:9px;">•</span><span>${escHtml(item)}</span></div>`;
-            }).join("")}
-          </div>
-
-          <!-- 번개 열기 바로가기 버튼 -->
-          <button class="btn btn-primary" style="width:100%; min-height:34px; margin-top:10px; font-size:12px; font-weight:800; padding:6px 10px;" onclick="openMeetupFromCafeteria('${curMealName}', '${escHtml(previewText)}')">
-            ⚡ 이 메뉴로 바로 밥약 번개 열기 ›
-          </button>
+              <!-- 번개 열기 바로가기 버튼 -->
+              <button class="btn btn-primary" style="width:100%; min-height:34px; margin-top:8px; font-size:12px; font-weight:800; padding:6px 10px;" onclick="event.stopPropagation(); openMeetupFromCafeteria('${curMealName}', '${escHtml(previewText)}')">
+                ⚡ 이 메뉴로 밥약 번개 열기 ›
+              </button>
+            </div>
+          ` : ''}
         </div>
       `;
     }
@@ -2847,37 +2882,72 @@
         </aside>
       `;
 
-      const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id).slice(0, 4);
-      const activeCnt = DB.posts.filter(p => p.status === "모집중").length;
-      const rightNotifHtml = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-weight:800; font-size:14px;">🔔 내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
-          <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">🏫 울산대 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›</span>
-        </div>
-        ${myNotifs.length === 0
-          ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
-          : myNotifs.map(n => `
-            <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
-              <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
-              <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
+      const isNotifsExp = Boolean(state.pc_accordions.notifs);
+      const isMapExp = Boolean(state.pc_accordions.map);
+
+      const notifCard = `
+        <div id="pc-right-notifs" class="meetup-accordion-card ${isNotifsExp ? 'is-expanded' : ''}" style="margin-bottom:12px;">
+          <div class="accordion-header" onclick="togglePcAccordion('notifs')">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
+                ${getSvgIcon('bell', 15, '#287D62')}
+              </span>
+              <span style="font-weight:800; font-size:13.5px; color:#191F28;">
+                내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}
+              </span>
             </div>
-          `).join("")}
-      `;
-      const rightHtml = `
-        <aside class="pc-right">
-          <div id="pc-right-notifs" class="uldaemo-card" style="padding:14px 16px;">
-            ${rightNotifHtml}
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
+                🏫 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›
+              </span>
+              <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
+            </div>
           </div>
-          ${(state.nav_tab !== "지도" && state.active_modal !== "detail") ? `
-            <div class="uldaemo-card" style="padding:14px 16px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-weight:800; font-size:14px;">🗺️ 캠퍼스 번개 지도</span>
-                <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="switchTab('지도')">크게 보기 ›</span>
-              </div>
+          ${isNotifsExp ? `
+            <div class="accordion-body" style="padding:10px 14px 14px;">
+              ${myNotifs.length === 0
+                ? `<div style="font-size:12px; color:#8B95A1; padding:6px 0;">내 알림은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
+                : myNotifs.map(n => `
+                  <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
+                    <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
+                    <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+                  </div>
+                `).join("")}
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      const mapCard = (state.nav_tab !== "지도" && state.active_modal !== "detail") ? `
+        <div id="pc-right-map" class="meetup-accordion-card ${isMapExp ? 'is-expanded' : ''}" style="margin-bottom:12px;">
+          <div class="accordion-header" onclick="togglePcAccordion('map')">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
+                ${getSvgIcon('map', 15, '#287D62')}
+              </span>
+              <span style="font-weight:800; font-size:13.5px; color:#191F28;">
+                캠퍼스 지도 <span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:1px 6px; border-radius:4px;">${activeCnt}건</span>
+              </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); switchTab('지도')">크게 보기 ›</span>
+              <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
+            </div>
+          </div>
+          ${isMapExp ? `
+            <div class="accordion-body" style="padding:10px 14px 14px;">
               <div id="side-map"></div>
               <div id="side-map-cnt" style="font-size:11.5px; color:#6B7684; margin-top:6px;">현재 모집 중인 번개 <b style="color:#287D62;">${activeCnt}건</b></div>
             </div>
-          ` : ""}
+          ` : ''}
+        </div>
+      ` : "";
+
+      const rightHtml = `
+        <aside class="pc-right">
+          ${notifCard}
+          ${mapCard}
           ${renderCafeteriaCard()}
         </aside>
       `;
