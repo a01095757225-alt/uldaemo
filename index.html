@@ -1251,6 +1251,13 @@
   <div id="app" class="app-shell"></div>
 
   <script>
+    window.onerror = function(msg, url, line, col, error) {
+      console.error("Global JS Error:", msg, line, col, error);
+      const root = document.getElementById("app");
+      if (root && (!root.innerHTML || root.innerHTML.trim() === "")) {
+        root.innerHTML = `<div class="app-shell" style="padding:24px; text-align:center;"><div class="uldaemo-card" style="padding:28px 20px;"><h3>⚠️ 화면 표시 복구 중</h3><p style="font-size:13px; color:#6B7684; margin:12px 0;">화면을 불러오는 도중 오류가 감지되었습니다.<br><span style="font-size:11px; color:#E02020;">${msg}</span></p><button class="btn btn-primary" onclick="localStorage.removeItem('uldaemo_db_v5'); location.reload();">🔄 화면 새로고침</button></div></div>`;
+      }
+    };
     // =========================================================
     // 1. 울산대학교 공식 캠퍼스맵 62개 전체 호관 및 주요 장소 실제 GPS 좌표
     // =========================================================
@@ -2782,8 +2789,9 @@
     }
 
     function render() {
-      const root = document.getElementById("app");
-      const currentUser = DB.users[state.user_id];
+      try {
+        const root = document.getElementById("app");
+        const currentUser = DB.users[state.user_id];
 
       // 로그인 전 화면
       if (!state.user_id || !currentUser) {
@@ -2884,6 +2892,9 @@
           </div>
         </aside>
       `;
+
+      const myNotifs = (DB.notifications || []).filter(n => n.user_id === state.user_id).slice(0, 4);
+      const activeCnt = (DB.posts || []).filter(p => p.status === "모집중").length;
 
       state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
       const isNotifsExp = Boolean(state.pc_accordions.notifs);
@@ -3008,7 +3019,14 @@
       if (isPC() && document.getElementById("side-map")) {
         setTimeout(initSideMap, 80);
       }
+    } catch (renderErr) {
+      console.error("render() critical error:", renderErr);
+      const root = document.getElementById("app");
+      if (root) {
+        root.innerHTML = `<div class="app-shell" style="padding:24px; text-align:center;"><div class="uldaemo-card" style="padding:28px 20px;"><h3>⚠️ 화면 표시 복구</h3><p style="font-size:13px; color:#6B7684; margin:12px 0;">화면을 불러오는 도중 오류가 발생했습니다.<br><span style="font-size:11px; color:#E02020;">${renderErr.message || renderErr}</span></p><button class="btn btn-primary" onclick="localStorage.removeItem('uldaemo_db_v5'); location.reload();">🔄 캐시 초기화 후 새로고침</button></div></div>`;
+      }
     }
+  }
 
     // 백그라운드 동기화 시 지도를 파괴하지 않고 본문/알림 영역만 부드럽게 갱신
     function renderWithoutMapFlicker() {
