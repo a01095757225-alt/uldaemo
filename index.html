@@ -57,6 +57,61 @@
     .uldaemo-card:hover {
       box-shadow: 0 6px 20px rgba(40, 125, 98, 0.08);
     }
+    /* 옵션 A: 슬림 컴팩트 아코디언 카드 (기본 56px 접힘 → 클릭 시 부드럽게 펼쳐짐) */
+    .meetup-accordion-card {
+      background: var(--surface);
+      border-radius: 16px;
+      margin-bottom: 9px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(25, 31, 40, 0.03);
+      overflow: hidden;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease;
+    }
+    .meetup-accordion-card:hover {
+      border-color: #C5E6D6;
+      box-shadow: 0 4px 14px rgba(40, 125, 98, 0.08);
+    }
+    .meetup-accordion-card.is-expanded {
+      border-color: var(--primary);
+      box-shadow: 0 6px 20px rgba(40, 125, 98, 0.12);
+    }
+    .accordion-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+      background: transparent;
+      transition: background 0.15s ease;
+    }
+    .accordion-header:hover {
+      background: #FAFCFB;
+    }
+    .accordion-chevron {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      color: #8B95A1;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s ease;
+      flex-shrink: 0;
+    }
+    .meetup-accordion-card.is-expanded .accordion-chevron {
+      transform: rotate(180deg);
+      color: var(--primary);
+    }
+    .accordion-body {
+      padding: 12px 14px 14px;
+      border-top: 1px solid #F2F4F6;
+      animation: accordionSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes accordionSlideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .app-header {
       display: flex;
       justify-content: space-between;
@@ -2079,6 +2134,10 @@
           return `<svg ${common}><circle cx="12" cy="12" r="1.5" fill="${c}" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="${c}" stroke="none"/><circle cx="5" cy="12" r="1.5" fill="${c}" stroke="none"/></svg>`;
         case 'tag':
           return `<svg ${common}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
+        case 'chevron-down':
+          return `<svg ${common}><polyline points="6 9 12 15 18 9"/></svg>`;
+        case 'chevron-up':
+          return `<svg ${common}><polyline points="18 15 12 9 6 15"/></svg>`;
         default:
           return `<svg ${common}><circle cx="12" cy="12" r="8"/></svg>`;
       }
@@ -3323,7 +3382,43 @@
       `;
     }
 
+    function toggleMeetupAccordion(postId) {
+      state.expanded_post_ids = state.expanded_post_ids || {};
+      if (state.expanded_post_ids[postId]) {
+        delete state.expanded_post_ids[postId];
+      } else {
+        state.expanded_post_ids[postId] = true;
+      }
+      const el = document.getElementById(`post-accordion-${postId}`);
+      if (el) {
+        const post = (DB.posts || []).find(p => p.id === postId);
+        if (post) {
+          el.outerHTML = renderMeetupCard(post);
+          return;
+        }
+      }
+      render();
+    }
+
+    function toggleAllAccordions(postCount) {
+      state.expanded_post_ids = state.expanded_post_ids || {};
+      const curCount = Object.keys(state.expanded_post_ids).length;
+      if (curCount > 0) {
+        state.expanded_post_ids = {};
+      } else {
+        (DB.posts || []).forEach(p => { state.expanded_post_ids[p.id] = true; });
+      }
+      const wrap = document.getElementById("home-feed-list-wrap");
+      if (wrap) {
+        wrap.innerHTML = renderHomeFeedListHtml();
+      } else {
+        render();
+      }
+    }
+
     function renderMeetupCard(post) {
+      state.expanded_post_ids = state.expanded_post_ids || {};
+      const isExpanded = Boolean(state.expanded_post_ids[post.id]);
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5, keywords: ["친절해요 😊"] };
       const acceptedCnt = DB.applications.filter(a => a.post_id === post.id && a.status === "승인됨").length + 1;
       const myApp = DB.applications.find(a => a.post_id === post.id && a.applicant_id === state.user_id);
@@ -3335,62 +3430,95 @@
       const distM = calcDistanceMeters(state.my_lat, state.my_lng, coords[0], coords[1]);
       const walkMin = Math.max(1, Math.round(distM / 67));
       const distHtml = state.gps_consent
-        ? `<span style="display:inline-flex; align-items:center; background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">🚶 약 ${distM}m (도보 ${walkMin}분)</span>`
+        ? `<span style="display:inline-flex; align-items:center; background:#EEF8F3; color:#287D62; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:4px;">🚶 ${distM}m (${walkMin}분)</span>`
         : "";
-
-      const mapUrl = `https://map.kakao.com/link/search/${encodeURIComponent("울산대학교 " + post.location)}`;
 
       let actionBtn = "";
       if (isAuthor) {
-        actionBtn = `<button class="btn" disabled>👑 내가 만든 번개</button>`;
+        actionBtn = `<button class="btn" style="min-height:38px; font-size:13px;" disabled>👑 내가 만든 번개</button>`;
       } else if (myApp && myApp.status === "승인됨") {
-        actionBtn = `<button class="btn btn-primary" onclick="switchTab('채팅')">💬 채팅방 이동</button>`;
+        actionBtn = `<button class="btn btn-primary" style="min-height:38px; font-size:13px;" onclick="switchTab('채팅')">💬 채팅방 이동</button>`;
       } else if (myApp && myApp.status === "대기중") {
-        actionBtn = `<button class="btn" disabled>⏳ 수락 대기중</button>`;
+        actionBtn = `<button class="btn" style="min-height:38px; font-size:13px;" disabled>⏳ 수락 대기중</button>`;
       } else if (isFull) {
-        actionBtn = `<button class="btn" disabled>모집 마감</button>`;
+        actionBtn = `<button class="btn" style="min-height:38px; font-size:13px;" disabled>모집 마감</button>`;
       } else {
-        actionBtn = `<button class="btn btn-primary" onclick="applyToPost(${post.id})">${isOfficial ? "🎁 공식 번개 참여 신청" : "참여 신청"}</button>`;
+        actionBtn = `<button class="btn btn-primary" style="min-height:38px; font-size:13px;" onclick="applyToPost(${post.id})">${isOfficial ? "🎁 공식 번개 참여 신청" : "참여 신청"}</button>`;
       }
 
       const isJustCreated = (window._justCreatedPostId === post.id);
+      const catIcon = getCategorySvgIcon(post.category);
+
       return `
-        <div id="post-card-${post.id}" class="uldaemo-card ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}" style="${isOfficial ? 'margin-top:14px;' : ''}">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
-            <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-              ${isOfficial ? `<span class="official-badge">👑 운영진 공식 번개</span>` : ""}
-              <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
-              ${distHtml}
-              <span class="privacy-pill-mini">🛡️ 익명 보장</span>
-            </div>
-            <span style="font-size:11px; color:#8B95A1; font-weight:600;">${post.meeting_style}</span>
-          </div>
-          <div style="font-size:17px; font-weight:800; margin-bottom:6px; ${isOfficial ? 'color:#1E3A8A;' : ''}">
-            ${isOfficial ? '⭐ ' : ''}${post.title}
-          </div>
-          <div style="font-size:12.5px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
-            <span>📍 <b>${post.location}</b></span>
-            <span>🕒 <b>${post.meet_date} ${post.meet_time}</b></span>
-            <span>👥 <b>${acceptedCnt} / ${post.max_participants}명</b></span>
-            ${isOfficial ? `<span style="color:#D97706; font-weight:700;">🎁 참가시 매너온도 +1.0°C 보너스</span>` : ""}
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:10px; margin-bottom:6px;">
-            <div>
-              <div style="font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
-                <span>${isOfficial ? '👑' : author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</span>
-                ${getUserStatsAndBadges(post.author_id).badges.slice(0, 2).map(b => `<span class="achieve-badge ${b.cls}" style="font-size:10px; padding:2px 6px;">${b.label}</span>`).join("")}
+        <div id="post-accordion-${post.id}" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''} ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}">
+          <!-- 컴팩트 요약 헤더 (클릭 시 펼침/접힘 토글) -->
+          <div class="accordion-header" onclick="toggleMeetupAccordion(${post.id})">
+            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+              <span style="width:34px; height:34px; border-radius:10px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
+                ${getSvgIcon(catIcon, 18, '#287D62')}
+              </span>
+              <div style="min-width:0; flex:1;">
+                <div style="font-size:14px; font-weight:800; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:5px;">
+                  ${isOfficial ? `<span class="official-badge" style="font-size:9.5px; padding:1px 6px;">👑 공식</span>` : ''}
+                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${post.title}</span>
+                </div>
+                <div style="font-size:11.5px; color:#6B7684; margin-top:2px; display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  <span>📍 ${post.location}</span>
+                  <span>·</span>
+                  <span>🕒 ${post.meet_time}</span>
+                  ${distHtml ? `<span>·</span>${distHtml}` : ''}
+                </div>
               </div>
-              <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${author.department} · ${author.mbti}</div>
             </div>
-            <div style="width:135px;">${renderTempGauge(author.manner_temp, false)}</div>
+            <div style="display:flex; align-items:center; gap:7px; flex-shrink:0;">
+              <span style="font-size:11px; font-weight:800; color:#287D62; background:#EEF8F3; padding:4px 8px; border-radius:6px; border:1px solid #C5E6D6;">
+                👥 ${acceptedCnt}/${post.max_participants}
+              </span>
+              <span class="accordion-chevron">
+                ${getSvgIcon('chevron-down', 16, 'currentColor')}
+              </span>
+            </div>
           </div>
-          <div style="margin-bottom:10px;">
-            ${(author.keywords || ["시간 약속을 잘 지켜요 ⏰"]).slice(0, 2).map(kw => `<span class="praise-tag">${kw}</span>`).join("")}
-          </div>
-          <div class="row-2">
-            <button class="btn" onclick="openDetailModal(${post.id})">상세 보기</button>
-            ${actionBtn}
-          </div>
+
+          <!-- 확장 상세 바디 (펼쳐졌을 때만 노출) -->
+          ${isExpanded ? `
+            <div class="accordion-body">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
+                <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+                  <span class="cat-badge" style="background:#EEF8F3; color:#287D62; font-size:11px; padding:2px 7px;">${post.category}</span>
+                  <span class="privacy-pill-mini">🛡️ 익명 보장</span>
+                  ${isOfficial ? `<span style="font-size:11px; color:#287D62; font-weight:700;">🎁 매너온도 +1.0°C 보너스</span>` : ''}
+                </div>
+                <span style="font-size:11px; color:#8B95A1; font-weight:600;">${post.meeting_style}</span>
+              </div>
+
+              <div style="font-size:12px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; padding:6px 10px; background:#F8FAF9; border-radius:8px;">
+                <span>📅 <b>${post.meet_date}</b></span>
+                <span>🕒 <b>${post.meet_time}</b></span>
+                <span>📍 <b>${post.location}</b></span>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:9px; margin-bottom:8px;">
+                <div>
+                  <div style="font-size:13px; font-weight:700; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                    <span>${isOfficial ? '👑' : author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</span>
+                    ${getUserStatsAndBadges(post.author_id).badges.slice(0, 2).map(b => `<span class="achieve-badge ${b.cls}" style="font-size:10px; padding:2px 6px;">${b.label}</span>`).join("")}
+                  </div>
+                  <div style="font-size:11px; color:#6B7684; margin-top:2px;">${author.department} · ${author.mbti}</div>
+                </div>
+                <div style="width:130px;">${renderTempGauge(author.manner_temp, false)}</div>
+              </div>
+
+              <div style="margin-bottom:10px;">
+                ${(author.keywords || ["시간 약속을 잘 지켜요 ⏰"]).slice(0, 2).map(kw => `<span class="praise-tag" style="font-size:10.5px; padding:2px 7px;">${kw}</span>`).join("")}
+              </div>
+
+              <div class="row-2">
+                <button class="btn" style="min-height:38px; font-size:13px;" onclick="openDetailModal(${post.id})">상세 페이지 ›</button>
+                ${actionBtn}
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
     }
@@ -3426,10 +3554,17 @@
 
     function renderHomeFeedListHtml() {
       const list = getFilteredHomePosts();
+      state.expanded_post_ids = state.expanded_post_ids || {};
+      const expCount = Object.keys(state.expanded_post_ids).length;
+
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:15px; font-weight:800;">⚡ 실시간 캠퍼스 번개 (${list.length}건)</span>
-          <span class="privacy-pill-mini">🛡️ 수락 전 익명 보장</span>
+          <span style="font-size:14.5px; font-weight:800; color:#191F28;">⚡ 실시간 캠퍼스 번개 (${list.length}건)</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer;" onclick="toggleAllAccordions(${list.length})">
+              ${expCount > 0 ? '모두 접기 ⌃' : '모두 펼치기 ⌄'}
+            </button>
+          </div>
         </div>
 
         ${list.length === 0 ? `
