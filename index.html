@@ -9,7 +9,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="build-version" content="20261109-2258-fix" />
+  <meta name="build-version" content="20261109-2315-scroll-fix" />
 
   <!-- 카카오톡 / SNS 공유 미리보기 (Open Graph) -->
   <meta property="og:type" content="website" />
@@ -34,7 +34,33 @@
       --text-sub: #6B7684;
       --border: #E5EAE7;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html {
+      scroll-behavior: smooth;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(40, 125, 98, 0.28) transparent;
+    }
+    /* ===== 울대모 4대 스크롤 개선: 초슬림 모던 스크롤바 ===== */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(40, 125, 98, 0.25);
+      border-radius: 999px;
+      transition: background 0.2s ease;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(40, 125, 98, 0.55);
+    }
     body {
       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg);
@@ -466,6 +492,11 @@
         top: 20px;
         max-height: calc(100vh - 40px);
         overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+      .app-shell.wide .pc-sidebar::-webkit-scrollbar,
+      .app-shell.wide .pc-right::-webkit-scrollbar {
+        width: 4px;
       }
       .app-shell.wide .app-header { display: none; }
       .app-shell.wide .floating-dock-wrap { display: none; }
@@ -1242,6 +1273,69 @@
       background: #FFF0F0;
       border-color: #FFA8A8;
       color: #E02020;
+    }
+
+    /* ===== 스크롤 개선: 상단 고정 카테고리 칩 바 ===== */
+    .category-sticky-wrap {
+      position: sticky;
+      top: 6px;
+      z-index: 45;
+      background: rgba(247, 249, 248, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px 2px;
+      margin-bottom: 8px;
+      border-radius: 14px;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+    @media (min-width: 1024px) {
+      .category-sticky-wrap {
+        top: 14px;
+      }
+    }
+
+    /* ===== 스크롤 개선: 플로팅 맨 위로 가기 버튼 ===== */
+    .floating-top-btn {
+      position: fixed;
+      right: 18px;
+      bottom: 82px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      color: #287D62;
+      border: 1px solid #C5E6D6;
+      box-shadow: 0 4px 14px rgba(40, 125, 98, 0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 85;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .floating-top-btn.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .floating-top-btn:hover {
+      background: #EEF8F3;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(40, 125, 98, 0.28);
+    }
+    .floating-top-btn:active {
+      transform: scale(0.92);
+    }
+    @media (min-width: 1024px) {
+      .floating-top-btn {
+        right: 32px;
+        bottom: 32px;
+        width: 46px;
+        height: 46px;
+      }
     }
   </style>
 </head>
@@ -3010,6 +3104,10 @@
             `).join("")}
           </div>
         </div>
+
+        <button id="btn-scroll-top" class="floating-top-btn" onclick="scrollToTop()" aria-label="맨 위로 가기" title="맨 위로 가기">
+          ${getSvgIcon('chevron-up', 20, '#287D62', 2.6)}
+        </button>
       `;
 
       if (state.active_modal === "detail") {
@@ -3021,6 +3119,9 @@
       if (isPC() && document.getElementById("side-map")) {
         setTimeout(initSideMap, 80);
       }
+      if (document.getElementById("btn-scroll-top") && window.scrollY > 240) {
+        document.getElementById("btn-scroll-top").classList.add("is-visible");
+      }
     } catch (renderErr) {
       console.error("render() critical error:", renderErr);
       const root = document.getElementById("app");
@@ -3029,6 +3130,20 @@
       }
     }
   }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  window.addEventListener("scroll", () => {
+    const btn = document.getElementById("btn-scroll-top");
+    if (!btn) return;
+    if (window.scrollY > 240) {
+      btn.classList.add("is-visible");
+    } else {
+      btn.classList.remove("is-visible");
+    }
+  }, { passive: true });
 
     // 백그라운드 동기화 시 지도를 파괴하지 않고 본문/알림 영역만 부드럽게 갱신
     function renderWithoutMapFlicker() {
@@ -3718,7 +3833,9 @@
         ${renderHomeRewardStrip()}
         <button class="btn btn-primary" style="margin-bottom:10px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
 
-        ${renderCategoryChips("home_cat")}
+        <div class="category-sticky-wrap">
+          ${renderCategoryChips("home_cat")}
+        </div>
 
         <div style="display:grid; grid-template-columns: 1.5fr 1.1fr; gap:6px; margin-bottom:10px;">
           <input id="home-search-input" class="input" style="margin-bottom:0;" placeholder="🔍 제목, 호관, 키워드 검색..." value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
