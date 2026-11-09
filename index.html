@@ -9,7 +9,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="build-version" content="20261109-1855-fix" />
+  <meta name="build-version" content="20261109-2258-fix" />
 
   <!-- 카카오톡 / SNS 공유 미리보기 (Open Graph) -->
   <meta property="og:type" content="website" />
@@ -2046,7 +2046,8 @@
       auth_code_sent: false,
       smtp_sent_live: false,
       smtp_sender: localStorage.getItem("uldaemo_smtp_sender") || "",
-      smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || ""
+      smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || "",
+      pc_accordions: { notifs: false, map: false, cafeteria: false }
     };
 
     function persistLogin(uid) {
@@ -2551,7 +2552,7 @@
     }
 
     function togglePcAccordion(key) {
-      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
+      state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
       state.pc_accordions[key] = !state.pc_accordions[key];
       render();
       if (key === "map" && state.pc_accordions.map) {
@@ -2562,7 +2563,7 @@
     function switchCafeteriaTab(dayIdx, mealKey) {
       if (dayIdx !== undefined && dayIdx !== null) CAFETERIA.activeDayIdx = dayIdx;
       if (mealKey) CAFETERIA.activeMeal = mealKey;
-      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: true };
+      state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: true };
       state.pc_accordions.cafeteria = true;
       const wrap = document.getElementById("cafeteria-card-wrap");
       if (wrap) {
@@ -2574,7 +2575,7 @@
 
     function renderCafeteriaCard() {
       loadCafeteriaMenu(false);
-      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
+      state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
       const isExpanded = Boolean(state.pc_accordions.cafeteria);
 
       const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
@@ -2897,7 +2898,7 @@
       const myNotifs = (DB.notifications || []).filter(n => n.user_id === state.user_id).slice(0, 4);
       const activeCnt = (DB.posts || []).filter(p => p.status === "모집중").length;
 
-      state.pc_accordions = state.pc_accordions || { notifs: true, map: false, cafeteria: false };
+      state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
       const isNotifsExp = Boolean(state.pc_accordions.notifs);
       const isMapExp = Boolean(state.pc_accordions.map);
 
