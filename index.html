@@ -9,7 +9,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="build-version" content="20261109-2323-hidescroll" />
+  <meta name="build-version" content="20261110-1115-chatfocus" />
 
   <!-- 카카오톡 / SNS 공유 미리보기 (Open Graph) -->
   <meta property="og:type" content="website" />
@@ -1887,21 +1887,15 @@
             syncToCloud(true);
           }
 
-          // 데이터가 실제로 바뀐 경우에만 화면 갱신 (지도 깜빡임 원천 방지)
+          // 데이터가 실제로 바뀐 경우에만 화면 갱신 (지도 깜빡임 및 입력창 커서 풀림 원천 방지)
           if (sigBefore !== sigAfter) {
             const ae = document.activeElement;
             const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
-            if (!typing) {
+            if (ae && ae.id && ae.id.startsWith("chat_in_")) {
+              // 채팅 입력 중일 때는 입력창(input) DOM을 절대 건드리지 않고 말풍선 목록만 부분 갱신
+              updateAllChatBoxesInPlace();
+            } else if (!typing) {
               renderWithoutMapFlicker();
-            } else if (ae && ae.id && ae.id.startsWith("chat_in_")) {
-              const activeId = ae.id;
-              const savedVal = ae.value;
-              renderWithoutMapFlicker();
-              const restored = document.getElementById(activeId);
-              if (restored) {
-                restored.value = savedVal;
-                restored.focus();
-              }
             }
           }
           return true;
@@ -3143,40 +3137,87 @@
       }
       const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
       const newNoticeCnt = unseenNoticeCnt();
-      let bodyHtml = "";
-      if (state.active_modal === "cafeteria") {
-        bodyHtml = renderCafeteriaModal();
-      } else if (state.active_modal === "notifications") {
-        bodyHtml = renderNotificationsModal(unreadCnt);
-      } else if (state.active_modal === "create") {
-        bodyHtml = renderCreateModal();
-      } else if (state.nav_tab === "홈") {
-        bodyHtml = renderHomeTab();
-      } else if (state.nav_tab === "광장") {
-        bodyHtml = renderPlazaTab();
-      } else if (state.nav_tab === "채팅") {
-        bodyHtml = renderChatTab();
-      } else if (state.nav_tab === "마이") {
-        bodyHtml = renderProfileTab(currentUser);
+
+      // 채팅 탭에 있고 모달이 안 열려 있을 때: 이미 렌더링된 채팅방들과 방장 수락 대기 구조가 동일하면 말풍선만 부분 갱신하여 입력창 커서 절대 유지
+      if (!state.active_modal && state.nav_tab === "채팅" && tryPartialChatTabUpdate()) {
+        // 채팅 입력창 및 커서 그대로 유지됨
+      } else {
+        const ae = document.activeElement;
+        const activeId = (ae && ae.id) ? ae.id : null;
+        const savedInputs = {};
+        document.querySelectorAll('input[id^="chat_in_"]').forEach(el => {
+          savedInputs[el.id] = { val: el.value, start: el.selectionStart, end: el.selectionEnd };
+        });
+
+        let bodyHtml = "";
+        if (state.active_modal === "cafeteria") {
+          bodyHtml = renderCafeteriaModal();
+        } else if (state.active_modal === "notifications") {
+          bodyHtml = renderNotificationsModal(unreadCnt);
+        } else if (state.active_modal === "create") {
+          bodyHtml = renderCreateModal();
+        } else if (state.nav_tab === "홈") {
+          bodyHtml = renderHomeTab();
+        } else if (state.nav_tab === "광장") {
+          bodyHtml = renderPlazaTab();
+        } else if (state.nav_tab === "채팅") {
+          bodyHtml = renderChatTab();
+        } else if (state.nav_tab === "마이") {
+          bodyHtml = renderProfileTab(currentUser);
+        }
+        mainBody.innerHTML = bodyHtml;
+
+        Object.keys(savedInputs).forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = savedInputs[id].val;
+        });
+        if (activeId && activeId.startsWith("chat_in_")) {
+          const restored = document.getElementById(activeId);
+          if (restored) {
+            restored.focus();
+            try {
+              const info = savedInputs[activeId];
+              if (info && info.start != null) restored.setSelectionRange(info.start, info.end);
+            } catch (e) {}
+          }
+        }
       }
-      mainBody.innerHTML = bodyHtml;
 
       const rightNotifs = document.getElementById("pc-right-notifs");
       if (rightNotifs) {
-        const myNotifs = DB.notifications.filter(n => n.user_id === state.user_id).slice(0, 4);
+        const myNotifs = (DB.notifications || []).filter(n => n.user_id === state.user_id).slice(0, 4);
+        state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
+        const isNotifsExp = Boolean(state.pc_accordions.notifs);
+        rightNotifs.className = `meetup-accordion-card ${isNotifsExp ? 'is-expanded' : ''}`;
         rightNotifs.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:800; font-size:14px;">🔔 내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}</span>
-            <span style="font-size:12px; color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">🏫 울산대 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›</span>
+          <div class="accordion-header" onclick="togglePcAccordion('notifs')">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
+                ${getSvgIcon('bell', 15, '#287D62')}
+              </span>
+              <span style="font-weight:800; font-size:13.5px; color:#191F28;">
+                내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}
+              </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
+                🏫 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›
+              </span>
+              <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
+            </div>
           </div>
-          ${myNotifs.length === 0
-            ? `<div style="font-size:12.5px; color:#8B95A1; padding:8px 0;">내 알림(참여 신청·수락)은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
-            : myNotifs.map(n => `
-              <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
-                <div style="font-size:12.5px; font-weight:600; line-height:1.4;">${n.message}</div>
-                <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
-              </div>
-            `).join("")}
+          ${isNotifsExp ? `
+            <div class="accordion-body" style="padding:10px 14px 14px;">
+              ${myNotifs.length === 0
+                ? `<div style="font-size:12px; color:#8B95A1; padding:6px 0;">내 알림은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
+                : myNotifs.map(n => `
+                  <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
+                    <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
+                    <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+                  </div>
+                `).join("")}
+            </div>
+          ` : ''}
         `;
       }
     }
@@ -3519,6 +3560,17 @@
       state.nav_tab = tab;
       state.active_modal = null;
       render();
+      if (tab === "채팅") {
+        setTimeout(() => {
+          document.querySelectorAll('[id^="chat_box_"]').forEach(box => {
+            box.scrollTop = box.scrollHeight;
+          });
+          if (isPC()) {
+            const firstInput = document.querySelector('input[id^="chat_in_"]');
+            if (firstInput) firstInput.focus();
+          }
+        }, 30);
+      }
       if (tab === "채팅" || tab === "홈") {
         pullFromCloud(true);
       }
@@ -4856,67 +4908,22 @@
 
               <!-- 2. 모던 말풍선 & 타임스탬프 & 읽음 표시 -->
               <div class="chat-box" id="chat_box_${post.id}">
-                ${msgs.length === 0 ? `
-                  <div style="text-align:center; color:#8B95A1; font-size:12.5px; padding:40px 0;">
-                    <div style="font-size:26px; margin-bottom:6px;">👋</div>
-                    <b>${escHtml(otherNames || partner.nickname)}</b>님과의 첫 대화를 시작해 보세요!
-                  </div>
-                ` : msgs.map(m => {
-                  if (m.sender_id === "AI_BOT") {
-                    return `<div class="chat-bubble-ai">${m.text}</div>`;
-                  }
-
-                  const isMe = String(m.sender_id) === myId;
-                  const senderUser = DB.users[m.sender_id] || partner;
-                  const timeStr = m.created_at ? (m.created_at.includes("오전") || m.created_at.includes("오후") ? m.created_at : (m.created_at.split(" ")[1] || m.created_at)) : formatMsgTime(m.id);
-                  const isRead = isMe ? Boolean(m.is_read || (m.id <= lastPartnerTime)) : true;
-
-                  if (isMe) {
-                    return `
-                      <div class="chat-msg-row me">
-                        <div class="chat-bubble-col me">
-                          <div class="chat-bubble-wrap me">
-                            <div class="chat-meta me">
-                              <span class="chat-read-badge">${isRead ? '읽음' : '<span style="color:#D97706; font-weight:800;">1</span>'}</span>
-                              <span>${timeStr}</span>
-                            </div>
-                            <div class="chat-bubble-me">${escHtml(m.text)}</div>
-                          </div>
-                        </div>
-                      </div>
-                    `;
-                  } else {
-                    return `
-                      <div class="chat-msg-row other">
-                        <div class="chat-avatar-mini">${(senderUser.avatar || "🐶").split(" ")[0]}</div>
-                        <div class="chat-bubble-col other">
-                          <div class="chat-sender-name">${escHtml(senderUser.nickname || m.sender_id)}</div>
-                          <div class="chat-bubble-wrap other">
-                            <div class="chat-bubble-other">${escHtml(m.text)}</div>
-                            <div class="chat-meta other">
-                              <span>${timeStr}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    `;
-                  }
-                }).join("")}
+                ${renderChatMessagesInner(post.id)}
               </div>
 
               <!-- 입력창 + 전송 버튼 -->
               <div style="display:grid; grid-template-columns: 1fr auto; gap:6px; margin-bottom:8px;">
-                <input id="chat_in_${post.id}" class="input" style="margin-bottom:0; border-radius:12px;" placeholder="메시지를 입력하세요 (카톡/전화번호 차단)" onkeydown="if(event.key==='Enter') sendChatMessage(${post.id})" />
-                <button class="btn btn-primary" style="min-width:68px; border-radius:12px; font-weight:800;" onclick="sendChatMessage(${post.id})">전송</button>
+                <input id="chat_in_${post.id}" class="input" style="margin-bottom:0; border-radius:12px;" autocomplete="off" placeholder="메시지를 입력하세요 (카톡/전화번호 차단)" onkeydown="handleChatInputKeydown(event, ${post.id})" />
+                <button type="button" class="btn btn-primary" style="min-width:68px; border-radius:12px; font-weight:800;" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendChatMessage(${post.id})">전송</button>
               </div>
 
               <!-- 4. 하단 액션 메뉴 (평소엔 한 줄로 접히고 필요 시 펼침) -->
               <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
                 <div style="display:flex; gap:6px;">
-                  <button class="btn" style="min-height:30px; padding:3px 9px; font-size:11.5px; font-weight:700; background:#F2F4F6; border:none;" onclick="triggerAiIcebreaker(${post.id})">
+                  <button type="button" class="btn" style="min-height:30px; padding:3px 9px; font-size:11.5px; font-weight:700; background:#F2F4F6; border:none;" onmousedown="event.preventDefault()" onclick="triggerAiIcebreaker(${post.id})">
                     🤖 AI 주제추천
                   </button>
-                  <button class="btn" style="min-height:30px; padding:3px 9px; font-size:11.5px; font-weight:700; background:${isActionOpen ? '#FEF3C7' : '#F9FAFB'}; border:1px solid ${isActionOpen ? '#F59E0B' : '#E5E8EB'}; color:${isActionOpen ? '#92400E' : '#4E5968'};" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">
+                  <button type="button" class="btn" style="min-height:30px; padding:3px 9px; font-size:11.5px; font-weight:700; background:${isActionOpen ? '#FEF3C7' : '#F9FAFB'}; border:1px solid ${isActionOpen ? '#F59E0B' : '#E5E8EB'}; color:${isActionOpen ? '#92400E' : '#4E5968'};" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">
                     ${isActionOpen ? '▲ 매너평가·신고 닫기' : '☕ 매너평가 / 신고 ▼'}
                   </button>
                 </div>
@@ -4948,6 +4955,141 @@
       `;
     }
 
+    function renderChatMessagesInner(postId) {
+      const myId = String(state.user_id);
+      const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
+      if (!post) return "";
+      const approvedApps = (DB.applications || []).filter(a => Number(a.post_id) === Number(postId) && a.status === "승인됨");
+      const allMemberIds = [String(post.author_id), ...approvedApps.map(a => String(a.applicant_id))];
+      const uniqueOthers = Array.from(new Set(allMemberIds.filter(uid => uid && uid !== myId)));
+      const partnerId = uniqueOthers[0] || String(post.author_id);
+      const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
+      const otherNames = uniqueOthers.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+      const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(postId));
+
+      const lastPartnerMsg = msgs.filter(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT").slice(-1)[0];
+      const lastPartnerTime = lastPartnerMsg ? (lastPartnerMsg.time || lastPartnerMsg.id || 0) : 0;
+
+      let markedRead = false;
+      msgs.forEach(m => {
+        if (String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
+          m.is_read = 1;
+          m.updated_at = Date.now();
+          markedRead = true;
+        }
+      });
+      if (markedRead) {
+        setTimeout(() => saveDB(false), 100);
+      }
+
+      if (msgs.length === 0) {
+        return `
+          <div style="text-align:center; color:#8B95A1; font-size:12.5px; padding:40px 0;">
+            <div style="font-size:26px; margin-bottom:6px;">👋</div>
+            <b>${escHtml(otherNames || partner.nickname)}</b>님과의 첫 대화를 시작해 보세요!
+          </div>
+        `;
+      }
+
+      return msgs.map(m => {
+        if (m.sender_id === "AI_BOT") {
+          return `<div class="chat-bubble-ai">${m.text}</div>`;
+        }
+
+        const isMe = String(m.sender_id) === myId;
+        const senderUser = DB.users[m.sender_id] || partner;
+        const timeStr = m.created_at ? (m.created_at.includes("오전") || m.created_at.includes("오후") ? m.created_at : (m.created_at.split(" ")[1] || m.created_at)) : formatMsgTime(m.id);
+        const isRead = isMe ? Boolean(m.is_read || (m.id <= lastPartnerTime)) : true;
+
+        if (isMe) {
+          return `
+            <div class="chat-msg-row me">
+              <div class="chat-bubble-col me">
+                <div class="chat-bubble-wrap me">
+                  <div class="chat-meta me">
+                    <span class="chat-read-badge">${isRead ? '읽음' : '<span style="color:#D97706; font-weight:800;">1</span>'}</span>
+                    <span>${timeStr}</span>
+                  </div>
+                  <div class="chat-bubble-me">${escHtml(m.text)}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="chat-msg-row other">
+              <div class="chat-avatar-mini">${(senderUser.avatar || "🐶").split(" ")[0]}</div>
+              <div class="chat-bubble-col other">
+                <div class="chat-sender-name">${escHtml(senderUser.nickname || m.sender_id)}</div>
+                <div class="chat-bubble-wrap other">
+                  <div class="chat-bubble-other">${escHtml(m.text)}</div>
+                  <div class="chat-meta other">
+                    <span>${timeStr}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }).join("");
+    }
+
+    function updateChatBoxDOM(postId, scrollToBottom = true) {
+      const box = document.getElementById(`chat_box_${postId}`);
+      if (!box) return false;
+      const wasAtBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+      box.innerHTML = renderChatMessagesInner(postId);
+      if (scrollToBottom || wasAtBottom) {
+        box.scrollTop = box.scrollHeight;
+      }
+      return true;
+    }
+
+    function updateAllChatBoxesInPlace() {
+      const boxes = document.querySelectorAll('[id^="chat_box_"]');
+      if (!boxes.length) return false;
+      boxes.forEach(box => {
+        const pid = Number(box.id.replace("chat_box_", ""));
+        if (pid) updateChatBoxDOM(pid, false);
+      });
+      return true;
+    }
+
+    function tryPartialChatTabUpdate() {
+      const myId = String(state.user_id);
+      const myHostedApps = (DB.applications || []).filter(a => {
+        const p = (DB.posts || []).find(post => Number(post.id) === Number(a.post_id));
+        return p && String(p.author_id) === myId;
+      });
+      const myAppliedApps = (DB.applications || []).filter(a => String(a.applicant_id) === myId);
+      const pendingHost = myHostedApps.filter(a => a.status === "대기중");
+      if (pendingHost.length > 0) return false;
+
+      const activePostIds = new Set();
+      myHostedApps.filter(a => a.status === "승인됨").forEach(a => activePostIds.add(Number(a.post_id)));
+      myAppliedApps.filter(a => a.status === "승인됨").forEach(a => activePostIds.add(Number(a.post_id)));
+
+      const validPids = Array.from(activePostIds).filter(pid => (DB.posts || []).some(p => Number(p.id) === Number(pid)));
+      const renderedBoxes = document.querySelectorAll('[id^="chat_box_"]');
+      if (validPids.length === 0 || renderedBoxes.length !== validPids.length) return false;
+
+      for (const pid of validPids) {
+        if (!document.getElementById(`chat_box_${pid}`) || !document.getElementById(`chat_in_${pid}`)) {
+          return false;
+        }
+      }
+
+      validPids.forEach(pid => updateChatBoxDOM(pid, false));
+      return true;
+    }
+
+    function handleChatInputKeydown(ev, postId) {
+      if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) {
+        ev.preventDefault();
+        sendChatMessage(postId);
+      }
+    }
+
     function formatMsgTime(ts) {
       if (!ts) return "";
       const d = new Date(ts);
@@ -4961,16 +5103,46 @@
 
     async function sendChatMessage(postId) {
       const input = document.getElementById(`chat_in_${postId}`);
-      const txt = input ? input.value.trim() : "";
-      if (!txt) return;
+      if (!input) return;
+      const txt = input.value.trim();
+      if (!txt) {
+        input.focus();
+        return;
+      }
 
       const banned = ["카톡", "카카오톡", "톡디", "전번", "전화번호", "010-", "오픈채팅", "인스타", "kakao", "insta"];
       const phoneRe = /01[016789][\s\-]?\d{3,4}[\s\-]?\d{4}/;
       const emailRe = /[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/;
       if (banned.some(b => txt.toLowerCase().includes(b)) || phoneRe.test(txt) || emailRe.test(txt)) {
+        input.focus();
         return showToast("🚨 [안심 AI 경찰] 사적인 외부 연락처(카톡/전화번호/이메일) 공유가 감지되어 차단되었습니다.");
       }
 
+      // 입력창 즉시 초기화 및 커서(포커스) 고정 -> 연속 채팅 즉시 입력 가능!
+      input.value = "";
+      input.focus();
+
+      const now = new Date();
+      const msgId = now.getTime();
+      const timeStr = formatMsgTime(msgId);
+      DB.messages.push({
+        id: msgId,
+        post_id: postId,
+        sender_id: state.user_id,
+        text: txt,
+        created_at: timeStr,
+        is_read: 0
+      });
+
+      // 입력창 DOM을 파괴하지 않고 말풍선 목록만 부분 업데이트
+      if (!updateChatBoxDOM(postId, true)) {
+        render();
+        const restored = document.getElementById(`chat_in_${postId}`);
+        if (restored) restored.focus();
+      }
+      saveDB(true);
+
+      // 백그라운드 AI 경찰 검증 (차단 감지 시 해당 메시지 회수)
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -4978,29 +5150,18 @@
           body: JSON.stringify({ action: "ai_police", text: txt })
         });
         const data = await res.json();
-        if (data.blocked) {
-          return showToast("🚨 [안심 AI 경찰] 부적절한 언행 또는 연락처 요구가 감지되어 차단되었습니다.");
+        if (data && data.blocked) {
+          DB.messages = (DB.messages || []).filter(m => m.id !== msgId);
+          updateChatBoxDOM(postId, true);
+          saveDB(true);
+          showToast("🚨 [안심 AI 경찰] 부적절한 언행 또는 연락처 요구가 감지되어 차단되었습니다.");
         }
       } catch (e) {}
 
-      const now = new Date();
-      const timeStr = formatMsgTime(now.getTime());
-      DB.messages.push({
-        id: Date.now(),
-        post_id: postId,
-        sender_id: state.user_id,
-        text: txt,
-        created_at: timeStr,
-        is_read: 0
-      });
-      saveDB();
-      render();
-
-      // 스크롤 맨 아래로 이동
-      setTimeout(() => {
-        const box = document.getElementById(`chat_box_${postId}`);
-        if (box) box.scrollTop = box.scrollHeight;
-      }, 50);
+      const curInput = document.getElementById(`chat_in_${postId}`);
+      if (curInput && document.activeElement !== curInput) {
+        curInput.focus();
+      }
     }
 
     async function triggerAiIcebreaker(postId) {
@@ -5029,8 +5190,12 @@
         sender_id: "AI_BOT",
         text: `🤖 <b>[AI 아이스브레이커]</b><br>${reply}`
       });
-      saveDB();
-      render();
+      if (!updateChatBoxDOM(postId, true)) {
+        render();
+      }
+      saveDB(true);
+      const curInput = document.getElementById(`chat_in_${postId}`);
+      if (curInput) curInput.focus();
     }
 
     function reportNoShow(partnerId) {
