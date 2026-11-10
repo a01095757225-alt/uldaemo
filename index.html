@@ -9,7 +9,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="build-version" content="20261110-1115-chatfocus" />
+  <meta name="build-version" content="20261110-1310-figma-modern4color" />
 
   <!-- 카카오톡 / SNS 공유 미리보기 (Open Graph) -->
   <meta property="og:type" content="website" />
@@ -492,65 +492,79 @@
       .app-shell.wide .only-mobile { display: none !important; }
 
       .pc-sidebar {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        padding: 18px 16px;
-        box-shadow: 0 4px 16px rgba(25, 31, 40, 0.05);
+        background: transparent;
+        border: none;
+        padding: 4px 0;
+        box-shadow: none;
       }
-      .side-logo {
+      .side-campus-card {
+        background: #FFFFFF;
+        border: 1px solid #E5EAE7;
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
         cursor: pointer;
-        padding: 4px 6px 16px;
-        border-bottom: 1px solid #F2F4F6;
-        margin-bottom: 12px;
+        transition: border-color 0.15s ease;
       }
-      .side-nav { display: flex; flex-direction: column; gap: 4px; }
+      .side-campus-card:hover {
+        border-color: #287D62;
+      }
+      .side-nav { display: flex; flex-direction: column; gap: 6px; }
       .side-nav-btn {
         display: flex;
         align-items: center;
         gap: 12px;
         width: 100%;
+        height: 44px;
         border: none;
         background: transparent;
-        color: #4E5968;
-        font-weight: 700;
+        color: #6B7684;
+        font-weight: 600;
         font-size: 14px;
-        padding: 11px 14px;
+        padding: 0 14px;
         border-radius: 12px;
         cursor: pointer;
         text-align: left;
         position: relative;
         transition: all 0.15s ease;
       }
-      .side-nav-btn:hover { background: #EEF8F3; color: var(--primary); }
+      .side-nav-btn:hover { background: #EEF8F3; color: #287D62; }
       .side-nav-btn.active {
-        background: var(--primary);
-        color: #FFFFFF;
-        box-shadow: 0 4px 12px rgba(40, 125, 98, 0.28);
+        background: #EEF8F3;
+        color: #287D62;
+        font-weight: 700;
+        box-shadow: none;
       }
-      .side-nav-btn.active .side-nav-icon svg { stroke: #FFFFFF; }
+      .side-nav-btn.active .side-nav-icon svg { stroke: #287D62; }
       .side-nav-icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
         line-height: 1;
       }
       .side-dot {
         margin-left: auto;
-        width: 8px;
-        height: 8px;
-        background: #E02020;
-        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 700;
+        color: #287D62;
+      }
+      .side-guide-card {
+        background: #EEF8F3;
+        border-radius: 16px;
+        padding: 16px;
+        margin-top: 10px;
       }
       .side-user {
-        margin-top: 16px;
-        padding-top: 14px;
-        border-top: 1px solid #F2F4F6;
+        background: #FFFFFF;
+        border: 1px solid #E5EAE7;
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-top: 12px;
       }
       .app-shell.wide .main-col { min-width: 0; }
       #campus-map { height: 520px; }
@@ -2101,7 +2115,7 @@
     }
 
     const state = {
-      user_id: localStorage.getItem("uldaemo_uid") || "",
+      user_id: localStorage.getItem("uldaemo_uid") || ((function(){ try { return window.self !== window.top ? "20241001" : ""; } catch(e) { return "20241001"; } })()),
       login_tab: "login",
       nav_tab: "홈",
       active_modal: null,
@@ -2110,7 +2124,7 @@
       home_cat: "전체",
       map_cat: "전체",
       search_q: "",
-      sort_opt: "🕒 마감 임박순",
+      sort_opt: "마감 임박순",
       gps_consent: true,
       my_building: "26호관 행정본관",
       my_lat: 35.543723,
@@ -2122,6 +2136,7 @@
       smtp_sent_live: false,
       smtp_sender: localStorage.getItem("uldaemo_smtp_sender") || "",
       smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || "",
+      expanded_post_ids: { 1: true },
       pc_accordions: { notifs: false, map: false, cafeteria: false }
     };
 
@@ -2225,6 +2240,12 @@
           return `<svg ${common}><polyline points="6 9 12 15 18 9"/></svg>`;
         case 'chevron-up':
           return `<svg ${common}><polyline points="18 15 12 9 6 15"/></svg>`;
+        case 'clock':
+          return `<svg ${common}><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>`;
+        case 'shield':
+          return `<svg ${common}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`;
+        case 'compass':
+          return `<svg ${common}><circle cx="12" cy="12" r="9"/><polygon points="15.5 8.5 13.5 13.5 8.5 15.5 10.5 10.5 15.5 8.5"/></svg>`;
         default:
           return `<svg ${common}><circle cx="12" cy="12" r="8"/></svg>`;
       }
@@ -2256,14 +2277,13 @@
     function renderTempGauge(temp, showLabel = true) {
       const t = parseFloat(temp || 36.5);
       const pct = Math.max(5, Math.min(100, Math.round((t / 60.0) * 100)));
-      const badge = t >= 40.0 ? "✅" : "";
       return `
         <div class="temp-wrap">
           <div class="temp-header">
-            <span>${showLabel ? "매너 온도" : ""}</span>
-            <span>🌡️ ${t.toFixed(1)}°C ${badge}</span>
+            <span style="color:#6B7684; font-weight:600;">${showLabel ? "매너온도" : "기본 36.5°C"}</span>
+            <span style="color:#287D62; font-weight:800;">${t.toFixed(1)}°C</span>
           </div>
-          <div class="temp-track"><div class="temp-fill" style="width:${pct}%;"></div></div>
+          <div class="temp-track" style="height:6px; background:#E5EAE7; border-radius:999px; overflow:hidden;"><div class="temp-fill" style="width:${pct}%; height:100%; background:linear-gradient(90deg, #B8DECB 0%, #287D62 100%); border-radius:999px;"></div></div>
         </div>
       `;
     }
@@ -2683,24 +2703,20 @@
           <!-- 아코디언 헤더 -->
           <div class="accordion-header" onclick="togglePcAccordion('cafeteria')">
             <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
-              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
-                ${getSvgIcon('meal', 15, '#287D62')}
-              </span>
               <div style="min-width:0; flex:1;">
-                <div style="font-weight:800; font-size:13.5px; color:#191F28; display:flex; align-items:center; gap:5px;">
-                  <span>오늘 학식</span>
-                  <span style="font-size:10px; background:#EEF8F3; color:#287D62; font-weight:800; padding:1px 5px; border-radius:4px; flex-shrink:0;">청운학사</span>
+                <div style="font-weight:700; font-size:13.5px; color:#191F28; display:flex; align-items:center; gap:6px;">
+                  <span>오늘의 학식</span>
+                  <span style="font-size:12px; color:#6B7684; font-weight:500;">청운학사</span>
                 </div>
                 ${!isExpanded ? `
-                  <div style="font-size:11px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    ${curMealName.split(" ")[0]}: ${previewText}
+                  <div style="font-size:11.5px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    ${curMealName.split(" ")[0]} · ${previewText}
                   </div>
                 ` : ''}
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
               ${isExpanded ? `
-                <span style="font-size:11px; font-weight:700; color:#287D62; cursor:pointer;" onclick="event.stopPropagation(); loadCafeteriaMenu(true)">🔄</span>
                 <span style="font-size:11px; font-weight:700; color:#287D62; cursor:pointer;" onclick="event.stopPropagation(); openCafeteriaModal()">전체 ›</span>
               ` : ''}
               <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
@@ -2926,47 +2942,65 @@
       }
 
       const navItems = [
-        { key: "홈", iconName: "home", label: "홈", mLabel: "홈" },
+        { key: "홈", iconName: "compass", label: "번개 둘러보기", mLabel: "홈" },
         { key: "광장", iconName: "fire", label: "캠퍼스 광장", mLabel: "광장" },
         { key: "지도", iconName: "map", label: "캠퍼스 지도", mLabel: "캠퍼스" },
-        { key: "채팅", iconName: "chat", label: "안심 채팅", mLabel: "채팅" },
+        { key: "채팅", iconName: "chat", label: "대화", mLabel: "채팅" },
         { key: "마이", iconName: "user", label: "내 프로필", mLabel: "마이" }
       ];
       const isActiveNav = (k) => state.nav_tab === k && !state.active_modal;
 
       const sidebarHtml = `
         <aside class="pc-sidebar">
-          <div class="side-logo" onclick="switchTab('홈')">
-            ${renderLogoSvg(36)}
+          <div class="side-campus-card" onclick="switchTab('지도')">
             <div>
-              <div class="app-logo-title">울대모</div>
-              <div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div>
+              <div style="font-size:11px; font-weight:700; color:#287D62; letter-spacing:0.04em;">MY CAMPUS</div>
+              <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:2px;">울산대학교</div>
             </div>
+            <span style="color:#6B7684; display:inline-flex; align-items:center;">${getSvgIcon('chevron-down', 16, '#6B7684')}</span>
           </div>
+
           <nav class="side-nav">
             ${navItems.map(n => `
               <button class="side-nav-btn ${isActiveNav(n.key) ? 'active' : ''}" onclick="switchTab('${n.key}')">
-                <span class="side-nav-icon">${getSvgIcon(n.iconName, 20)}</span>
+                <span class="side-nav-icon">${getSvgIcon(n.iconName, 18)}</span>
                 <span>${n.label}</span>
-                ${n.key === '채팅' && unreadCnt > 0 ? '<span class="side-dot"></span>' : ''}
+                ${n.key === '채팅' && unreadCnt > 0 ? `<span class="side-dot">${unreadCnt}</span>` : ''}
               </button>
             `).join("")}
           </nav>
-          <div class="side-user">
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-              <div class="${currentUser.manner_temp >= 40 ? 'aura-40' : ''}" style="width:40px; height:40px; border-radius:50%; background:#EEF8F3; border:2px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:22px;">${currentUser.avatar.split(" ")[0]}</div>
-              <div>
-                <div style="font-weight:800; font-size:14px; display:flex; align-items:center; gap:4px;">
-                  <span>${currentUser.nickname}</span>
-                  ${currentUser.manner_temp >= 40 ? "👑" : ""}
-                  ${isCurrentUserAdmin() ? `<span style="font-size:10px; background:#EEF8F3; color:#1E634C; font-weight:800; padding:2px 6px; border-radius:4px; border:1px solid #C5E6D6;">👑 운영진</span>` : ""}
+
+          <div style="margin-top:28px; padding:0 4px;">
+            <div style="font-size:11.5px; font-weight:600; color:#6B7684; margin-bottom:8px; padding-left:4px;">함께 만드는 안전한 캠퍼스</div>
+            <div class="side-guide-card">
+              <div style="display:flex; align-items:flex-start; gap:10px;">
+                <span style="color:#287D62; margin-top:1px; flex-shrink:0;">${getSvgIcon('shield', 18, '#287D62')}</span>
+                <div>
+                  <div style="font-size:13px; font-weight:700; color:#191F28;">처음 만날 때도 안심</div>
+                  <div style="font-size:12px; color:#6B7684; line-height:1.5; margin-top:4px;">재학생 인증과 매너온도로 서로를 먼저 알아보세요.</div>
+                  <div style="font-size:12px; font-weight:700; color:#287D62; margin-top:10px; cursor:pointer;" onclick="switchTab('마이')">안심 이용 가이드 →</div>
                 </div>
-                <div style="font-size:11.5px; color:#6B7684;">${currentUser.department} · ${currentUser.mbti}</div>
               </div>
             </div>
-            ${renderTempGauge(currentUser.manner_temp, true)}
-            <button class="btn" style="margin-top:10px; min-height:36px; font-size:13px;" onclick="clearLogin()">🚪 로그아웃</button>
           </div>
+
+          <div class="side-user">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                <div style="width:36px; height:36px; border-radius:50%; background:#EEF8F3; border:1px solid #C5E6D6; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${currentUser.avatar.split(" ")[0]}</div>
+                <div style="min-width:0;">
+                  <div style="font-weight:700; font-size:13.5px; color:#191F28; display:flex; align-items:center; gap:5px;">
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${currentUser.nickname}</span>
+                    ${isCurrentUserAdmin() ? `<span style="font-size:10px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 6px; border-radius:4px;">운영진</span>` : ""}
+                  </div>
+                  <div style="font-size:11.5px; color:#6B7684; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${currentUser.department} · ${currentUser.mbti}</div>
+                </div>
+              </div>
+              <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:11.5px; font-weight:600; padding:5px 10px; border-radius:8px; cursor:pointer; flex-shrink:0;" onclick="clearLogin()">로그아웃</button>
+            </div>
+          </div>
+
+          <div style="font-size:11.5px; color:#6B7684; padding:14px 8px 0;">울대모 · 캠퍼스에서 시작되는 연결</div>
         </aside>
       `;
 
@@ -2981,16 +3015,12 @@
         <div id="pc-right-notifs" class="meetup-accordion-card ${isNotifsExp ? 'is-expanded' : ''}" style="margin-bottom:12px;">
           <div class="accordion-header" onclick="togglePcAccordion('notifs')">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
-                ${getSvgIcon('bell', 15, '#287D62')}
-              </span>
-              <span style="font-weight:800; font-size:13.5px; color:#191F28;">
-                내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}
-              </span>
+              <span style="font-weight:700; font-size:13.5px; color:#191F28;">내 알림</span>
+              <span style="font-size:13px; font-weight:700; color:#287D62;">${unreadCnt}</span>
             </div>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
-                🏫 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:11.5px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
+                공지${newNoticeCnt > 0 ? ` ${newNoticeCnt}` : ""} ›
               </span>
               <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
             </div>
@@ -2998,11 +3028,11 @@
           ${isNotifsExp ? `
             <div class="accordion-body" style="padding:10px 14px 14px;">
               ${myNotifs.length === 0
-                ? `<div style="font-size:12px; color:#8B95A1; padding:6px 0;">내 알림은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
+                ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새로운 알림이 없습니다.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 ${newNoticeCnt}건 확인하기 →</span>` : ""}</div>`
                 : myNotifs.map(n => `
                   <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
                     <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
-                    <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+                    <div style="font-size:10.5px; color:#6B7684; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
                   </div>
                 `).join("")}
             </div>
@@ -3014,32 +3044,52 @@
         <div id="pc-right-map" class="meetup-accordion-card ${isMapExp ? 'is-expanded' : ''}" style="margin-bottom:12px;">
           <div class="accordion-header" onclick="togglePcAccordion('map')">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
-                ${getSvgIcon('map', 15, '#287D62')}
-              </span>
-              <span style="font-weight:800; font-size:13.5px; color:#191F28;">
-                캠퍼스 지도 <span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:1px 6px; border-radius:4px;">${activeCnt}건</span>
-              </span>
+              <span style="font-weight:700; font-size:13.5px; color:#191F28;">내 주변 번개</span>
+              <span style="font-size:13px; font-weight:700; color:#287D62;">${activeCnt}</span>
             </div>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); switchTab('지도')">크게 보기 ›</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:11.5px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); switchTab('지도')">지도 ›</span>
               <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
             </div>
           </div>
           ${isMapExp ? `
             <div class="accordion-body" style="padding:10px 14px 14px;">
               <div id="side-map"></div>
-              <div id="side-map-cnt" style="font-size:11.5px; color:#6B7684; margin-top:6px;">현재 모집 중인 번개 <b style="color:#287D62;">${activeCnt}건</b></div>
+              <div id="side-map-cnt" style="font-size:11.5px; color:#6B7684; margin-top:8px; display:flex; align-items:center; gap:5px;">
+                ${getSvgIcon('location', 13, '#287D62')}
+                <span>울산대학교 캠퍼스 일대 · 모집 중 <b style="color:#287D62;">${activeCnt}건</b></span>
+              </div>
             </div>
           ` : ''}
         </div>
       ` : "";
+
+      const userTemp = parseFloat(currentUser.manner_temp || 36.5);
+      const userTempPct = Math.max(8, Math.min(100, Math.round((userTemp / 60.0) * 100)));
+      const mannerCard = `
+        <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:16px; padding:18px; margin-bottom:12px;">
+          <div style="font-size:13.5px; font-weight:700; color:#191F28; margin-bottom:14px;">나의 캠퍼스 매너</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-size:13px; color:#6B7684; font-weight:500;">매너온도</span>
+            <span style="background:#EEF8F3; color:#287D62; font-size:14px; font-weight:800; padding:3px 10px; border-radius:999px;">${userTemp.toFixed(1)}°C</span>
+          </div>
+          <div style="position:relative; height:8px; background:#E5EAE7; border-radius:999px; overflow:hidden;">
+            <div style="width:${userTempPct}%; height:100%; background:linear-gradient(90deg, #B8DECB 0%, #287D62 100%); border-radius:999px;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11.5px;">
+            <span style="color:#6B7684;">기본 36.5°C</span>
+            <span style="color:#287D62; font-weight:600;">${userTemp >= 38.0 ? '따뜻한 학우예요' : '신뢰하는 학우예요'}</span>
+          </div>
+        </div>
+      `;
 
       const rightHtml = `
         <aside class="pc-right">
           ${notifCard}
           ${mapCard}
           ${renderCafeteriaCard()}
+          ${mannerCard}
+          <div style="padding:4px 8px; font-size:12px; color:#6B7684; cursor:pointer;" onclick="switchTab('마이')">안전한 만남을 위한 약속</div>
         </aside>
       `;
 
@@ -3677,49 +3727,45 @@
       const distM = calcDistanceMeters(state.my_lat, state.my_lng, coords[0], coords[1]);
       const walkMin = Math.max(1, Math.round(distM / 67));
       const distHtml = state.gps_consent
-        ? `<span style="display:inline-flex; align-items:center; background:#EEF8F3; color:#287D62; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:4px;">🚶 ${distM}m (${walkMin}분)</span>`
+        ? `<span style="color:#287D62; font-weight:600;"> · ${distM}m (도보 ${walkMin}분)</span>`
         : "";
 
       let actionBtn = "";
       if (isAuthor) {
-        actionBtn = `<button class="btn" style="min-height:38px; font-size:13px;" disabled>👑 내가 만든 번개</button>`;
+        actionBtn = `<button class="btn" style="min-height:42px; font-size:13.5px;" disabled>내가 만든 번개</button>`;
       } else if (myApp && myApp.status === "승인됨") {
-        actionBtn = `<button class="btn btn-primary" style="min-height:38px; font-size:13px;" onclick="switchTab('채팅')">💬 채팅방 이동</button>`;
+        actionBtn = `<button class="btn btn-primary" style="min-height:42px; font-size:13.5px;" onclick="switchTab('채팅')">대화방 이동</button>`;
       } else if (myApp && myApp.status === "대기중") {
-        actionBtn = `<button class="btn" style="min-height:38px; font-size:13px;" disabled>⏳ 수락 대기중</button>`;
+        actionBtn = `<button class="btn" style="min-height:42px; font-size:13.5px;" disabled>수락 대기중</button>`;
       } else if (isFull) {
-        actionBtn = `<button class="btn" style="min-height:38px; font-size:13px;" disabled>모집 마감</button>`;
+        actionBtn = `<button class="btn" style="min-height:42px; font-size:13.5px;" disabled>모집 마감</button>`;
       } else {
-        actionBtn = `<button class="btn btn-primary" style="min-height:38px; font-size:13px;" onclick="applyToPost(${post.id})">${isOfficial ? "🎁 공식 번개 참여 신청" : "참여 신청"}</button>`;
+        actionBtn = `<button class="btn btn-primary" style="min-height:42px; font-size:13.5px;" onclick="applyToPost(${post.id})">참여 신청하기</button>`;
       }
 
       const isJustCreated = (window._justCreatedPostId === post.id);
       const catIcon = getCategorySvgIcon(post.category);
+      const cleanCatName = String(post.category || "모임").replace(/^[^\w가-힣]+/, '').trim() || "모임";
+      const authorTemp = parseFloat(author.manner_temp || 36.5);
+      const authorTempPct = Math.max(8, Math.min(100, Math.round((authorTemp / 60.0) * 100)));
 
       return `
-        <div id="post-accordion-${post.id}" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''} ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}">
-          <!-- 컴팩트 요약 헤더 (클릭 시 펼침/접힘 토글) -->
-          <div class="accordion-header" onclick="toggleMeetupAccordion(${post.id})">
-            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-              <span style="width:34px; height:34px; border-radius:10px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
-                ${getSvgIcon(catIcon, 18, '#287D62')}
+        <div id="post-accordion-${post.id}" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''} ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}" style="border-radius:18px; margin-bottom:10px;">
+          <!-- 요약 헤더 (클릭 시 펼침/접힘 토글) -->
+          <div class="accordion-header" style="padding:14px 18px; min-height:56px;" onclick="toggleMeetupAccordion(${post.id})">
+            <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
+                ${getSvgIcon(catIcon, 16, '#287D62')}
               </span>
-              <div style="min-width:0; flex:1;">
-                <div style="font-size:14px; font-weight:800; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:5px;">
-                  ${isOfficial ? `<span class="official-badge" style="font-size:9.5px; padding:1px 6px;">👑 공식</span>` : ''}
-                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${post.title}</span>
-                </div>
-                <div style="font-size:11.5px; color:#6B7684; margin-top:2px; display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                  <span>📍 ${post.location}</span>
-                  <span>·</span>
-                  <span>🕒 ${post.meet_time}</span>
-                  ${distHtml ? `<span>·</span>${distHtml}` : ''}
-                </div>
+              <div style="min-width:0; flex:1; display:flex; align-items:center; gap:6px;">
+                ${isOfficial ? `<span style="background:#EEF8F3; color:#287D62; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:6px; flex-shrink:0;">공식</span>` : ''}
+                <span style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${post.title}</span>
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:7px; flex-shrink:0;">
-              <span style="font-size:11px; font-weight:800; color:#287D62; background:#EEF8F3; padding:4px 8px; border-radius:6px; border:1px solid #C5E6D6;">
-                👥 ${acceptedCnt}/${post.max_participants}
+            <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+              <span style="font-size:12px; color:#6B7684; font-weight:500;">${post.location}</span>
+              <span style="font-size:12.5px; font-weight:700; color:#287D62;">
+                ${acceptedCnt}/${post.max_participants}명
               </span>
               <span class="accordion-chevron">
                 ${getSvgIcon('chevron-down', 16, 'currentColor')}
@@ -3729,39 +3775,46 @@
 
           <!-- 확장 상세 바디 (펼쳐졌을 때만 노출) -->
           ${isExpanded ? `
-            <div class="accordion-body">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
-                <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-                  <span class="cat-badge" style="background:#EEF8F3; color:#287D62; font-size:11px; padding:2px 7px;">${post.category}</span>
-                  <span class="privacy-pill-mini">🛡️ 익명 보장</span>
-                  ${isOfficial ? `<span style="font-size:11px; color:#287D62; font-weight:700;">🎁 매너온도 +1.0°C 보너스</span>` : ''}
-                </div>
-                <span style="font-size:11px; color:#8B95A1; font-weight:600;">${post.meeting_style}</span>
+            <div class="accordion-body" style="padding:14px 18px 18px; border-top:1px solid #F2F4F3;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size:11.5px; font-weight:700; color:#287D62;">${cleanCatName}${isOfficial ? ' · 공식 모임' : ''}</span>
+                <span style="font-size:11.5px; color:#6B7684;">익명 프로필 보호</span>
               </div>
 
-              <div style="font-size:12px; color:#4E5968; display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; padding:6px 10px; background:#F8FAF9; border-radius:8px;">
-                <span>📅 <b>${post.meet_date}</b></span>
-                <span>🕒 <b>${post.meet_time}</b></span>
-                <span>📍 <b>${post.location}</b></span>
+              <div style="font-size:13.5px; color:#6B7684; line-height:1.5; margin-bottom:12px;">
+                ${post.meeting_style || '편하게 이야기 나누며 함께해요.'}
               </div>
 
-              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F2F4F6; padding-top:9px; margin-bottom:8px;">
-                <div>
-                  <div style="font-size:13px; font-weight:700; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
-                    <span>${isOfficial ? '👑' : author.avatar.split(" ")[0]} ${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</span>
-                    ${getUserStatsAndBadges(post.author_id).badges.slice(0, 2).map(b => `<span class="achieve-badge ${b.cls}" style="font-size:10px; padding:2px 6px;">${b.label}</span>`).join("")}
+              <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:12.5px; color:#6B7684; margin-bottom:14px;">
+                <span style="display:inline-flex; align-items:center; gap:5px;">
+                  ${getSvgIcon('clock', 14, '#6B7684')}
+                  <span>${post.meet_date} · ${post.meet_time}</span>
+                </span>
+                <span style="display:inline-flex; align-items:center; gap:5px;">
+                  ${getSvgIcon('location', 14, '#6B7684')}
+                  <span>${post.location}${distHtml}</span>
+                </span>
+              </div>
+
+              <div style="background:#F7F9F8; border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;">
+                <div style="min-width:0;">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="font-size:11.5px; color:#6B7684; font-weight:500;">방장</span>
+                    <span style="font-size:13px; font-weight:700; color:#191F28;">${author.nickname}</span>
                   </div>
-                  <div style="font-size:11px; color:#6B7684; margin-top:2px;">${author.department} · ${author.mbti}</div>
+                  <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${author.department} · ${author.mbti} · 재학생 인증</div>
                 </div>
-                <div style="width:130px;">${renderTempGauge(author.manner_temp, false)}</div>
+                <div style="width:128px; flex-shrink:0; text-align:right;">
+                  <div style="font-size:12px; font-weight:700; color:#287D62; margin-bottom:4px;">${authorTemp.toFixed(1)}°C</div>
+                  <div style="height:6px; background:#E5EAE7; border-radius:999px; overflow:hidden;">
+                    <div style="width:${authorTempPct}%; height:100%; background:linear-gradient(90deg, #B8DECB 0%, #287D62 100%); border-radius:999px;"></div>
+                  </div>
+                  <div style="font-size:10px; color:#6B7684; margin-top:3px;">기본 36.5°C</div>
+                </div>
               </div>
 
-              <div style="margin-bottom:10px;">
-                ${(author.keywords || ["시간 약속을 잘 지켜요 ⏰"]).slice(0, 2).map(kw => `<span class="praise-tag" style="font-size:10.5px; padding:2px 7px;">${kw}</span>`).join("")}
-              </div>
-
-              <div class="row-2">
-                <button class="btn" style="min-height:38px; font-size:13px;" onclick="openDetailModal(${post.id})">상세 페이지 ›</button>
+              <div class="row-2" style="gap:8px;">
+                <button class="btn" style="min-height:42px; font-size:13.5px;" onclick="openDetailModal(${post.id})">상세 보기</button>
                 ${actionBtn}
               </div>
             </div>
@@ -3784,13 +3837,13 @@
           (p.meeting_style && p.meeting_style.toLowerCase().includes(q))
         );
       }
-      if (state.sort_opt === "📍 내 위치에서 가까운 순") {
+      if (state.sort_opt.includes("가까운 순")) {
         list.sort((a, b) => {
           const ca = getBuildingCoords(a.location);
           const cb = getBuildingCoords(b.location);
           return calcDistanceMeters(state.my_lat, state.my_lng, ca[0], ca[1]) - calcDistanceMeters(state.my_lat, state.my_lng, cb[0], cb[1]);
         });
-      } else if (state.sort_opt === "🌡️ 방장 매너온도 높은 순") {
+      } else if (state.sort_opt.includes("매너온도")) {
         list.sort((a, b) => ((DB.users[b.author_id]?.manner_temp || 36.5) - (DB.users[a.author_id]?.manner_temp || 36.5)));
       }
 
@@ -3805,19 +3858,27 @@
       const expCount = Object.keys(state.expanded_post_ids).length;
 
       return `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:14.5px; font-weight:800; color:#191F28;">⚡ 실시간 캠퍼스 번개 (${list.length}건)</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:baseline; gap:6px;">
+            <span style="font-size:16px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">모집 중인 번개</span>
+            <span style="font-size:15px; font-weight:800; color:#287D62;">${list.length}</span>
+          </div>
           <div style="display:flex; align-items:center; gap:6px;">
-            <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer;" onclick="toggleAllAccordions(${list.length})">
-              ${expCount > 0 ? '모두 접기 ⌃' : '모두 펼치기 ⌄'}
+            <select class="select" style="width:auto; min-width:118px; height:34px; padding:0 10px; margin-bottom:0; font-size:12px; font-weight:600; color:#6B7684; border-radius:8px; border:1px solid #E5EAE7;" onchange="state.sort_opt=this.value; render();">
+              <option value="마감 임박순" ${state.sort_opt.includes('마감') ? 'selected' : ''}>마감 임박순</option>
+              <option value="가까운 순" ${state.sort_opt.includes('가까운') ? 'selected' : ''}>가까운 순</option>
+              <option value="매너온도 순" ${state.sort_opt.includes('매너온도') ? 'selected' : ''}>매너온도 순</option>
+            </select>
+            <button type="button" style="height:34px; border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:12px; font-weight:600; padding:0 11px; border-radius:8px; cursor:pointer;" onclick="toggleAllAccordions(${list.length})">
+              ${expCount > 0 ? '모두 접기' : '모두 펼치기'}
             </button>
           </div>
         </div>
 
         ${list.length === 0 ? `
-          <div class="uldaemo-card" style="text-align:center; padding:30px;">
-            <div style="font-size:32px;">🌱</div>
-            <div style="font-weight:800; margin-top:6px;">조건에 맞는 번개 모임이 없어요</div>
+          <div class="uldaemo-card" style="text-align:center; padding:36px 20px;">
+            <div style="font-weight:700; font-size:14px; color:#191F28;">조건에 맞는 번개 모임이 없어요</div>
+            <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">직접 새로운 번개를 만들어 학우들을 모아보세요.</div>
           </div>
         ` : list.map(renderMeetupCard).join("")}
       `;
@@ -3838,23 +3899,19 @@
     function renderHomeRewardStrip() {
       const st = getUserStatsAndBadges(state.user_id);
       return `
-        <div style="background:#FFFFFF; border:1px solid #C5E6D6; border-radius:14px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; box-shadow:0 2px 8px rgba(40,125,98,0.05);">
-          <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#191F28; font-weight:700;">
-            <span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; border:1px solid #C5E6D6;">
-              ${getSvgIcon('ticket', 12, '#287D62')} 리워드
-            </span>
-            <span>출석 <b style="color:#287D62;">${st.streakDays}일째</b> · 추첨권 <b>🎟️ ${st.coffeeTickets}장</b></span>
+        <div style="background:#EEF8F3; border-radius:12px; padding:11px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:#191F28; font-weight:500;">
+            <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
+            <span>학교 인증을 마친 학우들만 안전하게 만나요</span>
           </div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button type="button" style="border:none; border-radius:8px; padding:5px 10px; font-size:11.5px; font-weight:800; cursor:pointer; background:${st.checkedInToday ? '#F2F4F6' : '#287D62'}; color:${st.checkedInToday ? '#6B7684' : '#FFFFFF'}; display:inline-flex; align-items:center; gap:4px;" onclick="handleDailyCheckin()">
-              ${st.checkedInToday ? `${getSvgIcon('check', 12, '#6B7684')} 출석완료` : `${getSvgIcon('fire', 12, '#FFFFFF')} 출석 (+0.1°C)`}
-            </button>
-            <button type="button" style="border:1px solid #C5E6D6; border-radius:8px; padding:5px 9px; font-size:11.5px; font-weight:800; cursor:pointer; background:#FFFFFF; color:#287D62; display:inline-flex; align-items:center; gap:4px;" onclick="switchTab('마이')">
-              ${getSvgIcon('trophy', 12, '#287D62')} 랭킹 ›
-            </button>
-            <button type="button" class="only-mobile" style="border:1px solid #C5E6D6; border-radius:8px; padding:5px 9px; font-size:11.5px; font-weight:800; cursor:pointer; background:#EEF8F3; color:#1E634C; display:inline-flex; align-items:center; gap:4px;" onclick="openCafeteriaModal()">
-              ${getSvgIcon('meal', 12, '#1E634C')} 학식 ›
-            </button>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="handleDailyCheckin()">
+              ${st.checkedInToday ? `출석 ${st.streakDays}일째 완료` : `출석체크 (+0.1°C)`}
+            </span>
+            <span style="color:#C5E6D6;">|</span>
+            <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="openUlsanNoticesModal(event)">
+              캠퍼스 공지 →
+            </span>
           </div>
         </div>
       `;
@@ -3862,27 +3919,28 @@
 
     function renderHomeTab() {
       return `
-        <div class="main-banner">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
-            <div class="main-banner-tag">오늘도 좋은 하루예요! 🌱</div>
-            <p class="main-banner-title">공강 시간,<br>같이 보낼 학우를<br>찾아봐요!</p>
+            <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">오늘, 같이 할래요?</h1>
+            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">공강도 점심도, 우리 학교 친구와 함께</p>
           </div>
-          ${renderImportantNoticeCard()}
+          <button class="btn btn-primary" style="width:auto; min-height:42px; padding:0 18px; border-radius:12px; font-size:13.5px; font-weight:700; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;" onclick="state.active_modal='create'; render();">
+            ${getSvgIcon('plus', 15, '#FFFFFF', 2.5)}
+            <span>번개 만들기</span>
+          </button>
         </div>
+
         ${renderHomeRewardStrip()}
-        <button class="btn btn-primary" style="margin-bottom:10px;" onclick="state.active_modal='create'; render();">➕ 번개 모집하기</button>
 
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
         </div>
 
-        <div style="display:grid; grid-template-columns: 1.5fr 1.1fr; gap:6px; margin-bottom:10px;">
-          <input id="home-search-input" class="input" style="margin-bottom:0;" placeholder="🔍 제목, 호관, 키워드 검색..." value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
-          <select class="select" style="margin-bottom:0;" onchange="state.sort_opt=this.value; render();">
-            <option value="🕒 마감 임박순" ${state.sort_opt === '🕒 마감 임박순' ? 'selected' : ''}>🕒 마감 임박순</option>
-            <option value="📍 내 위치에서 가까운 순" ${state.sort_opt === '📍 내 위치에서 가까운 순' ? 'selected' : ''}>📍 내 위치 가까운 순</option>
-            <option value="🌡️ 방장 매너온도 높은 순" ${state.sort_opt === '🌡️ 방장 매너온도 높은 순' ? 'selected' : ''}>🌡️ 매너온도 높은 순</option>
-          </select>
+        <div style="position:relative; margin-bottom:14px;">
+          <span style="position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#6B7684; pointer-events:none; display:inline-flex;">
+            ${getSvgIcon('search', 15, '#6B7684')}
+          </span>
+          <input id="home-search-input" class="input" style="margin-bottom:0; padding-left:36px; height:40px; border-radius:12px; border:1px solid #E5EAE7; font-size:13px;" placeholder="찾고 싶은 모임이나 장소를 검색해보세요" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
         </div>
 
         <div id="home-feed-list-wrap">
