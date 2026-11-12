@@ -1873,6 +1873,44 @@
       }
       .floating-top-btn { bottom: 32px; }
     }
+  
+    /* 번개 만들기 빠른 칩 & 하단 고정 버튼 */
+    .quick-chip {
+      border: 1px solid #E5EAE7;
+      background: #F7F9F8;
+      color: #191F28;
+      border-radius: 999px;
+      padding: 6px 13px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .quick-chip:hover {
+      border-color: #C5E6D6;
+      background: #EEF8F3;
+      color: #287D62;
+    }
+    .quick-chip.active {
+      background: #287D62 !important;
+      border-color: #287D62 !important;
+      color: #FFFFFF !important;
+      font-weight: 700 !important;
+    }
+    .create-sticky-bar {
+      position: sticky;
+      bottom: 0;
+      background: #FFFFFF;
+      padding: 12px 0 env(safe-area-inset-bottom, 8px);
+      border-top: 1px solid #F2F4F3;
+      z-index: 20;
+      margin-top: 16px;
+    }
+
   </style>
 </head>
 <body>
@@ -4823,60 +4861,129 @@
       }
     }
 
+        function setCreateTitle(t, cat) {
+      const el = document.getElementById("c_title");
+      if (el) el.value = t;
+      if (cat) setCreateCat(cat);
+    }
+
+    function setCreateQuickTime(type) {
+      const dateEl = document.getElementById("c_date");
+      const timeEl = document.getElementById("c_time");
+      if (!dateEl || !timeEl) return;
+      const now = new Date();
+      if (type === "now") {
+        dateEl.value = getTodayStr();
+        timeEl.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      } else if (type === "30min") {
+        now.setMinutes(now.getMinutes() + 30);
+        dateEl.value = getTodayStr();
+        timeEl.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      } else if (type === "dinner") {
+        dateEl.value = getTodayStr();
+        timeEl.value = "18:30";
+      } else if (type === "tomorrow_lunch") {
+        const tm = new Date();
+        tm.setDate(tm.getDate() + 1);
+        const y = tm.getFullYear();
+        const m = String(tm.getMonth() + 1).padStart(2, '0');
+        const d = String(tm.getDate()).padStart(2, '0');
+        dateEl.value = `${y}-${m}-${d}`;
+        timeEl.value = "12:30";
+      }
+      document.querySelectorAll(".time-quick-chip").forEach(c => c.classList.remove("active"));
+      const target = document.getElementById(`time_chip_${type}`);
+      if (target) target.classList.add("active");
+    }
+
+    function setCreateMax(num) {
+      const input = document.getElementById("c_max");
+      if (input) input.value = num;
+      document.querySelectorAll(".max-quick-chip").forEach(c => c.classList.remove("active"));
+      const target = document.getElementById(`max_chip_${num}`);
+      if (target) target.classList.add("active");
+    }
+
+    function setCreateCat(cat) {
+      const catInput = document.getElementById("c_cat");
+      const customWrap = document.getElementById("c_cat_custom_wrap");
+      if (catInput) catInput.value = cat;
+      if (customWrap) {
+        customWrap.style.display = (cat === "💬 기타" || cat === "기타") ? "block" : "none";
+      }
+      document.querySelectorAll(".cat-quick-chip").forEach(c => c.classList.remove("active"));
+      const chipId = `cat_chip_${encodeURIComponent(cat)}`;
+      const target = document.getElementById(chipId);
+      if (target) target.classList.add("active");
+    }
+
     function renderCreateModal() {
       const buildingList = Object.keys(ULSAN_CAMPUS_COORDS);
       const prefillTitle = state.prefill_title || "";
-      const prefillCat = state.prefill_cat || "🍚 밥약";
+      const defaultCat = state.prefill_cat || "🍚 밥약";
+      const catPresets = ["🍚 밥약", "☕ 카공", "🎮 게임/PC방", "🏃 운동", "📚 스터디", "💬 기타"];
+
       return `
         <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; state.prefill_title=''; render();">← 돌아가기</button>
-        <h3 style="margin-bottom:8px;">➕ 새로운 번개 모집하기</h3>
-        <div class="privacy-badge"><span>🛡️</span><span>방장이 수락하기 전까지 내 실명과 연락처는 절대 노출되지 않습니다.</span></div>
-        <div class="uldaemo-card">
-          <label class="label">모집 제목 (최소 2글자 이상)</label>
-          <input id="c_title" class="input" value="${escHtml(prefillTitle)}" placeholder="예: 학식 같이 먹고 다음 수업 가요!" />
+        <h3 style="margin-bottom:6px; font-size:20px; font-weight:800; color:#191F28;">번개 올리기</h3>
+        <div class="privacy-badge" style="margin-bottom:12px;"><span>🛡️</span><span>수락 전까지 내 정보는 숨겨져요</span></div>
 
-          <label class="label">활동 카테고리 (목록에서 선택하거나 새로운 카테고리를 직접 입력하세요!)</label>
-          <input id="c_cat" list="cat_presets" class="input" placeholder="예: 🍚 밥약, 🎮 롤듀오, 🎤 코노, 🧩 방탈출 직접 입력" value="${escHtml(prefillCat)}" />
-          <datalist id="cat_presets">
-            <option value="🍚 밥약"></option>
-            <option value="☕ 카공"></option>
-            <option value="🎮 게임/PC방"></option>
-            <option value="🍻 술/번개"></option>
-            <option value="🏃 운동"></option>
-            <option value="🚶 산책"></option>
-            <option value="🚕 택시/카풀"></option>
-            <option value="📚 스터디/과제"></option>
-            <option value="🎤 코노/노래방"></option>
-            <option value="🧩 보드게임/방탈출"></option>
-            <option value="💬 기타/자유"></option>
+        <div class="uldaemo-card" style="padding-bottom:10px;">
+          <!-- 1. 제목 입력 & 추천 칩 -->
+          <label class="label" style="font-weight:700;">어떤 모임인가요?</label>
+          <input id="c_title" class="input" value="${escHtml(prefillTitle)}" placeholder="예: 학식 같이 먹어요" style="font-size:15px;" />
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin: -4px 0 16px;">
+            <button type="button" class="quick-chip" onclick="setCreateTitle('학식 같이 먹어요', '🍚 밥약')">🍚 학식 같이 먹어요</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('도서관 카공', '☕ 카공')">☕ 도서관 카공</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('헬스 같이 가요', '🏃 운동')">💪 헬스 같이 가요</button>
+          </div>
+
+          <!-- 2. 카테고리 칩 (기타 선택 시만 직접 입력) -->
+          <label class="label" style="font-weight:700;">카테고리</label>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            ${catPresets.map(c => `
+              <button type="button" id="cat_chip_${encodeURIComponent(c)}" class="quick-chip cat-quick-chip ${c === defaultCat ? 'active' : ''}" onclick="setCreateCat('${c}')">${c}</button>
+            `).join("")}
+          </div>
+          <input id="c_cat" type="hidden" value="${escHtml(defaultCat)}" />
+          <div id="c_cat_custom_wrap" style="display:none; margin-bottom:16px;">
+            <input id="c_cat_custom" class="input" placeholder="새로운 카테고리를 입력하세요 (예: 🎤 코노)" oninput="document.getElementById('c_cat').value = this.value.trim() || '💬 기타'" />
+          </div>
+
+          <!-- 3. 모임 시간 (빠른 칩 & 날짜·시간) -->
+          <label class="label" style="font-weight:700; margin-top:8px;">언제 만날까요?</label>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            <button type="button" id="time_chip_now" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('now')">⚡ 지금</button>
+            <button type="button" id="time_chip_30min" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('30min')">🕒 30분 뒤</button>
+            <button type="button" id="time_chip_dinner" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('dinner')">🌙 오늘 저녁</button>
+            <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('tomorrow_lunch')">☀️ 내일 점심</button>
+          </div>
+          <div class="row-2" style="margin-bottom:16px;">
+            <div>
+              <input id="c_date" type="date" class="input" value="${getTodayStr()}" min="${getTodayStr()}" style="font-size:13.5px;" />
+            </div>
+            <div>
+              <input id="c_time" type="time" class="input" value="12:30" style="font-size:13.5px;" />
+            </div>
+          </div>
+
+          <!-- 4. 장소 & 인원 칩 -->
+          <label class="label" style="font-weight:700;">어디서 만날까요?</label>
+          <input id="c_loc" list="loc_presets" class="input" value="22호관 학생회관" placeholder="호관 또는 장소 검색" style="margin-bottom:16px;" />
+          <datalist id="loc_presets">
+            ${buildingList.map(b => `<option value="${b}"></option>`).join("")}
           </datalist>
 
-          <div class="row-2">
-            <div>
-              <label class="label">모임 날짜</label>
-              <input id="c_date" type="date" class="input" value="${getTodayStr()}" min="${getTodayStr()}" />
-            </div>
-            <div>
-              <label class="label">모임 시간</label>
-              <input id="c_time" type="time" class="input" value="12:30" />
-            </div>
+          <label class="label" style="font-weight:700;">몇 명이서 만날까요?</label>
+          <div style="display:flex; gap:8px; margin-bottom:16px;">
+            ${[2, 3, 4, 5].map(n => `
+              <button type="button" id="max_chip_${n}" class="quick-chip max-quick-chip ${n === 3 ? 'active' : ''}" style="flex:1; justify-content:center; padding:9px 0; font-size:14px;" onclick="setCreateMax(${n})">${n}명</button>
+            `).join("")}
           </div>
+          <input id="c_max" type="hidden" value="3" />
 
-          <div class="row-2">
-            <div>
-              <label class="label">만날 장소 (호관 검색/직접 입력)</label>
-              <input id="c_loc" list="loc_presets" class="input" value="22호관 학생회관" />
-              <datalist id="loc_presets">
-                ${buildingList.map(b => `<option value="${b}"></option>`).join("")}
-              </datalist>
-            </div>
-            <div>
-              <label class="label">최대 모집 인원</label>
-              <input id="c_max" type="number" class="input" min="2" max="10" value="3" />
-            </div>
-          </div>
-
-          <label class="label">만남 성향 태그</label>
+          <!-- 5. 모임 성향 -->
+          <label class="label" style="font-weight:700;">만남 성향</label>
           <input id="c_style" list="style_presets" class="input" value="간단한 스몰토크 환영" />
           <datalist id="style_presets">
             <option value="간단한 스몰토크 환영"></option>
@@ -4886,18 +4993,21 @@
           </datalist>
 
           ${isCurrentUserAdmin() ? `
-          <div style="background:#FFFDF5; border:1px solid #F59E0B; border-radius:12px; padding:10px 12px; margin:10px 0 12px;">
+          <div style="background:#FFFDF5; border:1px solid #F59E0B; border-radius:12px; padding:10px 12px; margin:14px 0 6px;">
             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7A4B00; cursor:pointer;">
               <input id="c_official" type="checkbox" style="width:16px; height:16px; accent-color:#F59E0B;" />
               👑 운영진 공식 번개로 등록 (피드 최상단 고정 + 골드 강조 뱃지)
             </label>
             <div style="font-size:11px; color:#92400E; margin-top:3px; padding-left:24px;">
-              * 학우들의 참여를 유도하기 위해 운영진이 주최하는 공식 밥약·카공·이벤트 모임에 체크하세요. (운영진 계정에만 표시됨)
+              * 학우들의 참여를 유도하기 위해 운영진이 주최하는 공식 밥약·카공·이벤트 모임에 체크하세요.
             </div>
           </div>
           ` : ''}
 
-          <button class="btn btn-primary" style="margin-top:6px;" onclick="submitCreatePost()">⚡ 번개 모집 등록하기</button>
+          <!-- 하단 고정 액션 바 -->
+          <div class="create-sticky-bar">
+            <button class="btn btn-primary" style="height:48px; font-size:16px; font-weight:800;" onclick="submitCreatePost()">번개 올리기</button>
+          </div>
         </div>
       `;
     }
@@ -4936,7 +5046,7 @@
       saveDB(true);
       triggerLightningFlash();
       fireConfetti();
-      showToast("⚡ 번개 모집이 등록되었습니다!");
+      showToast("⚡ 번개가 등록되었어요!");
       state.active_modal = null;
       state.nav_tab = "홈";
       render();
