@@ -1004,7 +1004,7 @@
       z-index: 9999;
     }
 
-    /* ===== 🏆 리워드 뱃지 & 출석/참여 챌린지 & 커피 랭킹 ===== */
+    /* ===== 🏆 공식 안심 인증 뱃지 & 참여 챌린지 & 커피 랭킹 ===== */
     .achieve-badge {
       display: inline-flex;
       align-items: center;
@@ -1015,11 +1015,12 @@
       border-radius: 999px;
       line-height: 1.2;
       white-space: nowrap;
+      letter-spacing: -0.01em;
     }
-    .achieve-first { background: #EEF8F3; color: #1E634C; border: 1px solid #C5E6D6; }
-    .achieve-streak { background: #EEF8F3; color: #287D62; border: 1px solid #C5E6D6; }
-    .achieve-coffee { background: #EEF8F3; color: #1E634C; border: 1px solid #C5E6D6; }
-    .achieve-temp { background: #EEF8F3; color: #287D62; border: 1px solid #C5E6D6; }
+    .achieve-temp { background: #EEF8F3; color: #287D62; border: 1px solid #287D62; }
+    .achieve-verified { background: #191F28; color: #FFFFFF; border: 1px solid #191F28; }
+    .achieve-talk { background: #EEF8F3; color: #287D62; border: 1px solid #C5E6D6; }
+    .achieve-time { background: #EEF8F3; color: #287D62; border: 1px solid #C5E6D6; }
     .quest-item {
       background: #F9FAFB;
       border: 1px solid #E5E8EB;
@@ -1956,9 +1957,29 @@
       });
 
       // 데모/초기 데이터 자연스러운 기본 실적 보정
-      if (uid === "20241003" && validMeets < 4) validMeets = 4;
-      if (uid === "20241001" && validMeets < 3) validMeets = 3;
-      if (uid === "20241002" && validMeets < 2) validMeets = 2;
+      if (uid === "20241003" && validMeets < 15) validMeets = 15;
+      if (uid === "20241001" && validMeets < 12) validMeets = 12;
+      if (uid === "20241002" && validMeets < 3) validMeets = 3;
+
+      // 2) 번개 만남 후 받은 호평(칭찬 스티커) 누적 집계
+      let talkPraiseCnt = (uid === "20241003" ? 15 : uid === "20241001" ? 2 : uid === "20241002" ? 1 : 0);
+      let timePraiseCnt = (uid === "20241003" ? 2 : uid === "20241001" ? 9 : uid === "20241002" ? 2 : 1);
+      let kindPraiseCnt = (uid === "20241003" ? 1 : uid === "20241001" ? 6 : uid === "20241002" ? 1 : 1);
+
+      (DB.reviews || []).forEach(r => {
+        if (String(r.to_id) === String(uid)) {
+          const kw = String(r.keyword || "");
+          if (kw.includes("대화")) talkPraiseCnt++;
+          else if (kw.includes("시간")) timePraiseCnt++;
+          else kindPraiseCnt++;
+        }
+      });
+
+      const totalPraiseCnt = talkPraiseCnt + timePraiseCnt + kindPraiseCnt;
+      const mannerMannerCnt = timePraiseCnt + kindPraiseCnt;
+      const userTemp = parseFloat(u.manner_temp || 36.5);
+      const reportCnt = Number(u.report_count || 0);
+      const isCleanRecord = (reportCnt === 0);
 
       const today = getTodayStr();
       const streakDays = u.streak_days || (uid === "20241003" ? 5 : uid === "20241001" ? 4 : 1);
@@ -1969,23 +1990,55 @@
         ? u.coffee_tickets
         : ((firstMeetupDone ? 1 : 0) + (streakDays >= 3 ? 1 : 0) + (weeklyMeets >= 2 ? 1 : 0));
 
-      // 월간 커피 리워드 종합 점수 = (유효 만남 × 15점) + ((매너온도 - 36.5) × 10점) + (연속 출석 × 3점)
-      const tempBonus = Math.max(0, Math.round(((u.manner_temp || 36.5) - 36.5) * 10));
-      const rewardScore = (validMeets * 15) + tempBonus + (streakDays * 3);
+      // 월간 리워드 활동 점수 = (유효 만남 × 15점) + (누적 호평 × 5점) + (연속 출석 × 3점) + 보너스 점수
+      const bonusScore = Number(u.bonus_score || 0);
+      const rewardScore = (validMeets * 15) + (totalPraiseCnt * 5) + (streakDays * 3) + bonusScore;
 
-      const badges = [];
-      if (firstMeetupDone) {
-        badges.push({ label: "🌱 첫 번개 달성", cls: "achieve-first", desc: "첫 번개 매칭 성공 (+1.0°C 보너스)" });
-      }
-      if (streakDays >= 3 || weeklyMeets >= 2) {
-        badges.push({ label: "🔥 주간 챌린저", cls: "achieve-streak", desc: "주 3일 출석 또는 주 2회 번개 달성" });
-      }
-      if (rewardScore >= 55 || (u.manner_temp || 36.5) >= 38.5) {
-        badges.push({ label: "☕ 이달의 커피왕 후보", cls: "achieve-coffee", desc: "메가/컴포즈 아메리카노 리워드 상위권" });
-      }
-      if ((u.manner_temp || 36.5) >= 40.0) {
-        badges.push({ label: "🌡️ 매너 챔피언", cls: "achieve-temp", desc: "매너온도 40°C 돌파 클린 학우" });
-      }
+      // 3) 공식 안심 인증 뱃지 4종 ("완전히 인증된 사람" 보증 타이틀 · 노쇼/신고 0회 필수)
+      const badgeCatalog = [
+        {
+          id: "warm_peer",
+          label: "따뜻한 온기 학우",
+          cls: "achieve-temp",
+          condText: "매너온도 40.0°C 이상 · 노쇼 0회",
+          desc: "매너온도 40.0°C 이상을 달성하고 비매너 신고가 0회인 따뜻한 학우",
+          earned: isCleanRecord && userTemp >= 40.0,
+          progressText: `${userTemp.toFixed(1)}°C / 40.0°C`,
+          progressPct: Math.min(100, Math.max(8, Math.round(((userTemp - 36.5) / (40.0 - 36.5)) * 100)))
+        },
+        {
+          id: "verified_mate",
+          label: "검증된 안심 메이트",
+          cls: "achieve-verified",
+          condText: "번개 후 좋은 평가 누적 15회 이상",
+          desc: "번개 모임 이후 학우들로부터 좋은 평가를 15회 이상 받은 공식 보증 학우",
+          earned: isCleanRecord && totalPraiseCnt >= 15,
+          progressText: `${totalPraiseCnt} / 15회`,
+          progressPct: Math.min(100, Math.round((totalPraiseCnt / 15) * 100))
+        },
+        {
+          id: "fun_talker",
+          label: "대화가 즐거운 사람",
+          cls: "achieve-talk",
+          condText: "'즐거운 대화' 호평 15회 이상",
+          desc: "만남 후 '즐거운 대화' 칭찬 평가를 15회 이상 받은 유쾌한 소통 메이트",
+          earned: isCleanRecord && talkPraiseCnt >= 15,
+          progressText: `${talkPraiseCnt} / 15회`,
+          progressPct: Math.min(100, Math.round((talkPraiseCnt / 15) * 100))
+        },
+        {
+          id: "time_keeper",
+          label: "약속 칼지킴이",
+          cls: "achieve-time",
+          condText: "'시간 약속 · 친절 매너' 호평 15회 이상",
+          desc: "만남 후 시간 약속 준수 및 친절 매너 호평을 15회 이상 받은 신뢰 학우",
+          earned: isCleanRecord && mannerMannerCnt >= 15,
+          progressText: `${mannerMannerCnt} / 15회`,
+          progressPct: Math.min(100, Math.round((mannerMannerCnt / 15) * 100))
+        }
+      ];
+
+      const badges = badgeCatalog.filter(b => b.earned);
 
       return {
         validMeets,
@@ -1996,8 +2049,26 @@
         firstMeetupDone,
         coffeeTickets,
         rewardScore,
+        totalPraiseCnt,
+        talkPraiseCnt,
+        timePraiseCnt,
+        kindPraiseCnt,
+        mannerMannerCnt,
+        isCleanRecord,
+        badgeCatalog,
         badges
       };
+    }
+
+    function renderVerifiedBadgePills(uid, maxShow = 2) {
+      const st = getUserStatsAndBadges(uid);
+      if (!st.badges || st.badges.length === 0) return "";
+      return st.badges.slice(0, maxShow).map(b => `
+        <span class="achieve-badge ${b.cls}" title="${escHtml(b.desc)}">
+          ${getSvgIcon('shield', 11, b.cls === 'achieve-verified' ? '#FFFFFF' : '#287D62', 2.4)}
+          <span>${escHtml(b.label)}</span>
+        </span>
+      `).join("");
     }
 
     function getMonthlyLeaderboard() {
@@ -2025,10 +2096,10 @@
       const u = DB.users && DB.users[uid];
       if (!u || u.first_reward_claimed) return false;
       u.first_reward_claimed = true;
-      u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + 1.0) * 10) / 10);
       u.coffee_tickets = (u.coffee_tickets || 0) + 1;
+      u.bonus_score = (u.bonus_score || 0) + 15;
       u.updated_at = Date.now();
-      notifyUser(uid, "🎁 [첫 번개 달성 보상] 축하합니다! '🌱 첫 번개 달성' 프로필 뱃지와 매너온도 +1.0°C, 메가/컴포즈 커피 추첨권 1장이 지급되었습니다!");
+      notifyUser(uid, "[첫 번개 달성 리워드] 첫 번개 매칭 성공으로 아메리카노 추첨권 1장과 챌린지 활동 점수 +15점이 지급되었습니다. 만남 후 서로 매너 칭찬을 남겨 매너온도와 공식 인증 뱃지를 달성해보세요!");
       return true;
     }
 
@@ -2037,16 +2108,16 @@
       const u = DB.users[state.user_id];
       const today = getTodayStr();
       if (u.last_checkin === today) {
-        return showToast("✅ 오늘 출석체크를 이미 완료했어요! 내일 또 참여해 주세요 🌱");
+        return showToast("오늘 출석체크를 이미 완료했어요. 내일 또 참여해 주세요.");
       }
       u.last_checkin = today;
       u.streak_days = (u.streak_days || 1) + 1;
-      u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + 0.1) * 10) / 10);
+      u.bonus_score = (u.bonus_score || 0) + 3;
       if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
         u.coffee_tickets = (u.coffee_tickets || 0) + 1;
-        showToast(`🎉 연속 ${u.streak_days}일 출석 달성! 메가/컴포즈 아메리카노 추첨권 +1장 & 매너온도 +0.1°C 획득!`);
+        showToast(`연속 ${u.streak_days}일 출석 달성! 아메리카노 추첨권 +1장 & 활동 랭킹 +3점 획득!`);
       } else {
-        showToast(`🔥 주간 출석체크 완료! (연속 ${u.streak_days}일째 · 매너온도 +0.1°C 상승)`);
+        showToast(`출석체크 완료! (연속 ${u.streak_days}일째 · 활동 랭킹 +3점 획득)`);
       }
       u.updated_at = Date.now();
       fireConfetti();
@@ -2057,18 +2128,18 @@
     function submitMannerPraise(postId, partnerId, keyword) {
       if (!state.user_id || !partnerId) return;
       if (partnerId === state.user_id) {
-        return showToast("🛡️ [어뷰징 방지] 본인에게는 매너 평가를 남길 수 없습니다.");
+        return showToast("[어뷰징 방지] 본인에게는 매너 평가를 남길 수 없습니다.");
       }
       DB.reviews = DB.reviews || [];
       const alreadyThisPost = DB.reviews.some(r => r.post_id === postId && r.from_id === state.user_id && r.to_id === partnerId);
       if (alreadyThisPost) {
-        return showToast("✅ 이 번개 모임에서 이미 상대 학우에게 매너 칭찬을 보냈습니다.");
+        return showToast("이 번개 모임에서 이미 상대 학우에게 매너 칭찬을 보냈습니다.");
       }
 
       // 어뷰징 방지: 동일 학우 간 반복 평가는 월 최대 2회까지만 인정
       const samePairCount = DB.reviews.filter(r => r.from_id === state.user_id && r.to_id === partnerId).length;
       if (samePairCount >= 2) {
-        return showToast("🛡️ [어뷰징 조작 방지 작동] 동일한 학우와의 반복 평가는 월 최대 2회까지만 온도 및 커피 랭킹에 반영됩니다.");
+        return showToast("[어뷰징 방지] 동일한 학우와의 반복 평가는 월 최대 2회까지만 매너온도 및 인증 뱃지 실적에 반영됩니다.");
       }
 
       DB.reviews.push({
@@ -2076,7 +2147,7 @@
         post_id: postId,
         from_id: state.user_id,
         to_id: partnerId,
-        keyword: keyword || "친절해요 😊",
+        keyword: keyword || "친절해요",
         created_at: getTodayStr()
       });
 
@@ -2087,7 +2158,7 @@
         partner.keywords = partner.keywords || [];
         if (keyword && !partner.keywords.includes(keyword)) partner.keywords.push(keyword);
         partner.updated_at = Date.now();
-        notifyUser(partnerId, `☕ ${me ? me.nickname : "학우"}님이 [${keyword}] 칭찬 스티커를 보내 매너온도가 +0.5°C 상승했습니다!`, postId);
+        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 평가를 남겨 매너온도 +0.5°C 상승 및 공식 인증 뱃지 호평 횟수(+1회)가 누적되었습니다!`, postId);
       }
       if (me) {
         me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.2) * 10) / 10);
@@ -2099,7 +2170,7 @@
 
       fireConfetti();
       saveDB(true);
-      showToast(`🎉 매너 칭찬 완료! 상대방 +0.5°C, 내 온도 +0.2°C 상승 & 이달의 커피 랭킹 점수에 반영되었습니다!`);
+      showToast(`매너 평가 완료! 상대방 매너온도 +0.5°C & 인증 뱃지 호평 +1회 반영 (내 온도 +0.2°C)`);
       render();
     }
 
@@ -3041,11 +3112,12 @@
 
       const userTemp = parseFloat(currentUser.manner_temp || 36.5);
       const userTempPct = Math.max(8, Math.min(100, Math.round((userTemp / 60.0) * 100)));
+      const myMannerStats = getUserStatsAndBadges(state.user_id);
       const mannerCard = `
         <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:16px; padding:18px; margin-bottom:12px;">
           <div style="font-size:13.5px; font-weight:700; color:#191F28; margin-bottom:14px;">나의 캠퍼스 매너</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span style="font-size:13px; color:#6B7684; font-weight:500;">매너온도</span>
+            <span style="font-size:13px; color:#6B7684; font-weight:500;">실시간 매너온도</span>
             <span style="background:#EEF8F3; color:#287D62; font-size:14px; font-weight:800; padding:3px 10px; border-radius:999px;">${userTemp.toFixed(1)}°C</span>
           </div>
           <div style="position:relative; height:8px; background:#E5EAE7; border-radius:999px; overflow:hidden;">
@@ -3053,7 +3125,22 @@
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11.5px;">
             <span style="color:#6B7684;">기본 36.5°C</span>
-            <span style="color:#287D62; font-weight:600;">${userTemp >= 38.0 ? '따뜻한 학우예요' : '신뢰하는 학우예요'}</span>
+            <span style="color:#287D62; font-weight:600;">누적 호평 ${myMannerStats.totalPraiseCnt}회</span>
+          </div>
+          <div style="margin-top:12px; padding-top:12px; border-top:1px solid #F2F4F3;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span style="font-size:12px; font-weight:700; color:#191F28;">공식 인증 뱃지</span>
+              <span style="font-size:11px; font-weight:700; color:#287D62; cursor:pointer;" onclick="switchTab('마이')">기준 보기 ›</span>
+            </div>
+            ${myMannerStats.badges.length > 0 ? `
+              <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                ${renderVerifiedBadgePills(state.user_id, 4)}
+              </div>
+            ` : `
+              <div style="font-size:11.5px; color:#6B7684; line-height:1.45;">
+                40.0°C 달성 또는 호평 15회 누적 시 <b style="color:#191F28;">완전 인증 뱃지</b>가 부여됩니다.
+              </div>
+            `}
           </div>
         </div>
       `;
@@ -3723,6 +3810,9 @@
       const cleanCatName = String(post.category || "모임").replace(/^[^\w가-힣]+/, '').trim() || "모임";
       const authorTemp = parseFloat(author.manner_temp || 36.5);
       const authorTempPct = Math.max(8, Math.min(100, Math.round((authorTemp / 60.0) * 100)));
+      const authorStats = getUserStatsAndBadges(post.author_id);
+      const authorBadgesHtml = renderVerifiedBadgePills(post.author_id, 3);
+      const topBadge = authorStats.badges && authorStats.badges[0] ? authorStats.badges[0] : null;
 
       return `
         <div id="post-accordion-${post.id}" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''} ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}" style="border-radius:18px; margin-bottom:10px;">
@@ -3735,6 +3825,7 @@
               <div style="min-width:0; flex:1; display:flex; align-items:center; gap:6px;">
                 ${isOfficial ? `<span style="background:#EEF8F3; color:#287D62; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:6px; flex-shrink:0;">공식</span>` : ''}
                 <span style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${post.title}</span>
+                ${topBadge ? `<span style="background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; flex-shrink:0; display:inline-flex; align-items:center; gap:3px;">${getSvgIcon('shield', 10, '#287D62', 2.4)} ${escHtml(topBadge.label)}</span>` : ''}
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
@@ -3771,20 +3862,21 @@
                 </span>
               </div>
 
-              <div style="background:#F7F9F8; border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;">
-                <div style="min-width:0;">
-                  <div style="display:flex; align-items:center; gap:6px;">
+              <div style="background:#F7F9F8; border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+                <div style="min-width:0; flex:1;">
+                  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     <span style="font-size:11.5px; color:#6B7684; font-weight:500;">방장</span>
                     <span style="font-size:13px; font-weight:700; color:#191F28;">${author.nickname}</span>
+                    ${authorBadgesHtml}
                   </div>
-                  <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${author.department} · ${author.mbti} · 재학생 인증</div>
+                  <div style="font-size:11.5px; color:#6B7684; margin-top:4px;">${author.department} · ${author.mbti} · 누적 호평 ${authorStats.totalPraiseCnt}회</div>
                 </div>
                 <div style="width:128px; flex-shrink:0; text-align:right;">
-                  <div style="font-size:12px; font-weight:700; color:#287D62; margin-bottom:4px;">${authorTemp.toFixed(1)}°C</div>
+                  <div style="font-size:12px; font-weight:700; color:#287D62; margin-bottom:4px;">매너온도 ${authorTemp.toFixed(1)}°C</div>
                   <div style="height:6px; background:#E5EAE7; border-radius:999px; overflow:hidden;">
                     <div style="width:${authorTempPct}%; height:100%; background:linear-gradient(90deg, #B8DECB 0%, #287D62 100%); border-radius:999px;"></div>
                   </div>
-                  <div style="font-size:10px; color:#6B7684; margin-top:3px;">기본 36.5°C</div>
+                  <div style="font-size:10px; color:#6B7684; margin-top:3px;">실시간 매너 점수표</div>
                 </div>
               </div>
 
@@ -3877,11 +3969,11 @@
         <div style="background:#EEF8F3; border-radius:12px; padding:11px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:#191F28; font-weight:500;">
             <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
-            <span>학교 인증을 마친 학우들만 안전하게 만나요</span>
+            <span>실시간 매너온도와 공식 인증 뱃지로 검증된 학우들과 안전하게 만나요</span>
           </div>
           <div style="display:flex; align-items:center; gap:12px;">
             <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="handleDailyCheckin()">
-              ${st.checkedInToday ? `출석 ${st.streakDays}일째 완료` : `출석체크 (+0.1°C)`}
+              ${st.checkedInToday ? `출석 ${st.streakDays}일째 완료` : `출석체크 (리워드 +3점)`}
             </span>
             <span style="color:#C5E6D6;">|</span>
             <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="openUlsanNoticesModal(event)">
@@ -4093,6 +4185,8 @@
       const post = DB.posts.find(p => p.id === state.selected_post_id);
       if (!post) { state.active_modal = null; return renderHomeTab(); }
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5, keywords: [] };
+      const authorSt = getUserStatsAndBadges(post.author_id);
+      const authorBadgesHtml = renderVerifiedBadgePills(post.author_id, 4);
       const apps = DB.applications.filter(a => a.post_id === post.id);
       const acceptedCnt = apps.filter(a => a.status === "승인됨").length + 1;
       const isAuthor = post.author_id === state.user_id;
@@ -4103,36 +4197,39 @@
         <div class="uldaemo-card ${post.is_official ? 'card-official' : ''}" style="${post.is_official ? 'margin-top:14px;' : ''}">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:4px;">
             <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-              ${post.is_official ? `<span class="official-badge">👑 운영진 공식 번개</span>` : ""}
+              ${post.is_official ? `<span class="official-badge">운영진 공식 번개</span>` : ""}
               <span class="cat-badge" style="background:#EEF8F3; color:#287D62;">${post.category}</span>
-              <span class="privacy-pill-mini">🛡️ 블라인드 프로필 적용중</span>
+              <span class="privacy-pill-mini">블라인드 프로필 적용중</span>
             </div>
           </div>
-          <h3 style="font-size:20px; margin-bottom:12px; ${post.is_official ? 'color:#1E3A8A;' : ''}">${post.is_official ? '⭐ ' : ''}${post.title}</h3>
-          <div style="background:#F7F8F4; border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:12px;">
+          <h3 style="font-size:20px; margin-bottom:12px; color:#191F28;">${post.title}</h3>
+          <div style="background:#F7F9F8; border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:12px;">
             <div style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-              <span>📍 <b>만날 장소:</b> ${post.location}</span>
-              <a class="kakaomap-link" href="${mapUrl}" target="_blank">📍 카카오맵</a>
+              <span><b>만날 장소:</b> ${post.location}</span>
+              <a class="kakaomap-link" href="${mapUrl}" target="_blank">카카오맵</a>
             </div>
-            <div style="margin-bottom:6px;">🕒 <b>모임 일시:</b> ${post.meet_date} ${post.meet_time}</div>
-            <div style="margin-bottom:6px;">👥 <b>모집 현황:</b> ${acceptedCnt} / ${post.max_participants}명 (${post.status})</div>
-            <div>💬 <b>모임 성향:</b> ${post.meeting_style}</div>
+            <div style="margin-bottom:6px;"><b>모임 일시:</b> ${post.meet_date} ${post.meet_time}</div>
+            <div style="margin-bottom:6px;"><b>모집 현황:</b> ${acceptedCnt} / ${post.max_participants}명 (${post.status})</div>
+            <div><b>모임 성향:</b> ${post.meeting_style}</div>
           </div>
 
           <div style="margin-bottom:12px;">
-            <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:6px;">🗺️ 만남 장소 지도 · ${post.location}</div>
-            <div id="detail-map" style="height:220px; border-radius:12px; border:1px solid #E5E8EB; overflow:hidden;"></div>
+            <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:6px;">만남 장소 지도 · ${post.location}</div>
+            <div id="detail-map" style="height:220px; border-radius:12px; border:1px solid #E5EAE7; overflow:hidden;"></div>
           </div>
 
-          <div style="border-top:1px solid #E5E8EB; padding-top:12px;">
-            <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:8px;">👑 방장 블라인드 프로필</div>
-            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
-              <div class="${author.manner_temp >= 40 ? 'aura-40' : ''}" style="font-size:32px; background:#EEF8F3; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+          <div style="border-top:1px solid #E5EAE7; padding-top:12px;">
+            <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:8px;">방장 블라인드 프로필 (매너온도 & 공식 인증 뱃지)</div>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+              <div style="font-size:28px; background:#EEF8F3; border:1.5px solid #287D62; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
                 ${author.avatar.split(" ")[0]}
               </div>
               <div style="flex:1;">
-                <div style="font-size:15px; font-weight:800;">${author.nickname} ${author.manner_temp >= 40 ? "👑" : ""}</div>
-                <div style="font-size:12px; color:#6B7684;">${author.department} · ${author.mbti}</div>
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span style="font-size:15px; font-weight:800; color:#191F28;">${author.nickname}</span>
+                  ${authorBadgesHtml || `<span style="font-size:11px; color:#6B7684; background:#F7F9F8; border:1px solid #E5EAE7; padding:2px 8px; border-radius:999px;">재학생 인증 완료</span>`}
+                </div>
+                <div style="font-size:12px; color:#6B7684; margin-top:3px;">${author.department} · ${author.mbti} · 누적 호평 ${authorSt.totalPraiseCnt}회</div>
               </div>
             </div>
             ${renderTempGauge(author.manner_temp, true)}
@@ -4141,19 +4238,27 @@
 
         ${isAuthor ? `
           <div class="uldaemo-card">
-            <h4 style="margin-bottom:8px;">👑 방장 전용: 신청자 수락 및 모임 관리</h4>
+            <h4 style="margin-bottom:8px;">방장 전용: 신청자 수락 및 모임 관리</h4>
             ${apps.length === 0 ? `<div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">아직 참여를 신청한 학우가 없습니다.</div>` : apps.map(a => {
               const apUser = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, department: "울산대", mbti: "INFP", manner_temp: 36.5 };
+              const apBadges = renderVerifiedBadgePills(a.applicant_id, 2);
               return `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #F2F4F6;">
-                  <div style="font-size:13px;"><b>${apUser.avatar.split(" ")[0]} ${apUser.nickname}</b> (${apUser.department} · ${apUser.mbti}) — <span style="color:#287D62; font-weight:700;">${a.status}</span></div>
-                  ${a.status === "대기중" ? `<button class="btn btn-primary" style="width:auto; min-height:34px; padding:4px 12px;" onclick="acceptApplicant(${a.id})">✅ 수락</button>` : ""}
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F2F4F3; flex-wrap:wrap; gap:8px;">
+                  <div>
+                    <div style="font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <b>${apUser.avatar.split(" ")[0]} ${apUser.nickname}</b>
+                      <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 7px; border-radius:999px;">${(apUser.manner_temp || 36.5).toFixed(1)}°C</span>
+                      ${apBadges}
+                    </div>
+                    <div style="font-size:12px; color:#6B7684; margin-top:2px;">${apUser.department} · ${apUser.mbti} — <b style="color:#287D62;">${a.status}</b></div>
+                  </div>
+                  ${a.status === "대기중" ? `<button class="btn btn-primary" style="width:auto; min-height:34px; padding:4px 12px;" onclick="acceptApplicant(${a.id})">수락</button>` : ""}
                 </div>
               `;
             }).join("")}
             <div class="row-2" style="margin-top:10px;">
-              <button class="btn" onclick="closePostEarly(${post.id})">🔒 모집 마감하기</button>
-              <button class="btn btn-danger" onclick="deletePost(${post.id})">🗑️ 모임 삭제하기</button>
+              <button class="btn" onclick="closePostEarly(${post.id})">모집 마감하기</button>
+              <button class="btn btn-danger" onclick="deletePost(${post.id})">모임 삭제하기</button>
             </div>
           </div>
         ` : ""}
@@ -4195,15 +4300,15 @@
       if (side === "A") poll.votes_a.push(uid);
       else poll.votes_b.push(uid);
 
-      // 첫 투표 보너스 매너온도 +0.1°C
+      // 첫 투표 보너스: 활동 리워드 점수 +2점 (매너온도는 실제 대면 만남 평가로만 변동)
       const me = DB.users[uid];
       if (me && !window["_voted_" + pollId]) {
         window["_voted_" + pollId] = true;
-        me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.1) * 10) / 10);
+        me.bonus_score = (me.bonus_score || 0) + 2;
         fireConfetti();
-        showToast("🎉 투표 완료! 캠퍼스 소통 참여로 매너온도 +0.1°C 상승!");
+        showToast("투표 완료! 캠퍼스 소통 참여로 활동 리워드 점수 +2점 획득!");
       } else {
-        showToast("⚖️ 투표가 반영되었습니다!");
+        showToast("투표가 반영되었습니다!");
       }
       saveDB(true);
       render();
@@ -4312,12 +4417,12 @@
     }
 
     const REWARD_WHEEL_ITEMS = [
-      { label: "☕ 응모권+2", full: "☕ 아메리카노 응모권 +2장 대박!", type: "ticket", val: 2 },
-      { label: "🌡️ +0.5°C", full: "🌡️ 매너온도 +0.5°C 급상승!", type: "temp", val: 0.5 },
-      { label: "🍀 +0.2°C", full: "🍀 매너온도 +0.2°C 상승!", type: "temp", val: 0.2 },
-      { label: "🎟️ 티켓+1", full: "🎟️ 보너스 티켓 +1장 (한 번 더!)", type: "ticket", val: 1 },
-      { label: "⚡ +0.3°C", full: "⚡ 매너온도 +0.3°C 보너스!", type: "temp", val: 0.3 },
-      { label: "🌱 +0.1°C", full: "🌱 오늘의 행운 온도 +0.1°C!", type: "temp", val: 0.1 }
+      { label: "응모권+2", full: "아메리카노 응모권 +2장 당첨!", type: "ticket", val: 2 },
+      { label: "리워드+20점", full: "이달의 활동 리워드 점수 +20점!", type: "score", val: 20 },
+      { label: "리워드+10점", full: "이달의 활동 리워드 점수 +10점!", type: "score", val: 10 },
+      { label: "티켓+1", full: "보너스 티켓 +1장 (한 번 더!)", type: "ticket", val: 1 },
+      { label: "리워드+15점", full: "이달의 활동 리워드 점수 +15점!", type: "score", val: 15 },
+      { label: "리워드+5점", full: "오늘의 행운 리워드 점수 +5점!", type: "score", val: 5 }
     ];
 
     const MENU_WHEEL_ITEMS = [
@@ -4342,7 +4447,7 @@
       if (mode === "reward") {
         const curTickets = (u.coffee_tickets !== undefined) ? u.coffee_tickets : st.coffeeTickets;
         if (curTickets <= 0) {
-          return showToast("🎟️ 보유한 돌림판 티켓이 없습니다! 출석 도장을 찍거나 번개에 참여해 티켓을 모아보세요.");
+          return showToast("보유한 돌림판 티켓이 없습니다! 출석 도장을 찍거나 번개에 참여해 티켓을 모아보세요.");
         }
         u.coffee_tickets = Math.max(0, curTickets - 1);
       }
@@ -4365,18 +4470,18 @@
         _isSpinningRoulette = false;
         const won = items[winIdx];
         if (mode === "reward") {
-          if (won.type === "temp") {
-            u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + won.val) * 10) / 10);
+          if (won.type === "score") {
+            u.bonus_score = (u.bonus_score || 0) + won.val;
           } else if (won.type === "ticket") {
             u.coffee_tickets = (u.coffee_tickets || 0) + won.val;
           }
           u.updated_at = Date.now();
-          state.last_roulette_result = `🎉 [리워드 당첨] ${won.full}`;
-          showToast(`🎉 돌림판 당첨! ${won.full}`);
+          state.last_roulette_result = `[리워드 당첨] ${won.full}`;
+          showToast(`돌림판 당첨! ${won.full}`);
         } else {
-          state.last_roulette_result = `🍽️ [오늘의 추천 메뉴] ${won.full}`;
+          state.last_roulette_result = `[오늘의 추천 메뉴] ${won.full}`;
           state.last_roulette_menu = won;
-          showToast(`🍽️ 오늘의 공강 메뉴 추천: ${won.full}!`);
+          showToast(`오늘의 공강 메뉴 추천: ${won.full}!`);
         }
         fireConfetti();
         saveDB(true);
@@ -4420,13 +4525,13 @@
             </div>
           ` : `
             <div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">
-              매일 출석 체크 시 <b style="color:#287D62;">매너온도 +0.1°C</b>와 리워드 티켓이 지급됩니다. (연속 <b style="color:#191F28;">${st.streakDays}일째</b>)
+              매일 출석 체크 시 <b style="color:#287D62;">활동 리워드 +3점</b>과 추첨 티켓이 지급됩니다. (연속 <b style="color:#191F28;">${st.streakDays}일째</b> · 매너온도는 실제 만남 후기로만 변동)
             </div>
             <div class="stamp-grid">
               ${[1, 2, 3, 4, 5, 6, 7].map(d => {
                 const isStamped = d <= stampedCnt;
                 const isNext = (!st.checkedInToday && d === stampedCnt + 1);
-                const bonusTxt = (d === 3 || d === 6) ? "티켓+1" : (d === 7 ? "티켓+2" : "+0.1°C");
+                const bonusTxt = (d === 3 || d === 6) ? "티켓+1" : (d === 7 ? "티켓+2" : "+3점");
                 return `
                   <div class="stamp-day ${isStamped ? 'stamped' : ''} ${isNext ? 'today-target' : ''}" onclick="handleDailyCheckin()" style="cursor:pointer;">
                     <div style="font-size:10.5px;">${d}일차</div>
@@ -4439,7 +4544,7 @@
               }).join("")}
             </div>
             <button class="btn ${st.checkedInToday ? '' : 'btn-primary'}" style="min-height:40px; font-size:13px; margin-bottom:14px;" onclick="handleDailyCheckin()">
-              ${st.checkedInToday ? "오늘 출석체크 완료" : "오늘 출석체크 (+0.1°C)"}
+              ${st.checkedInToday ? "오늘 출석체크 완료" : "오늘 출석체크 (활동 +3점)"}
             </button>
 
             <div style="border-top:1px solid #F2F4F3; padding-top:14px;">
@@ -4453,7 +4558,7 @@
                   </button>
                 </div>
                 <span style="font-size:11.5px; color:#6B7684;">
-                  ${mode === 'reward' ? '티켓 1장으로 매너온도 · 추첨권 획득' : '점심·저녁 메뉴를 가볍게 골라보세요'}
+                  ${mode === 'reward' ? '티켓 1장으로 리워드 점수 · 추첨권 획득' : '점심·저녁 메뉴를 가볍게 골라보세요'}
                 </span>
               </div>
 
@@ -4892,12 +4997,16 @@
             ${pendingHost.map(a => {
               const u = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, mbti: "INFP", manner_temp: 36.5 };
               const p = DB.posts.find(post => Number(post.id) === Number(a.post_id));
+              const apBadges = renderVerifiedBadgePills(a.applicant_id, 2);
               return `
                 <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                   <div style="font-size:13.5px; color:#191F28;">
-                    <b>${u.avatar.split(" ")[0]} ${u.nickname}</b>
-                    <span style="color:#6B7684; font-size:12px;">(${u.mbti} · ${(u.manner_temp || 36.5).toFixed(1)}°C)</span>
-                    <div style="font-size:12px; color:#6B7684; margin-top:2px;">신청 모임 · <b style="color:#191F28;">${p ? p.title : ""}</b></div>
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <b>${u.avatar.split(" ")[0]} ${u.nickname}</b>
+                      <span style="color:#287D62; background:#EEF8F3; font-size:11.5px; font-weight:700; padding:2px 7px; border-radius:999px;">${(u.manner_temp || 36.5).toFixed(1)}°C</span>
+                      ${apBadges}
+                    </div>
+                    <div style="font-size:12px; color:#6B7684; margin-top:3px;">${u.mbti} · 신청 모임 · <b style="color:#191F28;">${p ? p.title : ""}</b></div>
                   </div>
                   <button class="btn btn-primary" style="width:auto; min-height:36px; padding:0 14px; font-size:12.5px;" onclick="acceptApplicant(${a.id})">수락하고 대화 열기</button>
                 </div>
@@ -4916,6 +5025,7 @@
           </div>
         ` : activeChats.map(({ post, partnerId, otherIds, totalMembers }) => {
           const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
+          const partnerBadges = renderVerifiedBadgePills(partnerId, 2);
           const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
           const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(post.id));
 
@@ -4944,6 +5054,7 @@
                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                       <span style="font-weight:800; font-size:14.5px; color:#191F28;">${escHtml(otherNames || partner.nickname)}</span>
                       <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">${(partner.manner_temp || 36.5).toFixed(1)}°C</span>
+                      ${partnerBadges}
                       ${totalMembers > 2 ? `<span style="font-size:11px; font-weight:700; color:#6B7684; background:#F7F9F8; padding:2px 8px; border-radius:999px; border:1px solid #E5EAE7;">${totalMembers}명 참여</span>` : ""}
                     </div>
                     <div style="font-size:12px; color:#6B7684; margin-top:2px; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="openDetailModal(${post.id})">
@@ -4976,7 +5087,7 @@
                     대화 주제 추천
                   </button>
                   <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:600; background:${isActionOpen ? '#EEF8F3' : '#FFFFFF'}; border:1px solid ${isActionOpen ? '#287D62' : '#E5EAE7'}; color:${isActionOpen ? '#287D62' : '#6B7684'};" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">
-                    ${isActionOpen ? '매너 칭찬 · 신고 닫기' : '매너 칭찬 · 신고'}
+                    ${isActionOpen ? '매너 평가 · 신고 닫기' : '매너 평가 · 신고'}
                   </button>
                 </div>
                 <span style="font-size:11.5px; color:#6B7684;">익명 보호 적용</span>
@@ -4984,18 +5095,22 @@
 
               ${isActionOpen ? `
                 <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:14px; margin-top:10px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:10px;">
-                    <span style="font-size:12.5px; font-weight:700; color:#191F28;">만남 완료 후 따뜻한 매너 칭찬을 남겨보세요</span>
-                    <span style="font-size:11px; color:#6B7684;">동일 학우 월 최대 2회</span>
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px;">
+                    <span style="font-size:12.5px; font-weight:700; color:#191F28;">만남 완료 후 상대 학우의 매너를 평가해 주세요</span>
+                    <span style="font-size:11px; color:#287D62; font-weight:700;">온도 +0.5°C & 15회 인증 뱃지 반영</span>
+                  </div>
+                  <div style="font-size:11.5px; color:#6B7684; margin-bottom:10px;">
+                    호평이 15회 누적되면 상대방에게 <b style="color:#191F28;">[검증된 안심 메이트] · [대화가 즐거운 사람] · [약속 칼지킴이]</b> 공식 인증 뱃지가 수여됩니다.
                   </div>
                   <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:10px;">
                     <button class="btn" style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '시간 약속을 잘 지켜요')">시간 약속 준수</button>
                     <button class="btn" style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '친절해요')">친절한 매너</button>
                     <button class="btn" style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '대화가 즐거워요')">즐거운 대화</button>
                   </div>
-                  <div style="text-align:right;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                    <span style="font-size:11px; color:#6B7684;">노쇼 · 비매너 신고 시 상대방의 모든 인증 뱃지가 즉시 회수됩니다.</span>
                     <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; min-height:30px; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:600; cursor:pointer;" onclick="reportNoShow('${partnerId}')">
-                      노쇼 · 비매너 신고
+                      노쇼 · 비매너 신고 (-3.0°C · 뱃지 박탈)
                     </button>
                   </div>
                 </div>
@@ -5268,12 +5383,12 @@
       target.manner_temp = Math.max(0, Math.round(((target.manner_temp || 36.5) - 3.0) * 10) / 10);
       target.updated_at = Date.now();
       saveDB(true);
-      showToast(`신고가 접수되었습니다 (누적 ${target.report_count}/3회, 매너온도 -3.0°C 차감).`);
+      showToast(`신고가 접수되었습니다 (누적 ${target.report_count}/3회 · 매너온도 -3.0°C 차감 및 상대방 인증 뱃지 즉시 회수).`);
       render();
     }
 
     // =========================================================
-    // 9. 내 프로필 탭 (매너온도 · 활동 리워드 · 관심 카테고리 · 프로필 수정)
+    // 9. 내 프로필 탭 (매너온도 · 공식 인증 뱃지 · 활동 리워드 · 프로필 수정)
     // =========================================================
     function renderFavBadgesHtml(user) {
       const favs = (user && user.fav_cats) || [];
@@ -5301,10 +5416,10 @@
             <div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:3px 9px; border-radius:6px;">이달의 리워드</span>
-                <h4 style="margin:0; font-size:15.5px; font-weight:800; color:#191F28;">캠퍼스 매너 챌린지</h4>
+                <h4 style="margin:0; font-size:15.5px; font-weight:800; color:#191F28;">캠퍼스 활동 챌린지</h4>
               </div>
               <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">
-                만남 빈도수와 매너온도가 높은 학우 TOP 3에게 커피 쿠폰과 전용 뱃지를 드립니다.
+                꾸준한 만남과 출석으로 활동 점수를 모은 TOP 3 학우에게 커피 쿠폰을 드립니다.
               </div>
             </div>
             <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:7px 12px; text-align:right;">
@@ -5323,7 +5438,7 @@
               </span>
             </div>
             <div style="font-size:12px; color:#6B7684; margin-top:4px;">
-              보상 · 첫 번개 달성 뱃지 + 매너온도 +1.0°C + 추첨권 1장
+              보상 · 활동 리워드 +15점 + 아메리카노 추첨권 1장
             </div>
           </div>
 
@@ -5334,11 +5449,11 @@
                   주간 챌린지 · 연속 출석 (${st.streakDays}/5일) & 주간 번개 (${st.weeklyMeets}/2회)
                 </div>
                 <div style="font-size:12px; color:#6B7684; margin-top:2px;">
-                  보상 · 주간 챌린저 뱃지 + 3일 출석마다 추첨권 +1장
+                  보상 · 출석 시 활동 +3점 & 3일 출석마다 추첨권 +1장
                 </div>
               </div>
               <button class="btn ${st.checkedInToday ? '' : 'btn-primary'}" style="width:auto; min-height:32px; padding:0 12px; font-size:11.5px; font-weight:700;" onclick="handleDailyCheckin()">
-                ${st.checkedInToday ? '오늘 출석 완료' : '출석체크 (+0.1°C)'}
+                ${st.checkedInToday ? '오늘 출석 완료' : '출석체크 (+3점)'}
               </button>
             </div>
             <div class="quest-progress-bg">
@@ -5353,18 +5468,20 @@
             </div>
             ${leaderboard.map((item, idx) => {
               const isRewardTarget = idx < 3;
+              const itemBadges = renderVerifiedBadgePills(item.uid, 2);
               return `
                 <div class="rank-row ${idx === 0 ? 'top1' : ''}">
                   <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:12.5px; font-weight:800; min-width:28px; color:${idx < 3 ? '#287D62' : '#6B7684'};">${idx + 1}위</span>
                     <span style="font-size:18px;">${item.avatar}</span>
                     <div>
-                      <div style="font-size:13px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px;">
+                      <div style="font-size:13px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         <span>${escHtml(item.nickname)}</span>
+                        ${itemBadges}
                         ${item.uid === state.user_id ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 6px; border-radius:4px;">나</span>` : ""}
                         ${isRewardTarget ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 7px; border-radius:999px;">리워드 대상</span>` : ""}
                       </div>
-                      <div style="font-size:11.5px; color:#6B7684;">만남 ${item.validMeets}회 · ${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일</div>
+                      <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">만남 ${item.validMeets}회 · ${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일</div>
                     </div>
                   </div>
                   <div style="font-size:13px; font-weight:800; color:#287D62;">${item.rewardScore}점</div>
@@ -5378,11 +5495,12 @@
 
     function renderProfileTab(user) {
       const myStats = getUserStatsAndBadges(state.user_id);
+      const myVerifiedPills = renderVerifiedBadgePills(state.user_id, 4);
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">내 프로필</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">나의 캠퍼스 매너온도와 활동 내역을 관리하세요</p>
+            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">실시간 매너온도와 공식 안심 인증 뱃지를 관리하세요</p>
           </div>
           <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 14px; border-radius:10px; font-size:12.5px; font-weight:700; color:#6B7684; border-color:#E5EAE7; background:#FFFFFF;" onclick="clearLogin()">로그아웃</button>
         </div>
@@ -5395,6 +5513,7 @@
             <div>
               <div style="font-size:19px; font-weight:800; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span>${user.nickname}</span>
+                ${myVerifiedPills}
                 ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:#EEF8F3; color:#287D62; font-weight:700; padding:2px 8px; border-radius:6px;">운영진</span>` : ""}
               </div>
               <div style="font-size:13px; color:#6B7684; margin-top:2px;">울산대학교 · ${user.department} · ${user.mbti}</div>
@@ -5402,19 +5521,59 @@
             </div>
           </div>
 
-          <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:10px 14px; margin-bottom:12px;">
-            <div style="font-size:12px; font-weight:700; color:#191F28; margin-bottom:6px;">획득한 활동 뱃지 (${myStats.badges.length})</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-              ${myStats.badges.length === 0
-                ? `<span style="font-size:12px; color:#6B7684;">첫 번개에 참여하거나 출석체크를 하면 활동 뱃지가 부여됩니다.</span>`
-                : myStats.badges.map(b => `<span class="achieve-badge ${b.cls}" title="${escHtml(b.desc)}">${escHtml(String(b.label).replace(/^[^\w가-힣]+/, "").trim() || b.label)}</span>`).join("")}
+          <div style="background:#F7F9F8; border-radius:10px; padding:11px 14px; font-size:13px; color:#191F28; margin-bottom:14px;">
+            "${user.bio || "공강 시간에 함께 소통할 학우들을 환영합니다."}"
+          </div>
+
+          <!-- 1) 매너온도: 실시간 매너 점수표 -->
+          <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:12px; padding:14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
+              <span style="font-size:13px; font-weight:800; color:#191F28;">실시간 매너온도 (과정 · 점수표)</span>
+              <span style="font-size:11.5px; color:#6B7684;">누적 만남 호평 <b style="color:#287D62;">${myStats.totalPraiseCnt}회</b></span>
+            </div>
+            ${renderTempGauge(user.manner_temp, false)}
+            <div style="font-size:11.5px; color:#6B7684; margin-top:6px;">
+              모든 학우가 36.5°C에서 시작하며, 실제 번개 모임 후 상대방의 칭찬(+0.5°C)과 노쇼 신고(-3.0°C)로만 변동됩니다.
             </div>
           </div>
 
-          <div style="background:#F7F9F8; border-radius:10px; padding:11px 14px; font-size:13px; color:#191F28; margin-bottom:12px;">
-            "${user.bio || "공강 시간에 함께 소통할 학우들을 환영합니다."}"
+          <!-- 2) 공식 인증 뱃지: 완전히 인증된 사람에게만 부여되는 보증 타이틀 -->
+          <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 15, '#287D62')}</span>
+                <span style="font-size:13.5px; font-weight:800; color:#191F28;">공식 안심 인증 뱃지 (${myStats.badges.length}/4)</span>
+              </div>
+              <span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">완전 검증 보증서</span>
+            </div>
+            <div style="font-size:12px; color:#6B7684; margin-bottom:12px;">
+              출석·단순 참여로는 획득할 수 없으며, <b>40.0°C 달성</b> 또는 <b>만남 후 좋은 평가 15회 이상</b>을 받은 검증된 학우에게만 수여됩니다.
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
+              ${myStats.badgeCatalog.map(b => `
+                <div style="background:#FFFFFF; border:1px solid ${b.earned ? '#287D62' : '#E5EAE7'}; border-radius:10px; padding:10px 12px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:4px;">
+                    <span class="achieve-badge ${b.earned ? b.cls : ''}" style="${b.earned ? '' : 'background:#F7F9F8; color:#6B7684; border:1px solid #E5EAE7;'}">
+                      ${getSvgIcon('shield', 11, b.earned ? (b.cls === 'achieve-verified' ? '#FFFFFF' : '#287D62') : '#6B7684', 2.3)}
+                      <span>${escHtml(b.label)}</span>
+                    </span>
+                    <span style="font-size:11px; font-weight:800; color:${b.earned ? '#287D62' : '#6B7684'};">
+                      ${b.earned ? '인증 완료' : b.progressText}
+                    </span>
+                  </div>
+                  <div style="font-size:11.5px; color:#6B7684; margin-bottom:6px;">${escHtml(b.condText)}</div>
+                  <div style="height:5px; background:#E5EAE7; border-radius:999px; overflow:hidden;">
+                    <div style="width:${b.progressPct}%; height:100%; background:${b.earned ? '#287D62' : '#6B7684'}; border-radius:999px;"></div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+            <div style="font-size:11px; color:#6B7684; margin-top:10px;">
+              * 노쇼 또는 비매너 신고가 1회라도 접수되면 보유 중인 모든 공식 인증 뱃지가 즉시 회수됩니다.
+            </div>
           </div>
-          ${renderTempGauge(user.manner_temp, true)}
+
           <div id="fav-profile-badges">${renderFavBadgesHtml(user)}</div>
         </div>
 
