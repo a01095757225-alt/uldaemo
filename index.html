@@ -1933,7 +1933,26 @@
 
     function getTodayStr() {
       const d = new Date();
-      return d.toISOString().split("T")[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function isPostExpired(post) {
+      if (!post) return true;
+      if (post.status !== "모집중") return true;
+      if (!post.meet_date) return false;
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "23:59";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 모임 시작 시각 기준 1시간(60분) 경과 시 홈 피드에서 자동 마감/숨김
+        return now.getTime() > (postDate.getTime() + 60 * 60 * 1000);
+      } catch (e) {
+        return false;
+      }
     }
 
     function showToast(msg) {
@@ -2168,6 +2187,74 @@
       }
       if (!Array.isArray(dbObj.plaza_talks)) {
         dbObj.plaza_talks = JSON.parse(JSON.stringify(DEFAULT_PLAZA_TALKS));
+      }
+      return ensureDefaultPosts(dbObj);
+    }
+
+    function ensureDefaultPosts(dbObj) {
+      if (!Array.isArray(dbObj.posts)) dbObj.posts = [];
+      const nonExpired = dbObj.posts.filter(p => p && p.status === "모집중" && !isPostExpired(p));
+      if (nonExpired.length === 0) {
+        const now = new Date();
+        const d1 = new Date(now.getTime() + 25 * 60 * 1000);
+        const t1H = String(d1.getHours()).padStart(2, '0');
+        const t1M = String(d1.getMinutes()).padStart(2, '0');
+        const date1 = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}-${String(d1.getDate()).padStart(2,'0')}`;
+
+        const d2 = new Date(now.getTime() + 110 * 60 * 1000);
+        const t2H = String(d2.getHours()).padStart(2, '0');
+        const t2M = String(d2.getMinutes()).padStart(2, '0');
+        const date2 = `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}-${String(d2.getDate()).padStart(2,'0')}`;
+
+        const d3 = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const date3 = `${d3.getFullYear()}-${String(d3.getMonth()+1).padStart(2,'0')}-${String(d3.getDate()).padStart(2,'0')}`;
+
+        const defPosts = [
+          {
+            id: 101,
+            author_id: "20261275",
+            title: "[공식] 중앙도서관 3층 카공 & 스터디 메이트 ☕",
+            category: "☕ 카공",
+            meet_date: date1,
+            meet_time: `${t1H}:${t1M}`,
+            location: "16호관 아산도서관",
+            max_participants: 4,
+            meeting_style: "조용히 각자 집중하는 분위기 🎧",
+            status: "모집중",
+            is_official: true,
+            created_at: Date.now() - 10 * 60 * 1000
+          },
+          {
+            id: 102,
+            author_id: "20261275",
+            title: "[공식] 학생회관 밥약 메이트 (소규모 번개) 🍚",
+            category: "🍚 밥약",
+            meet_date: date2,
+            meet_time: `${t2H}:${t2M}`,
+            location: "22호관 학생회관",
+            max_participants: 3,
+            meeting_style: "친절하고 편안한 스몰토크 환영 😊",
+            status: "모집중",
+            is_official: true,
+            created_at: Date.now() - 30 * 60 * 1000
+          },
+          {
+            id: 103,
+            author_id: "20261275",
+            title: "[공식] 저녁 아산스포츠센터 가벼운 트랙 러닝 🏃",
+            category: "🏃 운동",
+            meet_date: date3,
+            meet_time: "18:00",
+            location: "39호관 아산스포츠센터",
+            max_participants: 5,
+            meeting_style: "부담 없이 가볍게 땀 흘려요 👟",
+            status: "모집중",
+            is_official: true,
+            created_at: Date.now() - 60 * 60 * 1000
+          }
+        ];
+        const userPosts = dbObj.posts.filter(p => p && ![101, 102, 103].includes(p.id));
+        dbObj.posts = [...defPosts, ...userPosts];
       }
       return dbObj;
     }
@@ -2734,7 +2821,8 @@
       map_cat: "전체",
       search_q: "",
       sort_opt: "마감 임박순",
-      gps_consent: true,
+      gps_consent: false,
+      confirm_dialog: null,
       my_building: "26호관 행정본관",
       my_lat: 35.543723,
       my_lng: 129.257063,
@@ -4499,21 +4587,7 @@
       openDetailModal(postId);
     }
 
-    function isPostExpired(post) {
-      if (!post) return true;
-      if (post.status !== "모집중") return true;
-      if (!post.meet_date) return false;
-      try {
-        const now = new Date();
-        const timeStr = post.meet_time || "23:59";
-        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
-        if (isNaN(postDate.getTime())) return false;
-        // 모임 시작 시각 기준 1시간(60분) 경과 시 홈 피드에서 자동 마감/숨김
-        return now.getTime() > (postDate.getTime() + 60 * 60 * 1000);
-      } catch (e) {
-        return false;
-      }
-    }
+    /* isPostExpired defined globally above */
 
     function getPostTimeChip(post) {
       if (!post || !post.meet_date) return "";
