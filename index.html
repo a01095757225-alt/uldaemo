@@ -1909,7 +1909,7 @@
     // 운영진(관리자) 권한: 학번 20261275 단 1개 계정 + 전용 비밀번호 인증을 통과한 경우에만 부여됩니다.
     // (비밀번호 원문은 코드에 저장하지 않고 SHA-256 해시만 보관합니다.)
     const ADMIN_STUDENT_IDS = ["20261275"];
-    const ADMIN_PW_HASH = "5c65b8dd1f680328747169adb8037b14dd9b88fea82a48bba5033dd209d93cb6";
+    const ADMIN_PW_HASH = "799bd88683489d6a99dee51db6c04b3ca41c9a730fe7c34f44283157bd2aaded";
     const ADMIN_AUTH_KEY = "uldaemo_admin_auth";
     async function hashAdminPw(pw) {
       const buf = new TextEncoder().encode("uldaemo-admin::" + pw);
