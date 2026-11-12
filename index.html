@@ -5028,112 +5028,105 @@
       const items = mode === "reward" ? REWARD_WHEEL_ITEMS : MENU_WHEEL_ITEMS;
 
       return `
-        <div class="uldaemo-card" style="margin-bottom:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        <div class="uldaemo-card" style="margin-bottom:20px; border:1px solid #E5EAE7; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62;">
                 ${getSvgIcon('check', 15, '#287D62')}
               </span>
-              <span style="font-size:15px; font-weight:800; color:#191F28;">출석 · 룰렛</span>
+              <span style="font-size:16px; font-weight:800; color:#191F28;">7일 연속 출석 스탬프</span>
             </div>
-            <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:12px; font-weight:600; padding:5px 11px; border-radius:8px; cursor:pointer;" onclick="state.roulette_collapsed=!state.roulette_collapsed; render();">
-              ${state.roulette_collapsed ? "펼치기" : "접기"}
-            </button>
+            <span style="font-size:13px; font-weight:700; color:#287D62;">
+              연속 <b style="color:#191F28;">${st.streakDays}일째</b> 달성 중 🔥
+            </span>
           </div>
 
-          ${state.roulette_collapsed ? `
-            <div style="font-size:12.5px; color:#6B7684; display:flex; justify-content:space-between; align-items:center; padding-top:4px;">
-              <span>연속 <b style="color:#287D62;">${st.streakDays}일</b> 출석 중 · 보유 티켓 <b style="color:#191F28;">${st.coffeeTickets}장</b></span>
-              <span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="state.roulette_collapsed=false; render();">룰렛 열기 →</span>
-            </div>
-          ` : `
-            <div style="font-size:13px; color:#8B95A1; margin-bottom:10px;">연속 <b style="color:#191F28;">${st.streakDays}일째</b></div>
-            <div class="stamp-grid">
-              ${[1, 2, 3, 4, 5, 6, 7].map(d => {
-                const isStamped = d <= stampedCnt;
-                const isNext = (!st.checkedInToday && d === stampedCnt + 1);
-                const bonusTxt = (d === 3 || d === 6) ? "티켓+1" : (d === 7 ? "티켓+2" : "+3점");
-                return `
-                  <div class="stamp-day ${isStamped ? 'stamped' : ''} ${isNext ? 'today-target' : ''}" onclick="handleDailyCheckin()" style="cursor:pointer;">
-                    <div style="font-size:10.5px;">${d}일차</div>
-                    <div style="height:20px; display:flex; align-items:center; justify-content:center; margin:3px 0; color:${isStamped ? '#287D62' : '#6B7684'};">
-                      ${isStamped ? getSvgIcon('check', 15, '#287D62', 2.5) : `<span style="width:6px; height:6px; border-radius:50%; background:${isNext ? '#287D62' : '#E5EAE7'}; display:inline-block;"></span>`}
-                    </div>
-                    <div style="font-size:10px; color:${isStamped ? '#287D62' : '#6B7684'};">${isStamped ? "완료" : bonusTxt}</div>
+          <div class="stamp-grid">
+            ${[1, 2, 3, 4, 5, 6, 7].map(d => {
+              const isStamped = d <= stampedCnt;
+              const isNext = (!st.checkedInToday && d === stampedCnt + 1);
+              const bonusTxt = (d === 3 || d === 6) ? "티켓+1" : (d === 7 ? "티켓+2" : "+3점");
+              return `
+                <div class="stamp-day ${isStamped ? 'stamped' : ''} ${isNext ? 'today-target' : ''}" onclick="handleDailyCheckin()" style="cursor:pointer;">
+                  <div style="font-size:10.5px;">${d}일차</div>
+                  <div style="height:20px; display:flex; align-items:center; justify-content:center; margin:3px 0; color:${isStamped ? '#287D62' : '#6B7684'};">
+                    ${isStamped ? getSvgIcon('check', 15, '#287D62', 2.5) : `<span style="width:6px; height:6px; border-radius:50%; background:${isNext ? '#287D62' : '#E5EAE7'}; display:inline-block;"></span>`}
                   </div>
-                `;
-              }).join("")}
-            </div>
-            <button class="btn ${st.checkedInToday ? '' : 'btn-primary'}" style="min-height:40px; font-size:13px; margin-bottom:14px;" onclick="handleDailyCheckin()">
-              ${st.checkedInToday ? "오늘 출석체크 완료" : "오늘 출석체크 (활동 +3점)"}
-            </button>
-
-            <div style="border-top:1px solid #F2F4F3; padding-top:14px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
-                <div style="display:flex; gap:6px;">
-                  <button class="btn" style="width:auto; min-height:34px; padding:0 12px; font-size:12px; font-weight:700; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; render();">
-                    리워드 룰렛 (티켓 ${st.coffeeTickets}장)
-                  </button>
-                  <button class="btn" style="width:auto; min-height:34px; padding:0 12px; font-size:12px; font-weight:700; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; render();">
-                    오늘의 공강 메뉴 추천
-                  </button>
+                  <div style="font-size:10px; color:${isStamped ? '#287D62' : '#6B7684'};">${isStamped ? "완료" : bonusTxt}</div>
                 </div>
-              </div>
+              `;
+            }).join("")}
+          </div>
+          <button class="btn ${st.checkedInToday ? '' : 'btn-primary'}" style="min-height:42px; font-size:13.5px; margin-bottom:18px;" onclick="handleDailyCheckin()">
+            ${st.checkedInToday ? "오늘 출석체크 완료 (내일 또 만나요!)" : "오늘 출석체크하고 리워드 티켓 받기 (+3점)"}
+          </button>
 
-              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); align-items:center; gap:14px; background:#F7F9F8; border:1px solid #E5EAE7; border-radius:16px; padding:14px;">
-                <div class="roulette-stage">
-                  <div class="roulette-pin">▼</div>
-                  <div id="uldaemo-roulette-wheel" class="roulette-wheel" style="transform:rotate(${_currentWheelDeg}deg);">
-                    ${items.map((it, idx) => {
-                      const angle = idx * 60 + 30 - 90;
-                      const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
-                      return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(26px, -6px);">${cleanLabel}</div>`;
-                    }).join("")}
-                  </div>
-                  <button class="roulette-center-btn" onclick="spinRouletteWheel()">
-                    <span>SPIN</span>
-                  </button>
-                </div>
-
-                <div>
-                  <div style="font-size:13.5px; font-weight:800; color:#191F28; margin-bottom:8px;">
-                    ${mode === 'reward' ? '캠퍼스 리워드 룰렛' : '오늘의 공강 메뉴 룰렛'}
-                  </div>
-                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:10px;">
-                    ${items.map((it, i) => {
-                      const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
-                      return `
-                        <div style="font-size:11.5px; font-weight:600; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:8px; padding:6px 9px; color:#191F28;">
-                          ${i + 1}. ${cleanLabel}
-                        </div>
-                      `;
-                    }).join("")}
-                  </div>
-                  ${state.last_roulette_result ? `
-                    <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:10px; padding:9px 12px; margin-bottom:10px; font-size:12px; font-weight:700; color:#287D62;">
-                      ${escHtml(String(state.last_roulette_result).replace(/^[^\w가-힣\[]+/, "").trim())}
-                      ${mode === 'menu' && state.last_roulette_menu ? `
-                        <div style="margin-top:6px;">
-                          <button class="btn btn-primary" style="min-height:32px; padding:4px 10px; font-size:11.5px;" onclick="openMeetupFromRouletteMenu()">
-                            이 메뉴로 밥약 번개 만들기 →
-                          </button>
-                        </div>
-                      ` : ""}
-                    </div>
-                  ` : ""}
-                  <button class="btn btn-primary" style="min-height:40px; font-size:13px;" onclick="spinRouletteWheel()">
-                    ${mode === 'reward' ? `룰렛 돌리기 (보유 티켓 ${st.coffeeTickets}장)` : `메뉴 추천 돌리기`}
-                  </button>
-                </div>
+          <div style="border-top:1px solid #F2F4F3; padding-top:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; gap:6px;">
+                <button class="btn" style="width:auto; min-height:36px; padding:0 14px; font-size:12.5px; font-weight:700; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; render();">
+                  🎁 리워드 룰렛 (티켓 ${st.coffeeTickets}장)
+                </button>
+                <button class="btn" style="width:auto; min-height:36px; padding:0 14px; font-size:12.5px; font-weight:700; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; render();">
+                  🍱 오늘의 공강 메뉴 추천
+                </button>
               </div>
             </div>
-          `}
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items:center; gap:16px; background:#F7F9F8; border:1px solid #E5EAE7; border-radius:18px; padding:16px;">
+              <div class="roulette-stage">
+                <div class="roulette-pin">▼</div>
+                <div id="uldaemo-roulette-wheel" class="roulette-wheel" style="transform:rotate(${_currentWheelDeg}deg);">
+                  ${items.map((it, idx) => {
+                    const angle = idx * 60 + 30 - 90;
+                    const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
+                    return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(26px, -6px);">${cleanLabel}</div>`;
+                  }).join("")}
+                </div>
+                <button class="roulette-center-btn" onclick="spinRouletteWheel()">
+                  <span>SPIN</span>
+                </button>
+              </div>
+
+              <div>
+                <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">
+                  ${mode === 'reward' ? '🎉 캠퍼스 리워드 룰렛' : '🍴 오늘의 공강 메뉴 룰렛'}
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:12px;">
+                  ${items.map((it, i) => {
+                    const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
+                    return `
+                      <div style="font-size:12px; font-weight:600; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:8px; padding:6px 9px; color:#191F28;">
+                        ${i + 1}. ${cleanLabel}
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+                ${state.last_roulette_result ? `
+                  <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:12.5px; font-weight:700; color:#287D62;">
+                    ${escHtml(String(state.last_roulette_result).replace(/^[^\w가-힣\[]+/, "").trim())}
+                    ${mode === 'menu' && state.last_roulette_menu ? `
+                      <div style="margin-top:8px;">
+                        <button class="btn btn-primary" style="min-height:34px; padding:4px 12px; font-size:12px;" onclick="openMeetupFromRouletteMenu()">
+                          이 메뉴로 밥약 번개 만들기 →
+                        </button>
+                      </div>
+                    ` : ""}
+                  </div>
+                ` : ""}
+                <button class="btn btn-primary" style="min-height:44px; font-size:14px;" onclick="spinRouletteWheel()">
+                  ${mode === 'reward' ? `룰렛 돌리기 (보유 티켓 ${st.coffeeTickets}장)` : `메뉴 추천 돌리기`}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
     }
 
     function renderPlazaTab() {
       ensurePlazaDefaults(DB);
+      state.plaza_view = state.plaza_view || "balance";
       const st = getUserStatsAndBadges(state.user_id);
       const allPolls = DB.polls || [];
       const curPollCat = state.plaza_poll_cat || "전체";
@@ -5147,118 +5140,125 @@
 
       return `
         <div class="tk-plaza-wrap">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h1 class="tk-page-title" style="margin:0;">광장</h1>
-            <div style="display:flex; gap:8px;">
-              <button type="button" class="cat-btn" style="height:36px; font-size:13px;" onclick="state.show_roulette_drawer=!state.show_roulette_drawer; render();">
-                🎯 룰렛 · 메뉴추천
-              </button>
-              <button type="button" class="cat-btn active" style="height:36px; font-size:13px;" onclick="state.show_poll_form=!state.show_poll_form; render();">
+            ${state.plaza_view === 'balance' ? `
+              <button type="button" class="cat-btn ${state.show_poll_form ? 'active' : ''}" style="height:36px; font-size:13px;" onclick="state.show_poll_form=!state.show_poll_form; render();">
                 ${state.show_poll_form ? "닫기" : "+ 투표 만들기"}
               </button>
-            </div>
+            ` : ""}
           </div>
 
-          <!-- 모바일 1줄 출석체크 (토스 혜택 탭 스타일) -->
-          <div class="only-mobile" style="margin-bottom:8px;">
-            <button type="button" class="press-row" style="width:100%; display:flex; align-items:center; gap:12px; padding:12px 0; background:none; border:none; cursor:pointer; text-align:left;" onclick="handleDailyCheckin()">
-              <span style="width:40px; height:40px; border-radius:50%; background:${st.checkedInToday ? '#287D62' : '#F2F4F3'}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${st.checkedInToday ? '#FFFFFF' : '#B0B8C1'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-              </span>
-              <span style="flex:1;">
-                <span style="display:block; font-size:16px; font-weight:700; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</span>
-                <span style="display:block; font-size:13px; color:#8B95A1;">연속 ${st.streakDays}일째</span>
-              </span>
-              <span style="color:#B0B8C1; font-size:18px;">›</span>
+          <!-- 세그먼트 서브 탭: 밸런스 게임 vs 룰렛 · 메뉴추천 -->
+          <div style="display:inline-flex; width:100%; max-width:340px; background:#F2F4F3; padding:4px; border-radius:12px; gap:4px; margin-bottom:20px;">
+            <button type="button" onclick="state.plaza_view='balance'; render();" style="flex:1; border:none; padding:9px 12px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; transition:all 0.18s cubic-bezier(0.16, 1, 0.3, 1); ${state.plaza_view==='balance' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 1px 4px rgba(0,0,0,0.08);' : 'background:transparent; color:#8B95A1;'}">
+              ⚖️ 밸런스 게임
             </button>
-            <div class="tk-gap8"></div>
-          </div>
-
-          ${state.show_roulette_drawer ? renderStampAndRouletteCard() : ""}
-
-          ${state.show_poll_form ? `
-            <div style="background:#F7F9F8; border-radius:18px; padding:18px; margin-bottom:20px;">
-              <div style="font-size:15px; font-weight:800; margin-bottom:10px; color:#191F28;">새로운 밸런스 투표 만들기</div>
-              <select id="plaza_poll_tag" class="select">
-                <option value="음식">음식</option>
-                <option value="대학 공감">대학 공감</option>
-                <option value="연애">연애</option>
-                <option value="인생·만약에">인생·만약에</option>
-              </select>
-              <input id="plaza_poll_q" class="input" placeholder="질문 입력 (예: 점심 학식 vs 배달)" />
-              <div class="row-2">
-                <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 🍚 학식)" />
-                <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 🛵 배달)" />
-              </div>
-              <button class="btn btn-primary" onclick="createNewBalancePoll()">등록하기</button>
-            </div>
-          ` : ""}
-
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:13px; font-weight:700; color:#287D62;">오늘의 밸런스</span>
-            <button type="button" style="font-size:12px; font-weight:600; color:#8B95A1; background:none; border:none; cursor:pointer;" onclick="drawRandomViralPoll()">다른 질문 불러오기 ›</button>
-          </div>
-
-          ${visiblePolls.map(p => {
-            const va = (p.votes_a || []).length;
-            const vb = (p.votes_b || []).length;
-            const total = va + vb;
-            const myPick = (p.votes_a || []).includes(state.user_id) ? "A" : ((p.votes_b || []).includes(state.user_id) ? "B" : null);
-            const pctA = total === 0 ? 50 : Math.round((va / total) * 100);
-            const pctB = total === 0 ? 50 : (100 - pctA);
-            const cleanQ = String(p.question || "").replace(/^⚖️\s*/, "").trim();
-
-            return `
-              <div style="margin-bottom:26px;">
-                <div style="font-size:20px; font-weight:800; color:#191F28; margin:4px 0 14px; line-height:1.35; letter-spacing:-0.02em;">${escHtml(cleanQ)}</div>
-                ${[['A', p.opt_a, pctA], ['B', p.opt_b, pctB]].map(([k, label, pct]) => {
-                  const picked = (myPick === k);
-                  const fillW = myPick ? pct : 0;
-                  return `
-                    <button type="button" class="tk-balance-opt ${picked ? 'is-picked' : ''}" onclick="voteBalancePoll(${p.id}, '${k}')">
-                      <div class="tk-balance-fill ${picked ? 'is-picked' : ''}" style="width:${fillW}%;"></div>
-                      <div class="tk-balance-label">
-                        <span>${escHtml(label)}</span>
-                        ${myPick ? `<span>${pct}%</span>` : `<span style="font-size:13px; color:#8B95A1; font-weight:600;">선택</span>`}
-                      </div>
-                    </button>
-                  `;
-                }).join("")}
-              </div>
-            `;
-          }).join("")}
-
-          ${polls.length > 2 ? `
-            <button type="button" style="width:100%; height:42px; border:none; border-radius:12px; background:#F2F4F3; color:#4E5968; font-size:13.5px; font-weight:600; cursor:pointer; margin-bottom:12px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
-              ${showAll ? '투표 접기' : `밸런스 투표 ${hiddenCount}개 더보기`}
+            <button type="button" onclick="state.plaza_view='roulette'; render();" style="flex:1; border:none; padding:9px 12px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; transition:all 0.18s cubic-bezier(0.16, 1, 0.3, 1); ${state.plaza_view==='roulette' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 1px 4px rgba(0,0,0,0.08);' : 'background:transparent; color:#8B95A1;'}">
+              🎯 룰렛 · 메뉴추천
             </button>
-          ` : ""}
-
-          <div style="height:1px; background:#F2F4F3; margin:28px 0 24px;"></div>
-
-          <div style="font-size:17px; font-weight:700; color:#191F28; margin-bottom:12px;">한줄 이야기</div>
-
-          <div style="display:flex; gap:8px; margin-bottom:16px;">
-            <select id="plaza_talk_cat" style="display:none;"><option value="수다/질문" selected>수다/질문</option></select>
-            <input id="plaza_talk_in" type="text" style="flex:1; height:44px; border-radius:12px; border:none; background:#F2F4F3; padding:0 14px; font-size:14px; color:#191F28;" placeholder="캠퍼스 한줄 이야기를 남겨보세요" onkeydown="if(event.key==='Enter') submitPlazaTalk()" />
-            <button type="button" class="btn btn-primary" style="width:auto; min-height:44px; height:44px; padding:0 18px; border-radius:12px; font-size:14px;" onclick="submitPlazaTalk()">등록</button>
           </div>
 
-          <div>
-            ${talks.map(t => {
-              const u = DB.users[t.author_id] || { nickname: "학우", avatar: "🐰" };
-              const likes = t.likes || [];
-              const liked = likes.includes(state.user_id);
+          ${state.plaza_view === 'roulette' ? renderStampAndRouletteCard() : `
+            <!-- 모바일 1줄 출석체크 (토스 혜택 탭 스타일) -->
+            <div class="only-mobile" style="margin-bottom:8px;">
+              <button type="button" class="press-row" style="width:100%; display:flex; align-items:center; gap:12px; padding:12px 0; background:none; border:none; cursor:pointer; text-align:left;" onclick="handleDailyCheckin()">
+                <span style="width:40px; height:40px; border-radius:50%; background:${st.checkedInToday ? '#287D62' : '#F2F4F3'}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${st.checkedInToday ? '#FFFFFF' : '#B0B8C1'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+                </span>
+                <span style="flex:1;">
+                  <span style="display:block; font-size:16px; font-weight:700; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</span>
+                  <span style="display:block; font-size:13px; color:#8B95A1;">연속 ${st.streakDays}일째</span>
+                </span>
+                <span style="color:#B0B8C1; font-size:18px;">›</span>
+              </button>
+              <div class="tk-gap8"></div>
+            </div>
+
+            ${state.show_poll_form ? `
+              <div style="background:#F7F9F8; border-radius:18px; padding:18px; margin-bottom:20px;">
+                <div style="font-size:15px; font-weight:800; margin-bottom:10px; color:#191F28;">새로운 밸런스 투표 만들기</div>
+                <select id="plaza_poll_tag" class="select">
+                  <option value="음식">음식</option>
+                  <option value="대학 공감">대학 공감</option>
+                  <option value="연애">연애</option>
+                  <option value="인생·만약에">인생·만약에</option>
+                </select>
+                <input id="plaza_poll_q" class="input" placeholder="질문 입력 (예: 점심 학식 vs 배달)" />
+                <div class="row-2">
+                  <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 🍚 학식)" />
+                  <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 🛵 배달)" />
+                </div>
+                <button class="btn btn-primary" onclick="createNewBalancePoll()">등록하기</button>
+              </div>
+            ` : ""}
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span style="font-size:13px; font-weight:700; color:#287D62;">오늘의 밸런스</span>
+              <button type="button" style="font-size:12px; font-weight:600; color:#8B95A1; background:none; border:none; cursor:pointer;" onclick="drawRandomViralPoll()">다른 질문 불러오기 ›</button>
+            </div>
+
+            ${visiblePolls.map(p => {
+              const va = (p.votes_a || []).length;
+              const vb = (p.votes_b || []).length;
+              const total = va + vb;
+              const myPick = (p.votes_a || []).includes(state.user_id) ? "A" : ((p.votes_b || []).includes(state.user_id) ? "B" : null);
+              const pctA = total === 0 ? 50 : Math.round((va / total) * 100);
+              const pctB = total === 0 ? 50 : (100 - pctA);
+              const cleanQ = String(p.question || "").replace(/^⚖️\s*/, "").trim();
+
               return `
-                <div style="padding:12px 0; display:flex; align-items:center; gap:12px; border-bottom:1px solid #F7F9F8;">
-                  <span style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">${u.avatar.split(" ")[0]}</span>
-                  <span style="font-size:15px; color:#191F28; flex:1; min-width:0; line-height:1.4;">${escHtml(t.text)}</span>
-                  <button type="button" style="border:none; background:${liked ? '#EEF8F3' : '#F2F4F3'}; color:${liked ? '#287D62' : '#6B7684'}; font-size:12px; font-weight:600; padding:4px 9px; border-radius:999px; cursor:pointer; flex-shrink:0;" onclick="toggleTalkLike(${t.id})">❤️ ${likes.length}</button>
-                  <span style="font-size:12px; color:#B0B8C1; flex-shrink:0;">${escHtml(t.created_at || "방금 전")}</span>
+                <div style="margin-bottom:26px;">
+                  <div style="font-size:20px; font-weight:800; color:#191F28; margin:4px 0 14px; line-height:1.35; letter-spacing:-0.02em;">${escHtml(cleanQ)}</div>
+                  ${[['A', p.opt_a, pctA], ['B', p.opt_b, pctB]].map(([k, label, pct]) => {
+                    const picked = (myPick === k);
+                    const fillW = myPick ? pct : 0;
+                    return `
+                      <button type="button" class="tk-balance-opt ${picked ? 'is-picked' : ''}" onclick="voteBalancePoll(${p.id}, '${k}')">
+                        <div class="tk-balance-fill ${picked ? 'is-picked' : ''}" style="width:${fillW}%;"></div>
+                        <div class="tk-balance-label">
+                          <span>${escHtml(label)}</span>
+                          ${myPick ? `<span>${pct}%</span>` : `<span style="font-size:13px; color:#8B95A1; font-weight:600;">선택</span>`}
+                        </div>
+                      </button>
+                    `;
+                  }).join("")}
                 </div>
               `;
             }).join("")}
-          </div>
+
+            ${polls.length > 2 ? `
+              <button type="button" style="width:100%; height:42px; border:none; border-radius:12px; background:#F2F4F3; color:#4E5968; font-size:13.5px; font-weight:600; cursor:pointer; margin-bottom:12px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
+                ${showAll ? '투표 접기' : `밸런스 투표 ${hiddenCount}개 더보기`}
+              </button>
+            ` : ""}
+
+            <div style="height:1px; background:#F2F4F3; margin:28px 0 24px;"></div>
+
+            <div style="font-size:17px; font-weight:700; color:#191F28; margin-bottom:12px;">한줄 이야기</div>
+
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+              <select id="plaza_talk_cat" style="display:none;"><option value="수다/질문" selected>수다/질문</option></select>
+              <input id="plaza_talk_in" type="text" style="flex:1; height:44px; border-radius:12px; border:none; background:#F2F4F3; padding:0 14px; font-size:14px; color:#191F28;" placeholder="캠퍼스 한줄 이야기를 남겨보세요" onkeydown="if(event.key==='Enter') submitPlazaTalk()" />
+              <button type="button" class="btn btn-primary" style="width:auto; min-height:44px; height:44px; padding:0 18px; border-radius:12px; font-size:14px;" onclick="submitPlazaTalk()">등록</button>
+            </div>
+
+            <div>
+              ${talks.map(t => {
+                const u = DB.users[t.author_id] || { nickname: "학우", avatar: "🐰" };
+                const likes = t.likes || [];
+                const liked = likes.includes(state.user_id);
+                return `
+                  <div style="padding:12px 0; display:flex; align-items:center; gap:12px; border-bottom:1px solid #F7F9F8;">
+                    <span style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">${u.avatar.split(" ")[0]}</span>
+                    <span style="font-size:15px; color:#191F28; flex:1; min-width:0; line-height:1.4;">${escHtml(t.text)}</span>
+                    <button type="button" style="border:none; background:${liked ? '#EEF8F3' : '#F2F4F3'}; color:${liked ? '#287D62' : '#6B7684'}; font-size:12px; font-weight:600; padding:4px 9px; border-radius:999px; cursor:pointer; flex-shrink:0;" onclick="toggleTalkLike(${t.id})">❤️ ${likes.length}</button>
+                    <span style="font-size:12px; color:#B0B8C1; flex-shrink:0;">${escHtml(t.created_at || "방금 전")}</span>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `}
         </div>
       `;
     }
