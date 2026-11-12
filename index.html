@@ -2756,6 +2756,48 @@
       render();
     }
 
+
+    // =========================================================
+    // 토스/당근 감성 앱 스타일 안심 확인 시트/모달 시스템
+    // =========================================================
+    function openConfirmDialog(opts) {
+      state.confirm_dialog = opts || null;
+      render();
+    }
+
+    function closeConfirmDialog() {
+      state.confirm_dialog = null;
+      render();
+    }
+
+    function handleConfirmDialogAction() {
+      if (state.confirm_dialog && typeof state.confirm_dialog.onConfirm === "function") {
+        const fn = state.confirm_dialog.onConfirm;
+        state.confirm_dialog = null;
+        fn();
+      } else {
+        state.confirm_dialog = null;
+        render();
+      }
+    }
+
+    function renderConfirmDialogHtml() {
+      if (!state.confirm_dialog) return "";
+      const d = state.confirm_dialog;
+      return `
+        <div class="modal-backdrop" style="z-index:99999; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); animation:fadeIn 0.18s ease-out;" onclick="if(event.target===this) closeConfirmDialog();">
+          <div style="background:#FFFFFF; width:100%; max-width:440px; border-radius:24px 24px 0 0; padding:24px 20px 28px; box-shadow:0 -4px 24px rgba(0,0,0,0.18); animation:slideUp 0.22s cubic-bezier(0.16,1,0.3,1); max-height:85vh; overflow-y:auto;">
+            <div style="font-size:18px; font-weight:800; color:#191F28; margin-bottom:8px; line-height:1.35;">${escHtml(d.title || "확인")}</div>
+            <div style="font-size:14.5px; color:#4E5968; line-height:1.55; margin-bottom:22px; word-break:keep-all;">${escHtml(d.desc || "")}</div>
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="btn" style="flex:1; height:46px; border-radius:12px; font-size:14.5px; font-weight:700; background:#F2F4F3; color:#4E5968; border:none; cursor:pointer;" onclick="closeConfirmDialog()">${escHtml(d.cancelText || "돌아가기")}</button>
+              <button type="button" class="btn ${d.isDanger ? 'btn-danger' : 'btn-primary'}" style="flex:1; height:46px; border-radius:12px; font-size:14.5px; font-weight:700; cursor:pointer; ${d.isDanger ? 'background:#E53E3E; color:#FFFFFF;' : ''}" onclick="handleConfirmDialogAction()">${escHtml(d.confirmText || "확인")}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function executeLogoutNow() {
       state.user_id = "";
       state.verified_email = null;
