@@ -701,6 +701,7 @@
       font-size: 13.5px;
       line-height: 1.45;
       word-break: break-word;
+      white-space: pre-wrap;
       margin: 0;
       cursor: pointer;
       box-shadow: 0 1px 2px rgba(40,125,98,0.14);
@@ -717,6 +718,7 @@
       font-size: 13.5px;
       line-height: 1.45;
       word-break: break-word;
+      white-space: pre-wrap;
       margin: 0;
       cursor: pointer;
       box-shadow: 0 1px 2px rgba(0,0,0,0.03);
@@ -1589,14 +1591,20 @@
     .tk-chat-input {
       flex: 1;
       height: 44px;
-      border-radius: 999px;
+      min-height: 44px;
+      max-height: 120px;
+      border-radius: 22px;
       border: none;
       background: #F2F4F3;
-      padding: 0 16px;
+      padding: 11px 18px;
       font-size: 14px;
       color: #191F28;
       outline: none;
       font-family: inherit;
+      resize: none;
+      box-sizing: border-box;
+      line-height: 22px;
+      overflow-y: auto;
     }
     .tk-chat-input::placeholder { color: #B0B8C1; }
     .tk-chat-send-btn {
@@ -1854,7 +1862,7 @@
       .tk-room-sub { display: block; }
       .tk-chat-messages { padding: 24px 32px !important; }
       .tk-room-footer { padding: 12px 24px 20px; }
-      .tk-chat-input { border-radius: 12px; height: 48px; }
+      .tk-chat-input { border-radius: 12px; min-height: 44px; height: 44px; max-height: 120px; resize: none; }
       .tk-chat-send-btn {
         width: auto;
         height: 48px;
@@ -3953,7 +3961,7 @@
         const ae = document.activeElement;
         const activeId = (ae && ae.id) ? ae.id : null;
         const savedInputs = {};
-        document.querySelectorAll('input[id^="chat_in_"]').forEach(el => {
+        document.querySelectorAll('[id^="chat_in_"]').forEach(el => {
           savedInputs[el.id] = { val: el.value, start: el.selectionStart, end: el.selectionEnd };
         });
 
@@ -5803,12 +5811,15 @@
           if (inp) inp.focus();
         }
       }, 30);
+      pullFromCloud(true);
+      scheduleNextCloudPull(1000);
     }
 
     function backToChatList() {
       state.chat_list_mode = true;
       state.active_chat_post_id = null;
       render();
+      scheduleNextCloudPull(4000);
     }
 
     function leaveChatRoom(postId) {
@@ -5997,6 +6008,7 @@
               <div style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</div>
               <div class="tk-room-sub">${escHtml(post.title)} · ${escHtml(post.location)}</div>
             </div>
+            <button type="button" class="tk-room-top-btn" style="color:#287D62; border-color:#C5E6D6; background:#EEF8F3; font-weight:700;" onclick="triggerAiIcebreaker(${post.id})" title="AI 대화 주제 추천">✨ AI 추천</button>
             <button type="button" class="tk-room-top-btn" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">평가·신고</button>
             <button type="button" class="tk-room-top-btn only-pc" onclick="backToChatList()">닫기</button>
             <button type="button" class="tk-room-top-btn" style="color:#E53E3E; border-color:#FFD2D2; background:#FFF5F5;" onclick="leaveChatRoom(${post.id})">나가기</button>
@@ -6043,13 +6055,17 @@
           <!-- 하단 퀵 칩 + 메시지 입력 바 -->
           <div class="tk-room-footer">
             <div class="chat-quick-bar" style="margin-bottom:8px;">
+              <button type="button" class="cat-btn" style="height:34px; font-size:12.5px; padding:0 12px; font-weight:700; background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; display:inline-flex; align-items:center; gap:5px; flex-shrink:0;" onmousedown="event.preventDefault()" onclick="triggerAiIcebreaker(${post.id})">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                AI 대화 추천
+              </button>
               ${QUICK_CHAT_PHRASES.map(phrase => `
                 <button type="button" class="cat-btn" style="height:34px; font-size:13px; padding:0 13px;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
               `).join("")}
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <input id="chat_in_${post.id}" type="text" class="tk-chat-input" autocomplete="off" placeholder="메시지 보내기" onkeydown="handleChatInputKeydown(event, ${post.id})" />
-              <button type="button" class="tk-chat-send-btn press-flat" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendChatMessage(${post.id})">
+            <div style="display:flex; gap:8px; align-items:flex-end;">
+              <textarea id="chat_in_${post.id}" class="tk-chat-input" rows="1" autocomplete="off" placeholder="메시지 보내기 (Shift+Enter 줄바꿈)" onkeydown="handleChatInputKeydown(event, ${post.id})" oninput="autoResizeChatInput(this)"></textarea>
+              <button type="button" class="tk-chat-send-btn press-flat" style="margin-bottom:0;" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendChatMessage(${post.id})">
                 <span class="only-pc" style="font-size:14px; font-weight:700; color:#FFFFFF;">전송</span>
                 <svg class="only-mobile" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               </button>
@@ -6148,11 +6164,19 @@
 
       if (msgs.length === 0) {
         return `
-          <div style="text-align:center; color:#6B7684; font-size:13px; padding:44px 12px;">
-            <div style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:4px 12px; font-size:11.5px; color:#6B7684; margin-bottom:10px;">
+          <div style="text-align:center; color:#6B7684; font-size:13px; padding:32px 12px;">
+            <div style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:4px 12px; font-size:11.5px; color:#6B7684; margin-bottom:12px;">
               안심 대화방이 개설되었습니다
             </div>
-            <div><b style="color:#191F28;">${escHtml(otherNames || partner.nickname)}</b>님과 아래 빠른 문구 칩으로 첫 인사를 나눠보세요.</div>
+            <div style="font-size:14.5px; font-weight:700; color:#191F28; margin-bottom:6px;">
+              <span style="color:#287D62;">${escHtml(otherNames || partner.nickname)}</span>님과의 첫 대화예요
+            </div>
+            <div style="font-size:12.5px; color:#8B95A1; margin-bottom:14px;">
+              어떤 말로 시작할지 고민된다면 AI 추천을 받아보세요!
+            </div>
+            <button type="button" class="btn btn-primary" style="min-height:36px; padding:0 16px; font-size:12.5px; font-weight:700; border-radius:999px; display:inline-flex; align-items:center; gap:6px; margin:0 auto; box-shadow:0 3px 10px rgba(40,125,98,0.2);" onclick="triggerAiIcebreaker(${post.id})">
+              ✨ AI 대화 주제 추천받기
+            </button>
           </div>
         `;
       }
@@ -6260,10 +6284,30 @@
       return true;
     }
 
+    function autoResizeChatInput(el) {
+      if (!el) return;
+      el.style.height = "auto";
+      const newHeight = Math.min(Math.max(44, el.scrollHeight), 120);
+      el.style.height = newHeight + "px";
+      if (newHeight >= 56) {
+        el.style.borderRadius = "16px";
+      } else {
+        el.style.borderRadius = isPC() ? "12px" : "22px";
+      }
+    }
+
     function handleChatInputKeydown(ev, postId) {
       if (ev.key === "Enter" && !ev.isComposing && ev.keyCode !== 229) {
-        ev.preventDefault();
-        sendChatMessage(postId);
+        if (!ev.shiftKey) {
+          ev.preventDefault();
+          sendChatMessage(postId);
+        } else {
+          // Shift + Enter: 줄바꿈 허용 및 높이 자동 조절
+          setTimeout(() => {
+            const input = document.getElementById(`chat_in_${postId}`);
+            if (input) autoResizeChatInput(input);
+          }, 0);
+        }
       }
     }
 
@@ -6295,7 +6339,10 @@
         return showToast("사적인 외부 연락처(카톡/전화번호/이메일) 공유가 감지되어 차단되었습니다.");
       }
 
+      // 입력창 즉시 초기화 및 높이 리셋
       input.value = "";
+      input.style.height = "44px";
+      input.style.borderRadius = isPC() ? "12px" : "22px";
       input.focus();
 
       const now = new Date();
@@ -6310,27 +6357,30 @@
         is_read: 0
       });
 
+      // 내 화면에 0ms 즉시 렌더링 (낙관적 UI 업데이트)
       if (!updateChatBoxDOM(postId, true)) {
         render();
         const restored = document.getElementById(`chat_in_${postId}`);
         if (restored) restored.focus();
       }
+      // 클라우드 즉시 업로드 (상대방에게 전달)
       saveDB(true);
+      // 상대방 답장 및 읽음 반영을 위해 800ms 뒤 즉시 폴링
+      scheduleNextCloudPull(800);
 
-      try {
-        const res = await fetch("/api/index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "ai_police", text: txt })
-        });
-        const data = await res.json();
+      // AI 폴리스(유해 표현/외부 연락처 검사)는 메시지 전송을 차단/지연시키지 않고 백그라운드 비동기 실행
+      fetch("/api/index", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ai_police", text: txt })
+      }).then(res => res.json()).then(data => {
         if (data && data.blocked) {
           DB.messages = (DB.messages || []).filter(m => m.id !== msgId);
           updateChatBoxDOM(postId, true);
           saveDB(true);
           showToast("부적절한 언행 또는 외부 연락처 요구가 감지되어 차단되었습니다.");
         }
-      } catch (e) {}
+      }).catch(() => {});
 
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput && document.activeElement !== curInput) {
@@ -6341,8 +6391,8 @@
     async function triggerAiIcebreaker(postId) {
       const post = DB.posts.find(p => p.id === postId);
       if (!post) return;
-      showToast("대화 주제를 추천하는 중입니다...");
-      let reply = `<b>${post.location}</b> 근처에서 만나는군요! 오늘 공강 루틴이나 수업 이야기로 가볍게 대화를 시작해 보세요.`;
+      showToast("✨ AI 대화 주제를 생성하고 있어요...");
+      let reply = `💡 <b>${escHtml(post.location)}</b> 근처에서 만나는군요! 오늘 시간표나 공강 루틴 이야기로 가볍게 대화를 시작해 보세요. 만난 후 근처 학생식당이나 카페에서 음료 한 잔 어떠세요? 😊`;
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -6355,14 +6405,16 @@
           })
         });
         const data = await res.json();
-        if (data.reply) reply = data.reply;
+        if (data && data.reply) reply = data.reply;
       } catch (e) {}
 
       DB.messages.push({
         id: Date.now(),
         post_id: postId,
         sender_id: "AI_BOT",
-        text: `<b>추천 대화 주제</b><br>${reply}`
+        text: `🤖 <b>AI 추천 대화 주제</b><br>${reply}`,
+        created_at: formatMsgTime(Date.now()),
+        is_read: 1
       });
       if (!updateChatBoxDOM(postId, true)) {
         render();
@@ -6861,9 +6913,35 @@
       render();
     }
 
+    let _cloudPollTimer = null;
+    function scheduleNextCloudPull(delayMs = 4000) {
+      clearTimeout(_cloudPollTimer);
+      _cloudPollTimer = setTimeout(async () => {
+        const isChatActive = Boolean(state.active_chat_post_id) || (state.nav_tab === "채팅" && !state.chat_list_mode);
+        let nextDelay = 4000;
+        if (document.hidden) {
+          nextDelay = 8000;
+        } else if (isChatActive) {
+          nextDelay = 1000; // 활성 대화방에 진입한 경우 1초 고속 폴링으로 즉시 수신
+        }
+        try {
+          await pullFromCloud(isChatActive);
+        } catch (e) {}
+        scheduleNextCloudPull(nextDelay);
+      }, delayMs);
+    }
+
     render();
     pullFromCloud(true);
-    setInterval(() => { pullFromCloud(false); }, 4000);
+    scheduleNextCloudPull(4000);
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        const isChatActive = Boolean(state.active_chat_post_id) || (state.nav_tab === "채팅" && !state.chat_list_mode);
+        pullFromCloud(isChatActive);
+        scheduleNextCloudPull(isChatActive ? 1000 : 4000);
+      }
+    });
   </script>
 </body>
 </html>
