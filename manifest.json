@@ -1,0 +1,26 @@
+{
+  "name": "울대모 - 캠퍼스 안심 번개",
+  "short_name": "울대모",
+  "description": "울산대학교 캠퍼스 안심 번개 매칭 플랫폼",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#287D62",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
