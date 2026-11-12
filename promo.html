@@ -1,712 +1,1103 @@
 ﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>?몃?紐?15珥?紐⑥뀡洹몃옒??愿묎퀬 ?꾨━酉?/title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>울대모 - 18초 공식 모션그래픽 브랜드 광고</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       user-select: none;
+      -webkit-font-smoothing: antialiased;
     }
-
     body {
-      background: #0B0F19;
+      background: #11161B;
       color: #FFFFFF;
-      font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "留묒? 怨좊뵓", "Apple SD Gothic Neo", sans-serif;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 20px 10px;
-      overflow-x: hidden;
+      padding: 20px 14px 32px;
     }
-
-    .header-bar {
+    .top-bar {
       text-align: center;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
-
-    .header-bar h1 {
+    .top-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(40, 125, 98, 0.22);
+      border: 1px solid rgba(40, 125, 98, 0.55);
+      color: #7CE8C3;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    .top-bar h1 {
       font-size: 20px;
       font-weight: 800;
+      letter-spacing: -0.03em;
       color: #FFFFFF;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
     }
-
-    .header-bar p {
+    .top-bar p {
       font-size: 13px;
       color: #94A3B8;
       margin-top: 4px;
     }
 
-    /* 9:16 紐⑤컮???륂뤌 酉고룷??而⑦뀒?대꼫 */
-    .player-wrapper {
+    /* 9:16 모바일 릴스/쇼츠 고해상도 플레이어 (실제 캔버스는 1080x1920 렌더링) */
+    .stage-wrap {
       position: relative;
       width: 360px;
       height: 640px;
-      background: #111827;
       border-radius: 28px;
       overflow: hidden;
-      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      background: #F7F9F8;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65), 0 0 0 1.5px rgba(255, 255, 255, 0.14);
     }
-
     canvas {
       width: 100%;
       height: 100%;
       display: block;
+      cursor: pointer;
     }
 
-    /* ?섎떒 而⑦듃濡ㅻ윭 */
-    .controls-bar {
-      margin-top: 18px;
+    /* 상단 진행 바 (인스타 스토리/릴스 스타일) */
+    .story-progress {
+      position: absolute;
+      top: 12px;
+      left: 14px;
+      right: 14px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .story-seg {
+      height: 3.5px;
+      background: rgba(25, 31, 40, 0.14);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .story-seg-fill {
+      height: 100%;
+      width: 0%;
+      background: #287D62;
+      border-radius: 999px;
+      transition: width 0.06s linear;
+    }
+
+    /* 씬 점프 탭 */
+    .scene-tabs {
+      margin-top: 14px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 560px;
+    }
+    .scene-tab {
+      background: #1E2630;
+      color: #CBD5E1;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .scene-tab:hover {
+      border-color: #287D62;
+      color: #FFFFFF;
+    }
+    .scene-tab.active {
+      background: #287D62;
+      color: #FFFFFF;
+      border-color: #287D62;
+    }
+
+    /* 컨트롤러 바 */
+    .controls {
+      margin-top: 12px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: rgba(30, 41, 59, 0.85);
-      backdrop-filter: blur(12px);
-      padding: 10px 18px;
-      border-radius: 999px;
+      gap: 8px;
+      background: #1A212B;
       border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px 14px;
+      border-radius: 999px;
       flex-wrap: wrap;
       justify-content: center;
     }
-
-    .btn-ctrl {
-      background: transparent;
-      border: none;
-      color: #FFFFFF;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      transition: all 0.2s ease;
-    }
-
-    .btn-ctrl:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .btn-ctrl.primary {
+    .ctrl-btn {
       background: #287D62;
       color: #FFFFFF;
-    }
-
-    .btn-ctrl.primary:hover {
-      background: #1E634C;
-      transform: scale(1.04);
-    }
-
-    .time-indicator {
-      font-size: 13px;
-      font-weight: 800;
-      font-variant-numeric: tabular-nums;
-      color: #38BDF8;
-      min-width: 50px;
-      text-align: center;
-    }
-
-    .scene-pill {
-      font-size: 11px;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 15px;
+      font-size: 12.5px;
       font-weight: 700;
-      background: rgba(40, 125, 98, 0.25);
-      color: #34D399;
-      border: 1px solid rgba(52, 211, 153, 0.4);
-      padding: 2px 8px;
-      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .ctrl-btn:hover {
+      background: #1E634C;
+    }
+    .ctrl-btn.secondary {
+      background: #26303D;
+      color: #E2E8F0;
+    }
+    .ctrl-btn.secondary:hover {
+      background: #323F50;
+    }
+    .ctrl-btn.record {
+      background: #191F28;
+      border: 1px solid #287D62;
+      color: #7CE8C3;
+    }
+    .ctrl-btn.record.recording {
+      background: #DC2626;
+      border-color: #DC2626;
+      color: #FFFFFF;
+    }
+    .time-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #94A3B8;
+      min-width: 78px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
     }
   </style>
 </head>
 <body>
-
-  <div class="header-bar">
-    <h1>?렗 ?몃?紐?15珥?紐⑥뀡洹몃옒??愿묎퀬 ?꾨━酉?/h1>
-    <p>?몄뒪? 由댁뒪 쨌 ?좏뒠釉??쇱툩 洹쒓꺽 (9:16 ?몃줈?? / ?좊땲硫붿씠??+ BGM + ?곸긽 ?ㅼ슫濡쒕뱶</p>
+  <div class="top-bar">
+    <div class="top-badge">9:16 릴스 · 쇼츠 · 캠퍼스 홍보용 모션그래픽</div>
+    <h1>울대모 공식 브랜드 광고 (18초)</h1>
+    <p>타사 비교 없이 오직 '울대모만의 4대 핵심 강점'을 담은 모던 4색 에디토리얼 모션그래픽</p>
   </div>
 
-  <div class="player-wrapper">
-    <canvas id="motionCanvas" width="720" height="1280"></canvas>
+  <div class="stage-wrap" id="stageWrap">
+    <div class="story-progress">
+      <div class="story-seg"><div class="story-seg-fill" id="seg0"></div></div>
+      <div class="story-seg"><div class="story-seg-fill" id="seg1"></div></div>
+      <div class="story-seg"><div class="story-seg-fill" id="seg2"></div></div>
+      <div class="story-seg"><div class="story-seg-fill" id="seg3"></div></div>
+      <div class="story-seg"><div class="story-seg-fill" id="seg4"></div></div>
+    </div>
+    <canvas id="adCanvas" width="1080" height="1920" title="클릭하여 재생 / 일시정지"></canvas>
   </div>
 
-  <div class="controls-bar">
-    <button id="btnPlayPause" class="btn-ctrl primary">
-      <span id="playIcon">?몌툘</span>
-      <span id="playText">?쇱떆?뺤?</span>
-    </button>
-    <button id="btnReplay" class="btn-ctrl">
-      ?봽 ?ㅼ떆蹂닿린
-    </button>
-    <button id="btnAudio" class="btn-ctrl">
-      ?뵄 BGM 耳쒖쭚
-    </button>
-    <div class="time-indicator" id="timeDisplay">00:00</div>
-    <span class="scene-pill" id="sceneBadge">??1/4</span>
-    <button id="btnExport" class="btn-ctrl" style="background:#2563EB; color:#FFF;">
-      ?뱿 ?곸긽 ?뚯씪 ?ㅼ슫濡쒕뱶 (.webm)
-    </button>
+  <div class="scene-tabs">
+    <button class="scene-tab active" id="tab0" onclick="jumpToScene(0)">1. 공강 공감 Hook</button>
+    <button class="scene-tab" id="tab1" onclick="jumpToScene(1)">2. 학식 & 호관 지도</button>
+    <button class="scene-tab" id="tab2" onclick="jumpToScene(2)">3. 성향 & 인증뱃지</button>
+    <button class="scene-tab" id="tab3" onclick="jumpToScene(3)">4. 원터치 DM & 리워드</button>
+    <button class="scene-tab" id="tab4" onclick="jumpToScene(4)">5. 슬로건 & 시작하기</button>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="playBtn" onclick="togglePlay()">⏸ 일시정지</button>
+    <button class="ctrl-btn secondary" onclick="restartAd()">↺ 처음부터</button>
+    <span class="time-label" id="timeLabel">0.0s / 18.0s</span>
+    <button class="ctrl-btn secondary" id="soundBtn" onclick="toggleSound()">🔊 효과음 켜짐</button>
+    <button class="ctrl-btn record" id="recordBtn" onclick="exportVideoWebM()">🎥 영상 파일(.webm) 저장</button>
+    <button class="ctrl-btn secondary" onclick="location.href='/'">앱으로 돌아가기 →</button>
   </div>
 
   <script>
-    const canvas = document.getElementById('motionCanvas');
-    const ctx = canvas.getContext('2d');
-    const W = 720;
-    const H = 1280;
+    const canvas = document.getElementById("adCanvas");
+    const ctx = canvas.getContext("2d");
+    const W = 1080;
+    const H = 1920;
+    const TOTAL_DURATION = 18.0; // 18초 구성
 
-    const DURATION = 15.0; // 15珥?    let currentTime = 0;
+    // 5개 씬 타임라인 정의
+    const SCENES = [
+      { start: 0.0, end: 3.2, title: "1. 공강 공감 Hook" },
+      { start: 3.2, end: 7.0, title: "2. 학식 & 호관 지도" },
+      { start: 7.0, end: 11.2, title: "3. 성향 & 인증뱃지" },
+      { start: 11.2, end: 15.0, title: "4. 원터치 DM & 리워드" },
+      { start: 15.0, end: 18.0, title: "5. 슬로건 & 시작하기" }
+    ];
+
+    // 4-Color Non-AI Modern Editorial Palette
+    const C = {
+      primary: "#287D62",
+      primaryDark: "#1E634C",
+      mint: "#EEF8F3",
+      mintBorder: "#C5E6D6",
+      bg: "#F7F9F8",
+      white: "#FFFFFF",
+      charcoal: "#191F28",
+      gray: "#6B7684",
+      border: "#E5EAE7"
+    };
+
     let isPlaying = true;
-    let audioEnabled = true;
-    let lastTimestamp = null;
+    let currentTime = 0;
+    let lastFrameTs = performance.now();
+    let soundOn = true;
+    let lastCueKey = "";
     let audioCtx = null;
 
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    }
-
-    function playBeep(freq = 440, type = 'sine', duration = 0.12, gainVal = 0.08) {
-      if (!audioEnabled || !audioCtx) return;
+    // 경쾌한 모션그래픽 사운드 합성기 (외부 MP3 파일 없이 Web Audio API로 작동)
+    function playTone(freq, dur = 0.09, type = "sine", vol = 0.06, slideTo = null) {
+      if (!soundOn) return;
       try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        if (slideTo) {
+          osc.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + dur);
+        }
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+        osc.stop(audioCtx.currentTime + dur);
       } catch (e) {}
     }
 
-    let lastTriggeredBeat = -1;
-    function checkAudioBeats(t) {
-      if (!audioEnabled) return;
-      const beatIndex = Math.floor(t * 4); // 120 BPM 由щ벉
-      if (beatIndex !== lastTriggeredBeat) {
-        lastTriggeredBeat = beatIndex;
-        if (beatIndex % 4 === 0) {
-          playBeep(130, 'triangle', 0.15, 0.12); // Kick
-        } else if (beatIndex % 2 === 0) {
-          playBeep(880, 'sine', 0.08, 0.04); // Snare
-        } else {
-          playBeep(520, 'sine', 0.05, 0.02);
-        }
-
-        // ???꾪솚 ??李⑥엫
-        if (Math.abs(t - 3.8) < 0.15 || Math.abs(t - 7.5) < 0.15 || Math.abs(t - 11.2) < 0.15) {
-          playBeep(659.25, 'sine', 0.35, 0.18);
-          setTimeout(() => playBeep(880, 'triangle', 0.4, 0.2), 80);
+    function triggerSceneAudioCues(t) {
+      const cues = [
+        { time: 0.15, key: "s1_open", fn: () => playTone(523.25, 0.12, "triangle", 0.06, 659.25) },
+        { time: 1.1, key: "s1_chip", fn: () => playTone(783.99, 0.08, "sine", 0.05) },
+        { time: 3.25, key: "s2_open", fn: () => playTone(587.33, 0.12, "triangle", 0.06, 783.99) },
+        { time: 4.3, key: "s2_pin1", fn: () => playTone(880, 0.07, "sine", 0.05, 1046.5) },
+        { time: 4.8, key: "s2_pin2", fn: () => playTone(987.77, 0.07, "sine", 0.05, 1174.66) },
+        { time: 7.05, key: "s3_open", fn: () => playTone(523.25, 0.14, "triangle", 0.06, 783.99) },
+        { time: 8.6, key: "s3_badge", fn: () => playTone(1046.5, 0.12, "sine", 0.06, 1318.5) },
+        { time: 11.25, key: "s4_open", fn: () => playTone(659.25, 0.11, "triangle", 0.06, 880) },
+        { time: 12.6, key: "s4_msg", fn: () => playTone(987.77, 0.08, "sine", 0.05, 1318.5) },
+        { time: 13.5, key: "s4_heart", fn: () => playTone(1174.66, 0.1, "sine", 0.06, 1567.98) },
+        { time: 15.05, key: "s5_end", fn: () => {
+          playTone(523.25, 0.18, "triangle", 0.06, 659.25);
+          setTimeout(() => playTone(783.99, 0.25, "sine", 0.06, 1046.5), 110);
+        }}
+      ];
+      for (const c of cues) {
+        if (Math.abs(t - c.time) < 0.08 && lastCueKey !== c.key) {
+          lastCueKey = c.key;
+          c.fn();
         }
       }
     }
 
+    // 이징 헬퍼 함수
+    function clamp(v, min = 0, max = 1) { return Math.max(min, Math.min(max, v)); }
+    function prog(t, start, dur) { return clamp((t - start) / dur, 0, 1); }
+    function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
     function easeOutBack(x) {
       const c1 = 1.70158;
       const c3 = c1 + 1;
       return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
     }
 
-    function renderFrame(t) {
-      ctx.clearRect(0, 0, W, H);
-      const progress = Math.min(1, t / DURATION);
-
-      // ==========================================
-      // [SCENE 1: 0.0s ~ 3.8s] 怨듦컯 ?쒓컙 ?몃줈? & ?숈떇 怨좊?
-      // ==========================================
-      if (t < 4.0) {
-        const fadeOut = t > 3.4 ? (4.0 - t) / 0.6 : 1;
-
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, '#0F172A');
-        grad.addColorStop(1, '#1E293B');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, fadeOut);
-
-        // ?쒓퀎 ?쒓컖??        const clockScale = easeOutBack(Math.min(1, t / 0.8));
-        ctx.save();
-        ctx.translate(W / 2, 380);
-        ctx.scale(clockScale, clockScale);
-
-        ctx.strokeStyle = '#38BDF8';
-        ctx.lineWidth = 14;
-        ctx.beginPath();
-        ctx.arc(0, 0, 110, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const handAngle = t * Math.PI * 2.5;
-        ctx.strokeStyle = '#F1F5F9';
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(handAngle) * 75, Math.sin(handAngle) * 75);
-        ctx.stroke();
-
-        ctx.fillStyle = '#38BDF8';
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // ?띿뒪??1
-        if (t > 0.3) {
-          const t1Progress = easeOutBack(Math.min(1, (t - 0.3) / 0.5));
-          ctx.save();
-          ctx.translate(W / 2, 600);
-          ctx.scale(t1Progress, t1Progress);
-          ctx.fillStyle = '#94A3B8';
-          ctx.font = '800 38px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?ㅻ뒛 怨듦컯 3?쒓컙...', 0, 0);
-          ctx.restore();
-        }
-
-        // ?띿뒪??2
-        if (t > 1.3) {
-          const t2Progress = easeOutBack(Math.min(1, (t - 1.3) / 0.6));
-          const shake = t > 1.3 && t < 1.8 ? Math.sin(t * 40) * 4 : 0;
-          ctx.save();
-          ctx.translate(W / 2 + shake, 690);
-          ctx.scale(t2Progress, t2Progress);
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 56px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?숈떇 ?꾧뎄??癒뱀?? ?뜖', 0, 0);
-          ctx.restore();
-        }
-
-        // 留먰뭾??移?        if (t > 2.2) {
-          const chipScale = easeOutBack(Math.min(1, (t - 2.2) / 0.5));
-          ctx.save();
-          ctx.translate(W / 2, 830);
-          ctx.scale(chipScale, chipScale);
-
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
-          ctx.strokeStyle = '#EF4444';
-          ctx.lineWidth = 3;
-          drawRoundedRect(ctx, -240, -45, 480, 90, 45);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = '#FCA5A5';
-          ctx.font = '800 32px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?쇰갈? 議곌툑 ?ъ떖?쒕뜲... ?삟', 0, 12);
-          ctx.restore();
-        }
-
-        ctx.restore();
-      }
-
-      // ==========================================
-      // [SCENE 2: 3.8s ~ 7.5s] 移댄넚 NO! ?ㅻ챸 NO! ?덉떖 蹂댄샇 ?쒖뒪??      // ==========================================
-      if (t >= 3.6 && t < 7.7) {
-        const s2t = t - 3.8;
-        const fadeIn = s2t < 0.4 ? s2t / 0.4 : (t > 7.2 ? (7.7 - t) / 0.5 : 1);
-
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, '#1E293B');
-        grad.addColorStop(1, '#064E3B');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, fadeIn);
-
-        const headerScale = easeOutBack(Math.min(1, Math.max(0, s2t / 0.5)));
-        ctx.save();
-        ctx.translate(W / 2, 280);
-        ctx.scale(headerScale, headerScale);
-        ctx.fillStyle = '#F87171';
-        ctx.font = '900 42px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('移댄넚 ID 援먰솚? ?솀?띯셽截?, 0, 0);
-        ctx.fillStyle = '#CBD5E1';
-        ctx.font = '800 36px sans-serif';
-        ctx.fillText('?ㅻ챸쨌?꾪솕踰덊샇 怨듦컻? NO!', 0, 56);
-        ctx.restore();
-
-        if (s2t > 1.0) {
-          const shieldScale = easeOutBack(Math.min(1, (s2t - 1.0) / 0.6));
-          ctx.save();
-          ctx.translate(W / 2, 540);
-          ctx.scale(shieldScale, shieldScale);
-
-          ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
-          ctx.strokeStyle = '#10B981';
-          ctx.lineWidth = 8;
-          ctx.beginPath();
-          ctx.arc(0, 0, 95, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.font = '84px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?썳截?, 0, 30);
-          ctx.restore();
-        }
-
-        if (s2t > 1.8) {
-          const gaugeScale = easeOutBack(Math.min(1, (s2t - 1.8) / 0.5));
-          ctx.save();
-          ctx.translate(W / 2, 770);
-          ctx.scale(gaugeScale, gaugeScale);
-
-          ctx.fillStyle = '#1E293B';
-          ctx.strokeStyle = '#34D399';
-          ctx.lineWidth = 4;
-          drawRoundedRect(ctx, -260, -90, 520, 180, 24);
-          ctx.fill();
-          ctx.stroke();
-
-          const tempProgress = Math.min(1, (s2t - 1.8) / 1.2);
-          const currentTemp = (36.5 + tempProgress * 3.5).toFixed(1);
-
-          ctx.fillStyle = '#F8FAFC';
-          ctx.font = '800 30px sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText('?몄궛? ?덉떖 留ㅻ꼫?⑤룄', -220, -35);
-
-          ctx.fillStyle = '#34D399';
-          ctx.font = '900 36px sans-serif';
-          ctx.textAlign = 'right';
-          ctx.fillText(`?뙜截?${currentTemp}째C`, 220, -35);
-
-          ctx.fillStyle = '#334155';
-          drawRoundedRect(ctx, -220, 10, 440, 22, 11);
-          ctx.fill();
-
-          ctx.fillStyle = '#10B981';
-          drawRoundedRect(ctx, -220, 10, 440 * (tempProgress * 0.6 + 0.35), 22, 11);
-          ctx.fill();
-
-          ctx.fillStyle = '#94A3B8';
-          ctx.font = '700 22px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?섎씫 ??100% 釉붾씪?몃뱶 ?꾨줈??蹂댄샇', 0, 62);
-
-          ctx.restore();
-        }
-
-        ctx.restore();
-      }
-
-      // ==========================================
-      // [SCENE 3: 7.5s ~ 11.2s] ?ㅼ떆媛?罹좏띁??踰덇컻 吏??& ?숈떇쨌移닿났쨌寃뚯엫
-      // ==========================================
-      if (t >= 7.3 && t < 11.5) {
-        const s3t = t - 7.5;
-        const fadeIn = s3t < 0.4 ? s3t / 0.4 : (t > 11.0 ? (11.5 - t) / 0.5 : 1);
-
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, '#064E3B');
-        grad.addColorStop(1, '#042F2E');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, fadeIn);
-
-        const titleScale = easeOutBack(Math.min(1, Math.max(0, s3t / 0.5)));
-        ctx.save();
-        ctx.translate(W / 2, 240);
-        ctx.scale(titleScale, titleScale);
-        ctx.fillStyle = '#6EE7B7';
-        ctx.font = '900 48px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('?몄궛? ?ㅼ떆媛?踰덇컻 吏????, 0, 0);
-        ctx.restore();
-
-        const chips = [
-          { text: '?뜗 22?멸? ?숈깮?앸떦 ?숈떇 媛숈씠 癒뱀뼱??', delay: 0.5, y: 390, color: '#FEF3C7', border: '#F59E0B', fontColor: '#92400E' },
-          { text: '??16?멸? ?꾩궛?꾩꽌愿 2?쒓컙 吏묒쨷 移닿났!', delay: 1.1, y: 520, color: '#DBEAFE', border: '#3B82F6', fontColor: '#1E40AF' },
-          { text: '?렜 諛붾낫?ш굅由?濡????/ 寃뚯엫 踰덇컻!', delay: 1.7, y: 650, color: '#EDE9FE', border: '#8B5CF6', fontColor: '#5B21B6' }
-        ];
-
-        chips.forEach(chip => {
-          if (s3t > chip.delay) {
-            const sc = easeOutBack(Math.min(1, (s3t - chip.delay) / 0.5));
-            ctx.save();
-            ctx.translate(W / 2, chip.y);
-            ctx.scale(sc, sc);
-
-            ctx.fillStyle = chip.color;
-            ctx.strokeStyle = chip.border;
-            ctx.lineWidth = 3;
-            drawRoundedRect(ctx, -280, -45, 560, 90, 20);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = chip.fontColor;
-            ctx.font = '800 28px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(chip.text, 0, 10);
-            ctx.restore();
-          }
-        });
-
-        if (s3t > 2.3) {
-          const pulseT = (s3t - 2.3) * 2;
-          const radarRadius = (pulseT % 1.5) * 80;
-          const radarAlpha = Math.max(0, 1 - (pulseT % 1.5) / 1.5);
-
-          ctx.save();
-          ctx.translate(W / 2, 870);
-
-          ctx.strokeStyle = `rgba(52, 211, 153, ${radarAlpha})`;
-          ctx.lineWidth = 6;
-          ctx.beginPath();
-          ctx.arc(0, 0, radarRadius + 40, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.fillStyle = '#10B981';
-          ctx.beginPath();
-          ctx.arc(0, 0, 36, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 5;
-          ctx.stroke();
-
-          ctx.font = '36px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?뱧', 0, 12);
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = '800 30px sans-serif';
-          ctx.fillText('?꾩옱 ?곕━ ?숆탳 紐⑥쭛 以?踰덇컻 4嫄?, 0, 80);
-
-          ctx.restore();
-        }
-
-        ctx.restore();
-      }
-
-      // ==========================================
-      // [SCENE 4: 11.2s ~ 15.0s] 而ㅽ뵾 由ъ썙??& 理쒖쥌 濡쒓퀬 ?붾뵫 (CTA)
-      // ==========================================
-      if (t >= 11.0) {
-        const s4t = t - 11.2;
-        const fadeIn = s4t < 0.4 ? s4t / 0.4 : 1;
-
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, '#1E634C');
-        grad.addColorStop(0.6, '#287D62');
-        grad.addColorStop(1, '#115E59');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, fadeIn);
-
-        const ticketScale = easeOutBack(Math.min(1, Math.max(0, s4t / 0.6)));
-        ctx.save();
-        ctx.translate(W / 2, 340);
-        ctx.scale(ticketScale, ticketScale);
-
-        ctx.fillStyle = '#FEF3C7';
-        ctx.strokeStyle = '#F59E0B';
-        ctx.lineWidth = 6;
-        drawRoundedRect(ctx, -260, -90, 520, 180, 24);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#D97706';
-        ctx.font = '900 30px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('?럞 泥?踰덇컻 ?꾨즺 蹂대꼫??, 0, -32);
-
-        ctx.fillStyle = '#78350F';
-        ctx.font = '900 36px sans-serif';
-        ctx.fillText('硫붽?쨌而댄룷利??꾨찓由ъ뭅??異붿꺼沅??렅截?, 0, 18);
-
-        ctx.fillStyle = '#92400E';
-        ctx.font = '700 24px sans-serif';
-        ctx.fillText('留ㅻ꼫?⑤룄 +1.0째C 利됱떆 蹂대꼫???곸듅!', 0, 58);
-        ctx.restore();
-
-        if (s4t > 1.0) {
-          const logoScale = easeOutBack(Math.min(1, (s4t - 1.0) / 0.6));
-          ctx.save();
-          ctx.translate(W / 2, 680);
-          ctx.scale(logoScale, logoScale);
-
-          ctx.fillStyle = '#FFFFFF';
-          drawRoundedRect(ctx, -70, -70, 140, 140, 36);
-          ctx.fill();
-
-          ctx.font = '80px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('?뙮', 0, 28);
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = '900 72px sans-serif';
-          ctx.fillText('?몃?紐?, 0, 140);
-
-          ctx.fillStyle = '#D1FAE5';
-          ctx.font = '800 32px sans-serif';
-          ctx.fillText('?몄궛?????紐⑥뿬??', 0, 195);
-          ctx.restore();
-        }
-
-        if (s4t > 1.8) {
-          const ctaScale = easeOutBack(Math.min(1, (s4t - 1.8) / 0.5));
-          ctx.save();
-          ctx.translate(W / 2, 1020);
-          ctx.scale(ctaScale, ctaScale);
-
-          ctx.fillStyle = '#FFFFFF';
-          drawRoundedRect(ctx, -240, -42, 480, 84, 42);
-          ctx.fill();
-
-          ctx.fillStyle = '#1E634C';
-          ctx.font = '900 34px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('吏湲??묒냽?섍린 ?몛 uldaemo.app', 0, 12);
-          ctx.restore();
-        }
-
-        ctx.restore();
-      }
-
-      // ?꾨줈洹몃젅??諛?      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(0, 0, W, 8);
-      ctx.fillStyle = '#10B981';
-      ctx.fillRect(0, 0, W * progress, 8);
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.font = '700 20px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('?몃?紐?怨듭떇 愿묎퀬 쨌 15s', W - 30, 45);
+    // 캔버스 도형 헬퍼
+    function roundRect(x, y, w, h, r, fill, stroke, lineWidth = 2) {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lineWidth; ctx.stroke(); }
     }
 
-    function drawRoundedRect(c, x, y, width, height, radius) {
-      c.beginPath();
-      c.moveTo(x + radius, y);
-      c.lineTo(x + width - radius, y);
-      c.quadraticCurveTo(x + width, y, x + width, y + radius);
-      c.lineTo(x + width, y + height - radius);
-      c.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-      c.lineTo(x + radius, y + height);
-      c.quadraticCurveTo(x, y + height, x, y + height - radius);
-      c.lineTo(x, y + radius);
-      c.quadraticCurveTo(x, y, x + radius, y);
-      c.closePath();
+    function drawShadowCard(x, y, w, h, r, fill = C.white, border = C.border, shadowAlpha = 0.06) {
+      ctx.save();
+      ctx.shadowColor = `rgba(25, 31, 40, ${shadowAlpha})`;
+      ctx.shadowBlur = 36;
+      ctx.shadowOffsetY = 14;
+      roundRect(x, y, w, h, r, fill, null);
+      ctx.restore();
+      if (border) roundRect(x, y, w, h, r, null, border, 2.5);
     }
 
-    function animate(timestamp) {
-      if (!lastTimestamp) lastTimestamp = timestamp;
-      const delta = (timestamp - lastTimestamp) / 1000;
-      lastTimestamp = timestamp;
-
-      if (isPlaying) {
-        currentTime += delta;
-        if (currentTime >= DURATION) {
-          currentTime = 0;
-        }
-        checkAudioBeats(currentTime);
-      }
-
-      renderFrame(currentTime);
-      updateUI();
-      requestAnimationFrame(animate);
+    function drawPill(cx, cy, text, bg, fg, border = null, fontSize = 28, padX = 28, padY = 16) {
+      ctx.save();
+      ctx.font = `700 ${fontSize}px Pretendard, sans-serif`;
+      const tw = ctx.measureText(text).width;
+      const w = tw + padX * 2;
+      const h = fontSize + padY * 2;
+      const x = cx - w / 2;
+      const y = cy - h / 2;
+      roundRect(x, y, w, h, h / 2, bg, border, 2);
+      ctx.fillStyle = fg;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, cx, cy + 1);
+      ctx.restore();
+      return { w, h };
     }
 
-    function updateUI() {
-      const sec = Math.floor(currentTime);
-      const ms = Math.floor((currentTime % 1) * 10);
-      document.getElementById('timeDisplay').innerText = `00:${String(sec).padStart(2, '0')}.${ms}`;
-
-      let scene = '??1/4 (怨듦컯쨌?숈떇)';
-      if (currentTime >= 3.8 && currentTime < 7.5) scene = '??2/4 (?덉떖蹂댄샇)';
-      else if (currentTime >= 7.5 && currentTime < 11.2) scene = '??3/4 (?ㅼ떆媛꾨쾲媛?';
-      else if (currentTime >= 11.2) scene = '??4/4 (蹂댁긽쨌?붾뵫)';
-      document.getElementById('sceneBadge').innerText = scene;
+    function drawLogo(cx, cy, size = 120) {
+      const x = cx - size / 2;
+      const y = cy - size / 2;
+      roundRect(x, y, size, size, size * 0.3, C.primary, null);
+      ctx.fillStyle = "#DDF2E7";
+      ctx.beginPath();
+      ctx.arc(x + size * 0.36, y + size * 0.36, size * 0.075, 0, Math.PI * 2);
+      ctx.arc(x + size * 0.64, y + size * 0.36, size * 0.075, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = size * 0.08;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x + size * 0.3, y + size * 0.56);
+      ctx.bezierCurveTo(
+        x + size * 0.38, y + size * 0.72,
+        x + size * 0.62, y + size * 0.72,
+        x + size * 0.7, y + size * 0.56
+      );
+      ctx.stroke();
     }
 
-    document.getElementById('btnPlayPause').addEventListener('click', () => {
-      initAudio();
-      isPlaying = !isPlaying;
-      document.getElementById('playIcon').innerText = isPlaying ? '?몌툘' : '?띰툘';
-      document.getElementById('playText').innerText = isPlaying ? '?쇱떆?뺤?' : '?ъ깮';
-    });
+    function drawShieldIcon(cx, cy, r = 22, color = C.primary) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, -r);
+      ctx.lineTo(r * 0.85, -r * 0.62);
+      ctx.lineTo(r * 0.85, r * 0.1);
+      ctx.quadraticCurveTo(r * 0.85, r * 0.75, 0, r);
+      ctx.quadraticCurveTo(-r * 0.85, r * 0.75, -r * 0.85, r * 0.1);
+      ctx.lineTo(-r * 0.85, -r * 0.62);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.32, 0);
+      ctx.lineTo(-r * 0.05, r * 0.28);
+      ctx.lineTo(r * 0.38, -r * 0.22);
+      ctx.stroke();
+      ctx.restore();
+    }
 
-    document.getElementById('btnReplay').addEventListener('click', () => {
-      initAudio();
-      currentTime = 0;
-      isPlaying = true;
-      document.getElementById('playIcon').innerText = '?몌툘';
-      document.getElementById('playText').innerText = '?쇱떆?뺤?';
-    });
+    // 공통 배경 + 상단 브랜드 헤더
+    function drawBaseBackground(sceneIdx, subTag) {
+      ctx.fillStyle = C.bg;
+      ctx.fillRect(0, 0, W, H);
 
-    document.getElementById('btnAudio').addEventListener('click', () => {
-      initAudio();
-      audioEnabled = !audioEnabled;
-      document.getElementById('btnAudio').innerText = audioEnabled ? '?뵄 BGM 耳쒖쭚' : '?뵁 ?뚯냼嫄?;
-    });
+      // 은은한 소프트 민트 원형 장식
+      ctx.save();
+      const grad = ctx.createRadialGradient(W * 0.5, 260, 40, W * 0.5, 260, 620);
+      grad.addColorStop(0, "rgba(238, 248, 243, 0.95)");
+      grad.addColorStop(1, "rgba(247, 249, 248, 0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, 900);
+      ctx.restore();
 
-    document.getElementById('btnExport').addEventListener('click', async () => {
-      initAudio();
-      const exportBtn = document.getElementById('btnExport');
-      exportBtn.disabled = true;
-      exportBtn.innerText = '??15珥??뱁솕 吏꾪뻾 以?..';
+      // 상단 브랜드 미니 바
+      ctx.save();
+      drawLogo(110, 118, 56);
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 34px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("울대모", 152, 118);
 
-      currentTime = 0;
-      isPlaying = true;
+      // 우측 상단 태그
+      drawPill(W - 190, 118, subTag, C.mint, C.primary, C.mintBorder, 24, 24, 12);
+      ctx.restore();
+    }
 
-      const stream = canvas.captureStream(60);
-      const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-          ? 'video/webm;codecs=vp9'
-          : 'video/webm'
+    // =====================================================
+    // SCENE 1 (0.0s ~ 3.2s): 캠퍼스 공강 공감 Hook
+    // =====================================================
+    function renderScene1(t) {
+      drawBaseBackground(0, "울산대학교 캠퍼스 번개");
+
+      const pTitle = easeOutCubic(prog(t, 0.05, 0.55));
+      ctx.save();
+      ctx.translate(0, (1 - pTitle) * 40);
+      ctx.globalAlpha = pTitle;
+
+      drawPill(W / 2, 270, "⏰ 12:30 · 갑자기 생긴 공강 2시간", C.mint, C.primary, C.mintBorder, 30, 34, 16);
+
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 72px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("오늘 공강 2시간,", W / 2, 410);
+      ctx.fillStyle = C.primary;
+      ctx.fillText("우리 학교 친구랑", W / 2, 505);
+      ctx.fillStyle = C.charcoal;
+      ctx.fillText("가볍게 모여볼까?", W / 2, 600);
+      ctx.restore();
+
+      // 중앙 메인 시간표 & 번개 제안 카드
+      const pCard = easeOutBack(prog(t, 0.45, 0.6));
+      ctx.save();
+      ctx.translate(W / 2, 1050);
+      ctx.scale(0.86 + 0.14 * pCard, 0.86 + 0.14 * pCard);
+      ctx.globalAlpha = clamp(prog(t, 0.45, 0.35));
+
+      drawShadowCard(-440, -290, 880, 580, 40, C.white, C.border, 0.08);
+
+      // 카드 상단 헤더
+      roundRect(-390, -240, 230, 52, 26, C.mint, null);
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 25px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("오늘, 같이 할래요?", -275, -214);
+
+      ctx.fillStyle = C.gray;
+      ctx.font = "600 25px Pretendard, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("울산대학교 재학생 전용", 390, -214);
+
+      // 4개 인기 공강 카테고리 칩 그리드
+      const cats = [
+        { icon: "🍚", title: "학생회관 학식 밥약", desc: "혼밥 대신 기분 좋게 한 끼", col: -205, row: -80, delay: 0.75 },
+        { icon: "☕", title: "아산도서관·무거동 카공", desc: "이어폰 끼고 집중할 메이트", col: 205, row: -80, delay: 0.9 },
+        { icon: "🏃", title: "아산스포츠센터 운동", desc: "배드민턴·러닝·헬스 메이트", col: -205, row: 125, delay: 1.05 },
+        { icon: "🚕", title: "울산역·태화강 카풀", desc: "택시비 반값으로 아끼기", col: 205, row: 125, delay: 1.2 }
+      ];
+
+      cats.forEach(c => {
+        const cp = easeOutBack(prog(t, c.delay, 0.45));
+        ctx.save();
+        ctx.translate(c.col, c.row);
+        ctx.scale(0.8 + 0.2 * cp, 0.8 + 0.2 * cp);
+        ctx.globalAlpha = clamp(prog(t, c.delay, 0.25));
+        roundRect(-185, -78, 370, 156, 26, C.bg, C.border, 2);
+        ctx.font = "44px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(c.icon, -155, -18);
+        ctx.fillStyle = C.charcoal;
+        ctx.font = "800 27px Pretendard, sans-serif";
+        ctx.fillText(c.title, -92, -20);
+        ctx.fillStyle = C.gray;
+        ctx.font = "600 22px Pretendard, sans-serif";
+        ctx.fillText(c.desc, -155, 36);
+        ctx.restore();
       });
 
-      const chunks = [];
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+      ctx.restore();
 
+      // 하단 안내 문구
+      const pBot = easeOutCubic(prog(t, 1.4, 0.5));
+      ctx.save();
+      ctx.globalAlpha = pBot;
+      drawPill(W / 2, 1540, "공강도 점심도, 우리 학교 학우와 안전하게", C.charcoal, C.white, null, 30, 44, 22);
+      ctx.restore();
+    }
+
+    // =====================================================
+    // SCENE 2 (3.2s ~ 7.0s): 강점 1 — 학식 메뉴 & 62개 호관 지도
+    // =====================================================
+    function renderScene2(localT) {
+      drawBaseBackground(1, "강점 01 · 캠퍼스 밀착");
+
+      const pHead = easeOutCubic(prog(localT, 0.05, 0.45));
+      ctx.save();
+      ctx.globalAlpha = pHead;
+      ctx.translate(0, (1 - pHead) * 30);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 62px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("오늘 학식 메뉴부터 확인하고", W / 2, 290);
+      ctx.fillStyle = C.primary;
+      ctx.fillText("내 호관 바로 옆 번개를 콕!", W / 2, 375);
+      ctx.restore();
+
+      // 1) 상단 실시간 학식 카드
+      const pCafe = easeOutBack(prog(localT, 0.3, 0.55));
+      ctx.save();
+      ctx.translate(W / 2, 595);
+      ctx.scale(0.9 + 0.1 * pCafe, 0.9 + 0.1 * pCafe);
+      ctx.globalAlpha = clamp(prog(localT, 0.3, 0.3));
+      drawShadowCard(-450, -145, 900, 290, 32, C.white, C.mintBorder, 0.07);
+
+      roundRect(-410, -108, 170, 44, 14, C.mint, null);
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 23px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("오늘의 학식 연동", -325, -86);
+
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 30px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("울산대 학생식당 · 중식 (11:30~13:00)", -220, -86);
+
+      // 메뉴 칩들
+      const menus = ["치즈돈까스 & 데미소스", "순두부찌개", "새우볶음밥", "요구르트"];
+      let mx = -410;
+      menus.forEach(m => {
+        ctx.font = "700 24px Pretendard, sans-serif";
+        const mw = ctx.measureText(m).width + 36;
+        roundRect(mx, -22, mw, 52, 16, C.bg, C.border, 2);
+        ctx.fillStyle = C.charcoal;
+        ctx.textAlign = "center";
+        ctx.fillText(m, mx + mw / 2, 4);
+        mx += mw + 14;
+      });
+
+      // 이 메뉴로 번개 만들기 버튼
+      roundRect(-410, 52, 820, 64, 18, C.primary, null);
+      ctx.fillStyle = C.white;
+      ctx.font = "800 26px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("🍚 이 식단으로 바로 밥약 번개 모집하기 →", 0, 85);
+      ctx.restore();
+
+      // 2) 하단 울산대 62개 호관 지도 & 말풍선 핀
+      const pMap = easeOutBack(prog(localT, 0.75, 0.55));
+      ctx.save();
+      ctx.translate(W / 2, 1215);
+      ctx.scale(0.9 + 0.1 * pMap, 0.9 + 0.1 * pMap);
+      ctx.globalAlpha = clamp(prog(localT, 0.75, 0.3));
+      drawShadowCard(-450, -390, 900, 780, 36, "#EBF3EE", C.border, 0.08);
+
+      // 캠퍼스 지도 도로/블록 그래픽
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(-450, -390, 900, 780, 36);
+      ctx.clip();
+
+      // 잔디 영역과 도로선
+      roundRect(-380, -320, 310, 220, 28, "#DCECE2", null);
+      roundRect(40, -300, 350, 250, 28, "#DCECE2", null);
+      roundRect(-340, 40, 680, 280, 32, "#DCECE2", null);
+
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 26;
+      ctx.beginPath();
+      ctx.moveTo(-450, -40); ctx.lineTo(450, -40);
+      ctx.moveTo(-30, -390); ctx.lineTo(-30, 390);
+      ctx.stroke();
+
+      // 레이더 펄스 (내 위치: 아산도서관)
+      const pulse = (localT * 1.3) % 1;
+      ctx.fillStyle = `rgba(40, 125, 98, ${(1 - pulse) * 0.28})`;
+      ctx.beginPath();
+      ctx.arc(0, 10, 30 + pulse * 130, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = C.primary;
+      ctx.beginPath();
+      ctx.arc(0, 10, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = C.white;
+      ctx.stroke();
+
+      // 말풍선 핀 3개 (통통 튀는 등장)
+      const pins = [
+        { x: -200, y: -180, cat: "🍚 밥약", cnt: "2/3명", bld: "22호관 학생회관", d: 1.05 },
+        { x: 195, y: -150, cat: "☕ 카공", cnt: "1/2명", bld: "16호관 아산도서관", d: 1.35 },
+        { x: 110, y: 185, cat: "🏃 운동", cnt: "3/4명", bld: "39호관 스포츠센터", d: 1.65 }
+      ];
+
+      pins.forEach(p => {
+        const pp = easeOutBack(prog(localT, p.d, 0.45));
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(pp, pp);
+        // 말풍선 카드
+        drawShadowCard(-145, -70, 290, 96, 24, C.white, C.primary, 0.14);
+        ctx.fillStyle = C.charcoal;
+        ctx.font = "800 26px Pretendard, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(p.cat, -118, -32);
+        ctx.fillStyle = C.primary;
+        ctx.textAlign = "right";
+        ctx.fillText(p.cnt, 118, -32);
+
+        ctx.fillStyle = C.gray;
+        ctx.font = "600 21px Pretendard, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(p.bld, 0, 4);
+        ctx.restore();
+      });
+
+      // 하단 지도 캡션 바
+      roundRect(-410, 285, 820, 74, 22, C.white, C.border, 2);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 26px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("📍 울산대학교 62개 전체 호관 GPS 거리 자동 계산", 0, 322);
+
+      ctx.restore();
+      ctx.restore();
+    }
+
+    // =====================================================
+    // SCENE 3 (7.0s ~ 11.2s): 강점 2 — 성향 매칭 & 공식 안심 인증 뱃지
+    // =====================================================
+    function renderScene3(localT) {
+      drawBaseBackground(2, "강점 02 · 검증된 학우");
+
+      const pHead = easeOutCubic(prog(localT, 0.05, 0.45));
+      ctx.save();
+      ctx.globalAlpha = pHead;
+      ctx.translate(0, (1 - pHead) * 30);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 60px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("성향 태그로 결이 맞는 학우만,", W / 2, 290);
+      ctx.fillStyle = C.primary;
+      ctx.fillText("인증 뱃지로 안심하고 수락!", W / 2, 375);
+      ctx.restore();
+
+      // 메인 검증 프로필 카드
+      const pCard = easeOutBack(prog(localT, 0.3, 0.55));
+      ctx.save();
+      ctx.translate(W / 2, 910);
+      ctx.scale(0.9 + 0.1 * pCard, 0.9 + 0.1 * pCard);
+      ctx.globalAlpha = clamp(prog(localT, 0.3, 0.3));
+
+      drawShadowCard(-450, -430, 900, 860, 40, C.white, C.border, 0.08);
+
+      // 아바타 & 닉네임
+      ctx.fillStyle = C.mint;
+      ctx.beginPath();
+      ctx.arc(-320, -305, 64, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = C.primary;
+      ctx.stroke();
+
+      ctx.font = "64px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🐶", -320, -302);
+
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 38px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("무거동곰돌이", -225, -330);
+
+      // 공식 보증 배지 필
+      roundRect(-8, -356, 235, 48, 24, C.charcoal, null);
+      ctx.fillStyle = C.white;
+      ctx.font = "800 22px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("🛡️ 검증된 안심 메이트", 110, -331);
+
+      ctx.fillStyle = C.gray;
+      ctx.font = "600 25px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("울산대학교 · 컴퓨터공학부 · ENFP", -225, -275);
+
+      // 성향 태그 박스
+      roundRect(-395, -205, 790, 74, 20, C.mint, C.mintBorder, 2);
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 26px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("✨ 만남 성향 · #간단한스몰토크환영  #시간약속칼준수", 0, -168);
+
+      // 매너온도 게이지 애니메이션 (36.5 -> 40.5°C)
+      const gaugeP = easeOutCubic(prog(localT, 0.7, 1.1));
+      const tempVal = (36.5 + 4.0 * gaugeP).toFixed(1);
+
+      roundRect(-395, -100, 790, 155, 24, C.bg, C.border, 2);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 26px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("실시간 매너온도 (번개 후 호평으로만 상승)", -360, -52);
+
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 34px Pretendard, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${tempVal}°C`, 360, -52);
+
+      // 게이지 트랙
+      roundRect(-360, -6, 720, 26, 13, "#E5EAE7", null);
+      roundRect(-360, -6, 720 * (0.55 + 0.28 * gaugeP), 26, 13, C.primary, null);
+
+      // 공식 안심 인증 뱃지 4종 그리드
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 27px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("🏅 공식 안심 인증 뱃지 4종 (노쇼 0회 보증)", -390, 105);
+
+      const badges = [
+        { title: "따뜻한 온기 학우", sub: "매너온도 40.0°C 달성", x: -200, y: 195, d: 1.1 },
+        { title: "검증된 안심 메이트", sub: "만남 호평 15회 이상", x: 200, y: 195, d: 1.3 },
+        { title: "대화가 즐거운 사람", sub: "즐거운 대화 15회 이상", x: -200, y: 325, d: 1.5 },
+        { title: "약속 칼지킴이", sub: "시간·매너 호평 15회+", x: 200, y: 325, d: 1.7 }
+      ];
+
+      badges.forEach(b => {
+        const bp = easeOutBack(prog(localT, b.d, 0.45));
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.scale(0.85 + 0.15 * bp, 0.85 + 0.15 * bp);
+        ctx.globalAlpha = clamp(prog(localT, b.d, 0.25));
+        roundRect(-190, -52, 380, 104, 22, C.white, C.primary, 2.5);
+        drawShieldIcon(-142, 0, 22, C.primary);
+        ctx.fillStyle = C.charcoal;
+        ctx.font = "800 25px Pretendard, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(b.title, -102, -14);
+        ctx.fillStyle = C.primary;
+        ctx.font = "700 20px Pretendard, sans-serif";
+        ctx.fillText(b.sub, -102, 20);
+        ctx.restore();
+      });
+
+      ctx.restore();
+
+      // 하단 수락 버튼
+      const pBtn = easeOutBack(prog(localT, 2.0, 0.5));
+      ctx.save();
+      ctx.translate(W / 2, 1485);
+      ctx.scale(0.9 + 0.1 * pBtn, 0.9 + 0.1 * pBtn);
+      ctx.globalAlpha = clamp(prog(localT, 2.0, 0.3));
+      roundRect(-420, -48, 840, 96, 28, C.primary, null);
+      ctx.fillStyle = C.white;
+      ctx.font = "800 32px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("✓ 프로필 확인 완료 · 수락하고 대화방 열기", 0, 0);
+      ctx.restore();
+    }
+
+    // =====================================================
+    // SCENE 4 (11.2s ~ 15.0s): 강점 3 — 원터치 번개 채팅 & 커피 쿠폰 리워드
+    // =====================================================
+    function renderScene4(localT) {
+      drawBaseBackground(3, "강점 03 · 소통 & 리워드");
+
+      const pHead = easeOutCubic(prog(localT, 0.05, 0.45));
+      ctx.save();
+      ctx.globalAlpha = pHead;
+      ctx.translate(0, (1 - pHead) * 30);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 60px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("원터치 채팅으로 편하게 만나고,", W / 2, 290);
+      ctx.fillStyle = C.primary;
+      ctx.fillText("모일수록 쌓이는 커피 쿠폰까지!", W / 2, 375);
+      ctx.restore();
+
+      // 1) 카톡·인스타 DM급 안심 대화방 카드
+      const pChat = easeOutBack(prog(localT, 0.25, 0.5));
+      ctx.save();
+      ctx.translate(W / 2, 825);
+      ctx.scale(0.92 + 0.08 * pChat, 0.92 + 0.08 * pChat);
+      ctx.globalAlpha = clamp(prog(localT, 0.25, 0.3));
+      drawShadowCard(-450, -345, 900, 690, 36, C.white, C.border, 0.08);
+
+      // 상단 고정 약속 공지 바
+      roundRect(-405, -305, 810, 82, 20, C.bg, C.border, 2);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 25px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("📌 22호관 학생회관 학식 밥약 · 오늘 12:30 (단톡 3명)", -375, -264);
+
+      // 상대방 말풍선
+      const m1 = easeOutCubic(prog(localT, 0.65, 0.4));
+      ctx.save();
+      ctx.globalAlpha = m1;
+      ctx.translate(0, (1 - m1) * 20);
+      roundRect(-395, -185, 510, 82, 24, C.bg, C.border, 2);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "600 26px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("🐶 무거동곰돌이: 저 학생회관 1층 입구예요!", -365, -144);
+      ctx.restore();
+
+      // 내 원터치 말풍선 + 읽음 배지 + 인스타 DM 하트 공감
+      const m2 = easeOutBack(prog(localT, 1.25, 0.45));
+      ctx.save();
+      ctx.globalAlpha = clamp(prog(localT, 1.25, 0.25));
+      ctx.translate(0, (1 - m2) * 24);
+      roundRect(45, -65, 360, 82, 24, C.primary, null);
+      ctx.fillStyle = C.white;
+      ctx.font = "700 26px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("장소에 도착했어요 📍", 225, -24);
+
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 20px Pretendard, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("읽음 · 오후 12:28", 25, -12);
+      ctx.restore();
+
+      // 하트 공감 리액션 팝업
+      const pHeart = easeOutBack(prog(localT, 1.8, 0.4));
+      if (pHeart > 0) {
+        ctx.save();
+        ctx.translate(335, 38);
+        ctx.scale(pHeart, pHeart);
+        roundRect(-65, -24, 130, 48, 24, C.mint, C.primary, 2.5);
+        ctx.fillStyle = C.primary;
+        ctx.font = "800 23px Pretendard, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("❤️ 2  🙌 1", 0, 1);
+        ctx.restore();
+      }
+
+      // 하단 번개 전용 원터치 퀵 문구 바
+      ctx.fillStyle = C.gray;
+      ctx.font = "700 21px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("원터치 번개 퀵 문구", -395, 130);
+
+      const quickChips = ["지금 출발해요 🏃", "장소에 도착했어요 📍", "5분 정도 늦어요 🙏"];
+      let qx = -395;
+      quickChips.forEach((q, idx) => {
+        ctx.font = "700 23px Pretendard, sans-serif";
+        const qw = ctx.measureText(q).width + 40;
+        const isActive = idx === 1 && localT > 1.1;
+        roundRect(qx, 152, qw, 56, 28, isActive ? C.mint : C.white, isActive ? C.primary : C.border, 2.5);
+        ctx.fillStyle = isActive ? C.primary : C.charcoal;
+        ctx.textAlign = "center";
+        ctx.fillText(q, qx + qw / 2, 180);
+        qx += qw + 14;
+      });
+
+      // 대화창 닫기 / 목록 전환 안내
+      roundRect(-395, 236, 790, 68, 18, C.bg, C.border, 2);
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "700 24px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("💬 대화방 목록 분리 · 연속 말풍선 · 다인원 개별 매너 평가", 0, 270);
+      ctx.restore();
+
+      // 2) 하단 이달의 커피 쿠폰 리워드 카드
+      const pRew = easeOutBack(prog(localT, 2.0, 0.55));
+      ctx.save();
+      ctx.translate(W / 2, 1385);
+      ctx.scale(0.9 + 0.1 * pRew, 0.9 + 0.1 * pRew);
+      ctx.globalAlpha = clamp(prog(localT, 2.0, 0.3));
+      drawShadowCard(-450, -145, 900, 290, 34, C.mint, C.primary, 0.1);
+
+      ctx.font = "74px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("☕", -330, 0);
+
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 24px Pretendard, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("이달의 캠퍼스 활동 리워드 챌린지", -235, -55);
+
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 36px Pretendard, sans-serif";
+      ctx.fillText("첫 번개 달성 & 출석만 해도 커피 추첨권 지급!", -235, 2);
+
+      ctx.fillStyle = C.gray;
+      ctx.font = "600 24px Pretendard, sans-serif";
+      ctx.fillText("활동 점수 TOP 3 학우에게 매달 아메리카노 쿠폰 증정", -235, 56);
+      ctx.restore();
+    }
+
+    // =====================================================
+    // SCENE 5 (15.0s ~ 18.0s): 엔딩 슬로건 & CTA
+    // =====================================================
+    function renderScene5(localT) {
+      drawBaseBackground(4, "지금 바로 시작하기");
+
+      const pLogo = easeOutBack(prog(localT, 0.08, 0.55));
+      ctx.save();
+      ctx.translate(W / 2, 540);
+      ctx.scale(pLogo, pLogo);
+      drawLogo(0, 0, 180);
+      ctx.restore();
+
+      const pText = easeOutCubic(prog(localT, 0.3, 0.5));
+      ctx.save();
+      ctx.globalAlpha = pText;
+      ctx.translate(0, (1 - pText) * 30);
+
+      drawPill(W / 2, 710, "울산대학교 캠퍼스 안심 번개 매칭 플랫폼", C.mint, C.primary, C.mintBorder, 28, 36, 16);
+
+      ctx.fillStyle = C.charcoal;
+      ctx.font = "800 76px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("우리 학교, 가볍게 모여!", W / 2, 845);
+
+      ctx.fillStyle = C.primary;
+      ctx.font = "800 88px Pretendard, sans-serif";
+      ctx.fillText("울대모", W / 2, 965);
+      ctx.restore();
+
+      // 4대 핵심 요약 카드
+      const pBox = easeOutBack(prog(localT, 0.6, 0.55));
+      ctx.save();
+      ctx.translate(W / 2, 1255);
+      ctx.scale(0.92 + 0.08 * pBox, 0.92 + 0.08 * pBox);
+      ctx.globalAlpha = clamp(prog(localT, 0.6, 0.3));
+      drawShadowCard(-430, -175, 860, 350, 34, C.white, C.border, 0.08);
+
+      const summary = [
+        "✓  학번 + 비밀번호 보안 & 30일 자동 로그인",
+        "✓  실시간 매너온도 & 4종 공식 안심 인증 뱃지",
+        "✓  울산대 62개 호관 지도 & 오늘의 학식 연동",
+        "✓  원터치 번개 채팅 & 매달 커피 쿠폰 리워드"
+      ];
+      summary.forEach((line, i) => {
+        ctx.fillStyle = C.charcoal;
+        ctx.font = "700 28px Pretendard, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(line, -340, -95 + i * 68);
+      });
+      ctx.restore();
+
+      // 하단 URL 검색창 CTA
+      const pUrl = easeOutBack(prog(localT, 0.95, 0.5));
+      ctx.save();
+      ctx.translate(W / 2, 1585);
+      ctx.scale(0.9 + 0.1 * pUrl, 0.9 + 0.1 * pUrl);
+      ctx.globalAlpha = clamp(prog(localT, 0.95, 0.3));
+      roundRect(-410, -56, 820, 112, 56, C.primary, null);
+      ctx.fillStyle = C.white;
+      ctx.font = "800 38px Pretendard, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🔍  www.uladaemo.app", 0, 0);
+      ctx.restore();
+    }
+
+    // 상단 인스타 릴스형 진행바 및 탭 상태 업데이트
+    function updateUiIndicators(t) {
+      document.getElementById("timeLabel").textContent = `${t.toFixed(1)}s / ${TOTAL_DURATION.toFixed(1)}s`;
+      SCENES.forEach((s, idx) => {
+        const segEl = document.getElementById(`seg${idx}`);
+        const tabEl = document.getElementById(`tab${idx}`);
+        let pct = 0;
+        if (t >= s.end) pct = 100;
+        else if (t > s.start) pct = ((t - s.start) / (s.end - s.start)) * 100;
+        if (segEl) segEl.style.width = `${pct}%`;
+        if (tabEl) {
+          const isCurrent = t >= s.start && (t < s.end || (idx === SCENES.length - 1 && t <= TOTAL_DURATION));
+          tabEl.classList.toggle("active", isCurrent);
+        }
+      });
+    }
+
+    function renderFrame(t) {
+      triggerSceneAudioCues(t);
+      updateUiIndicators(t);
+
+      if (t < SCENES[0].end) {
+        renderScene1(t - SCENES[0].start);
+      } else if (t < SCENES[1].end) {
+        renderScene2(t - SCENES[1].start);
+      } else if (t < SCENES[2].end) {
+        renderScene3(t - SCENES[2].start);
+      } else if (t < SCENES[3].end) {
+        renderScene4(t - SCENES[3].start);
+      } else {
+        renderScene5(t - SCENES[4].start);
+      }
+    }
+
+    function loop(now) {
+      const dt = (now - lastFrameTs) / 1000;
+      lastFrameTs = now;
+      if (isPlaying) {
+        currentTime += dt;
+        if (currentTime > TOTAL_DURATION) {
+          currentTime = 0;
+          lastCueKey = "";
+        }
+      }
+      renderFrame(currentTime);
+      requestAnimationFrame(loop);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById("playBtn").textContent = isPlaying ? "⏸ 일시정지" : "▶ 재생";
+    }
+
+    function restartAd() {
+      currentTime = 0;
+      lastCueKey = "";
+      isPlaying = true;
+      document.getElementById("playBtn").textContent = "⏸ 일시정지";
+    }
+
+    function jumpToScene(idx) {
+      if (!SCENES[idx]) return;
+      currentTime = SCENES[idx].start + 0.01;
+      lastCueKey = "";
+      isPlaying = true;
+      document.getElementById("playBtn").textContent = "⏸ 일시정지";
+    }
+
+    function toggleSound() {
+      soundOn = !soundOn;
+      document.getElementById("soundBtn").textContent = soundOn ? "🔊 효과음 켜짐" : "🔇 효과음 꺼짐";
+    }
+
+    canvas.addEventListener("click", togglePlay);
+
+    // 🎥 캔버스 모션그래픽을 고화질 WebM 동영상 파일로 즉시 녹화·추출
+    let isRecording = false;
+    function exportVideoWebM() {
+      if (isRecording) return;
+      if (!canvas.captureStream || typeof MediaRecorder === "undefined") {
+        alert("현재 브라우저에서는 직접 영상 추출을 지원하지 않습니다. 화면 녹화(Win+G)를 이용해 주세요.");
+        return;
+      }
+      isRecording = true;
+      const btn = document.getElementById("recordBtn");
+      btn.classList.add("recording");
+      btn.textContent = "🔴 18초 녹화 중... (잠시만 기다려주세요)";
+
+      currentTime = 0;
+      lastCueKey = "";
+      isPlaying = true;
+      document.getElementById("playBtn").textContent = "⏸ 일시정지";
+
+      const stream = canvas.captureStream(60);
+      const chunks = [];
+      let mime = "video/webm;codecs=vp9";
+      if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
+        const blob = new Blob(chunks, { type: "video/webm" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = `uldaemo_motion_15s_${Date.now()}.webm`;
+        a.download = "uldaemo_official_promo_18s.webm";
         a.click();
-        URL.revokeObjectURL(url);
-        exportBtn.disabled = false;
-        exportBtn.innerText = '?뱿 ?곸긽 ?뚯씪 ?ㅼ슫濡쒕뱶 (.webm)';
-        alert('?럦 15珥?紐⑥뀡洹몃옒???곸긽 ?뚯씪(.webm)???깃났?곸쑝濡??ㅼ슫濡쒕뱶?섏뿀?듬땲??');
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        isRecording = false;
+        btn.classList.remove("recording");
+        btn.textContent = "✅ 영상 저장 완료! (다시 저장)";
       };
 
       recorder.start();
-
       setTimeout(() => {
-        if (recorder.state === 'recording') {
-          recorder.stop();
-        }
-      }, DURATION * 1000 + 300);
-    });
+        if (recorder.state === "recording") recorder.stop();
+      }, TOTAL_DURATION * 1000 + 150);
+    }
 
-    window.addEventListener('click', initAudio, { once: true });
-    requestAnimationFrame(animate);
+    requestAnimationFrame(loop);
   </script>
 </body>
 </html>
