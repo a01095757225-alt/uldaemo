@@ -688,7 +688,7 @@
     .chat-bubble-wrap {
       display: flex;
       align-items: flex-end;
-      gap: 6px;
+      gap: 7px; /* 말풍선과 시간·읽음 사이의 안락한 4~6px 여백 */
     }
     .chat-bubble-wrap.me {
       flex-direction: row;
@@ -798,15 +798,18 @@
       flex-direction: column;
       font-size: 10px;
       color: #8B95A1;
-      line-height: 1.2;
-      margin-bottom: 2px;
+      line-height: 1.25;
+      margin-bottom: 3px;
+      gap: 2px;
       flex-shrink: 0;
     }
     .chat-meta.me {
       align-items: flex-end;
+      margin-right: 2px;
     }
     .chat-meta.other {
       align-items: flex-start;
+      margin-left: 2px;
     }
     .chat-read-badge {
       font-size: 9.5px;
@@ -6220,6 +6223,26 @@
             <span style="color:#8B95A1; flex-shrink:0; margin-left:8px;">${escHtml(post.location)}</span>
           </div>
 
+          <!-- 모임 시간이 지난 방: 오늘 어땠어요? 매너 후기 남기기 배너 -->
+          ${(() => {
+            const hasReviewed = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId);
+            if (isPostExpired(post) && !hasReviewed) {
+              return `
+                <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:10px 14px; margin:10px 16px 0; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="state['chat_action_open_${post.id}']=true; render();">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:18px;">✨</span>
+                    <div>
+                      <div style="font-size:13px; font-weight:700; color:#287D62;">오늘 어땠어요? 매너 후기 남기기</div>
+                      <div style="font-size:11.5px; color:#6B7684;">서로의 매너온도를 올려보세요</div>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-primary" style="min-height:28px; height:28px; padding:0 10px; font-size:11.5px; border-radius:8px;">후기 남기기 ›</button>
+                </div>
+              `;
+            }
+            return "";
+          })()}
+
           ${isActionOpen ? `
             <div style="background:#F7F9F8; border-radius:14px; padding:14px; margin:10px 16px 0;">
               ${otherIds.length > 1 ? `
@@ -6270,9 +6293,9 @@
                 </div>
               </div>
             ` : ""}
-            <div class="chat-quick-bar" style="margin-bottom:8px;">
+            <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 6px;">
               ${QUICK_CHAT_PHRASES.map(phrase => `
-                <button type="button" class="cat-btn" style="height:34px; font-size:13px; padding:0 13px;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
+                <button type="button" class="cat-btn" style="height:34px; font-size:13px; padding:0 13px; flex-shrink:0; white-space:nowrap;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
               `).join("")}
             </div>
             <div style="display:flex; gap:8px; align-items:flex-end;">
