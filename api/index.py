@@ -376,7 +376,7 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
                         merged_u.update(s_u)
 
                 # 동일 계정의 중복 신고 방지 (reported_by 기준 1인 1회만 인정) 및 운영진 계정(20261275 등) 정지 해제 보장
-                if str(uid) in ("20261275", "20241001", "admin"):
+                if str(uid) == "20261275":
                     merged_u["report_count"] = 0
                     merged_u["reported_by"] = []
                     if (merged_u.get("manner_temp") or 36.5) < 36.5:
