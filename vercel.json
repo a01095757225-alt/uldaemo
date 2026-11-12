@@ -11,6 +11,6 @@
     { "src": "/promo", "dest": "/promo.html" },
     { "src": "/promo.html", "dest": "/promo.html" },
     { "src": "/sw.js", "dest": "/sw.js", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate", "Service-Worker-Allowed": "/" } },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/(.*)", "dest": "/index.html", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" } }
   ]
 }
