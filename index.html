@@ -762,22 +762,26 @@
       border: 1px solid var(--border);
     }
     .chat-box {
-      height: 320px;
+      height: 360px;
       overflow-y: auto;
-      background: #F8FAF9;
+      background: #F7F9F8;
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 14px 12px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 4px;
     }
     .chat-msg-row {
       display: flex;
       gap: 8px;
       align-items: flex-end;
       width: 100%;
+      margin-top: 6px;
+    }
+    .chat-msg-row.grouped {
+      margin-top: 1px;
     }
     .chat-msg-row.me {
       justify-content: flex-end;
@@ -789,19 +793,24 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: #FFFFFF;
-      border: 1.5px solid #C5E6D6;
+      background: #EEF8F3;
+      border: 1.5px solid #287D62;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 16px;
       flex-shrink: 0;
-      margin-bottom: 2px;
+      align-self: flex-start;
+      margin-top: 2px;
+    }
+    .chat-avatar-spacer {
+      width: 32px;
+      flex-shrink: 0;
     }
     .chat-bubble-col {
       display: flex;
       flex-direction: column;
-      max-width: 75%;
+      max-width: 76%;
     }
     .chat-bubble-col.me {
       align-items: flex-end;
@@ -810,7 +819,7 @@
       align-items: flex-start;
     }
     .chat-sender-name {
-      font-size: 11px;
+      font-size: 11.5px;
       font-weight: 700;
       color: #6B7684;
       margin-bottom: 3px;
@@ -827,23 +836,106 @@
     .chat-bubble-me {
       background: #287D62;
       color: #FFFFFF;
-      padding: 9px 13px;
+      padding: 9px 14px;
       border-radius: 18px 18px 4px 18px;
       font-size: 13.5px;
       line-height: 1.45;
       word-break: break-word;
-      box-shadow: 0 1px 3px rgba(40,125,98,0.2);
+      margin: 0;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(40,125,98,0.14);
+    }
+    .chat-msg-row.grouped .chat-bubble-me {
+      border-radius: 18px 6px 4px 18px;
     }
     .chat-bubble-other {
       background: #FFFFFF;
       color: var(--text-main);
-      border: 1px solid #E5E8EB;
-      padding: 9px 13px;
+      border: 1px solid #E5EAE7;
+      padding: 9px 14px;
       border-radius: 18px 18px 18px 4px;
       font-size: 13.5px;
       line-height: 1.45;
       word-break: break-word;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      margin: 0;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .chat-msg-row.grouped .chat-bubble-other {
+      border-radius: 6px 18px 18px 4px;
+    }
+    .chat-quick-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      scrollbar-width: none;
+    }
+    .chat-quick-bar::-webkit-scrollbar { display: none; }
+    .chat-quick-chip {
+      border: 1px solid #E5EAE7;
+      background: #FFFFFF;
+      color: #191F28;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 11px;
+      border-radius: 999px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .chat-quick-chip:hover {
+      background: #EEF8F3;
+      border-color: #287D62;
+      color: #287D62;
+    }
+    .chat-react-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 3px;
+      flex-wrap: wrap;
+    }
+    .chat-react-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 999px;
+      border: 1px solid #E5EAE7;
+      background: #FFFFFF;
+      color: #191F28;
+      cursor: pointer;
+    }
+    .chat-react-pill.active {
+      background: #EEF8F3;
+      border-color: #287D62;
+      color: #287D62;
+    }
+    .chat-room-item {
+      background: #FFFFFF;
+      border: 1px solid #E5EAE7;
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .chat-room-item:hover {
+      border-color: #287D62;
+      background: #F7F9F8;
+    }
+    .chat-room-item.has-unread {
+      border-color: #287D62;
+      background: #EEF8F3;
     }
     .chat-meta {
       display: flex;
@@ -1829,7 +1921,7 @@
           u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, v.coffee_tickets, v.streak_days]),
           p: (DB.posts || []).map(p => [p.id, p.status, p.title]),
           a: (DB.applications || []).map(a => [a.id, a.status]),
-          m: (DB.messages || []).map(m => [m.id, m.is_read, m.text]),
+          m: (DB.messages || []).map(m => [m.id, m.is_read, m.text, m.reactions]),
           n: (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => [n.id, n.is_read]),
           pl: (DB.polls || []).map(p => [p.id, (p.votes_a || []).length, (p.votes_b || []).length]),
           t: (DB.plaza_talks || []).map(t => [t.id, (t.likes || []).length])
@@ -2991,6 +3083,7 @@
       root.className = "app-shell wide";
 
       const unreadCnt = DB.notifications.filter(n => n.user_id === state.user_id && !n.is_read).length;
+      const unreadChatCnt = typeof getUnreadChatCount === "function" ? getUnreadChatCount() : 0;
       const badgeCnt = unreadCnt + unseenNoticeCnt();
       const newNoticeCnt = unseenNoticeCnt();
       const notifBadgeText = badgeCnt > 0
@@ -3044,7 +3137,7 @@
               <button class="side-nav-btn ${isActiveNav(n.key) ? 'active' : ''}" onclick="switchTab('${n.key}')">
                 <span class="side-nav-icon">${getSvgIcon(n.iconName, 18)}</span>
                 <span>${n.label}</span>
-                ${n.key === '채팅' && unreadCnt > 0 ? `<span class="side-dot">${unreadCnt}</span>` : ''}
+                ${n.key === '채팅' && unreadChatCnt > 0 ? `<span class="side-dot">${unreadChatCnt}</span>` : ''}
               </button>
             `).join("")}
           </nav>
@@ -3211,7 +3304,7 @@
               <button class="dock-btn ${isActiveNav(n.key) ? 'active' : ''}" onclick="switchTab('${n.key}')">
                 <span class="dock-icon">${getSvgIcon(n.iconName, 20)}</span>
                 <span>${n.mLabel}</span>
-                ${n.key === '채팅' && unreadCnt > 0 ? '<span class="dock-badge-dot"></span>' : ''}
+                ${n.key === '채팅' && unreadChatCnt > 0 ? '<span class="dock-badge-dot"></span>' : ''}
               </button>
             `).join("")}
           </div>
@@ -4506,6 +4599,8 @@
       if (post) {
         notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었습니다! 안심 채팅방을 확인하세요.`, post.id);
         checkAndGrantFirstMeetupReward(post.author_id);
+        state.active_chat_post_id = Number(post.id);
+        state.chat_list_mode = false;
       }
       checkAndGrantFirstMeetupReward(app.applicant_id);
       saveDB(true);
@@ -5182,16 +5277,24 @@
     }
 
     // =========================================================
-    // 8. 안심 채팅 탭 (정규식 + Gemini AI 경찰 + AI 주제추천 + 매너평가)
+    // 8. 안심 채팅 탭 (카톡·인스타 DM형 목록/대화방 분리 + 연속 말풍선 + 공감 리액션 + 원터치 번개 칩 + 다인원 개별 평가)
     // =========================================================
-    function renderChatTab() {
-      const myId = String(state.user_id);
+    const QUICK_CHAT_PHRASES = [
+      "지금 출발해요 🏃",
+      "장소에 도착했어요 📍",
+      "5분 정도 늦을 것 같아요 🙏",
+      "어디쯤이신가요? 👀",
+      "반가웠어요! 조심히 들어가세요 🙌"
+    ];
+
+    function getMyActiveChatRooms() {
+      const myId = String(state.user_id || "");
+      if (!myId) return { pendingHost: [], activeChats: [] };
       const myHostedApps = (DB.applications || []).filter(a => {
         const p = (DB.posts || []).find(post => Number(post.id) === Number(a.post_id));
         return p && String(p.author_id) === myId;
       });
       const myAppliedApps = (DB.applications || []).filter(a => String(a.applicant_id) === myId);
-
       const pendingHost = myHostedApps.filter(a => a.status === "대기중");
 
       const activePostIds = new Set();
@@ -5206,26 +5309,109 @@
         const allMemberIds = [String(post.author_id), ...approvedApps.map(a => String(a.applicant_id))];
         const uniqueOthers = Array.from(new Set(allMemberIds.filter(uid => uid && uid !== myId)));
         const partnerId = uniqueOthers[0] || String(post.author_id);
-        activeChats.push({ post, partnerId, otherIds: uniqueOthers, totalMembers: new Set(allMemberIds).size });
+        const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(pid));
+        const unreadInRoom = msgs.filter(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read).length;
+        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+        const lastMsgTs = lastMsg ? (Number(lastMsg.id) || 0) : (Number(post.id) || 0);
+        activeChats.push({
+          post,
+          partnerId,
+          otherIds: uniqueOthers,
+          totalMembers: new Set(allMemberIds).size,
+          msgs,
+          unreadInRoom,
+          lastMsg,
+          lastMsgTs
+        });
       });
 
+      activeChats.sort((a, b) => b.lastMsgTs - a.lastMsgTs);
+      return { pendingHost, activeChats };
+    }
+
+    function getUnreadChatCount() {
+      const { pendingHost, activeChats } = getMyActiveChatRooms();
+      const msgUnread = activeChats.reduce((acc, c) => acc + c.unreadInRoom, 0);
+      return msgUnread + pendingHost.length;
+    }
+
+    function openChatRoom(postId) {
+      state.active_chat_post_id = Number(postId);
+      state.chat_list_mode = false;
+      render();
+      setTimeout(() => {
+        const box = document.getElementById(`chat_box_${postId}`);
+        if (box) box.scrollTop = box.scrollHeight;
+        if (isPC()) {
+          const inp = document.getElementById(`chat_in_${postId}`);
+          if (inp) inp.focus();
+        }
+      }, 30);
+    }
+
+    function backToChatList() {
+      state.chat_list_mode = true;
+      render();
+    }
+
+    function selectChatEvalTarget(postId, targetUid) {
+      state[`chat_eval_target_${postId}`] = String(targetUid);
+      render();
+    }
+
+    function renderChatTab() {
+      const myId = String(state.user_id);
+      const { pendingHost, activeChats } = getMyActiveChatRooms();
+
+      if (activeChats.length === 1 && !state.active_chat_post_id) {
+        state.active_chat_post_id = Number(activeChats[0].post.id);
+        state.chat_list_mode = false;
+      } else if (activeChats.length > 0 && state.active_chat_post_id && !activeChats.some(c => Number(c.post.id) === Number(state.active_chat_post_id))) {
+        state.active_chat_post_id = Number(activeChats[0].post.id);
+      }
+
+      // 대화방이 2개 이상이고 사용자가 목록 보기를 눌렀거나 아직 방을 안 골랐다면 카톡/인스타 DM형 목록 뷰 표시
+      const showRoomList = activeChats.length >= 2 && (state.chat_list_mode || !state.active_chat_post_id);
+      const activeRoom = !showRoomList && activeChats.length > 0
+        ? (activeChats.find(c => Number(c.post.id) === Number(state.active_chat_post_id)) || activeChats[0])
+        : null;
+
+      const totalUnreadMsgs = activeChats.reduce((acc, c) => acc + c.unreadInRoom, 0);
+
       return `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">대화</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">매칭된 학우들과 안전하게 이야기를 나누세요</p>
+            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">
+              ${activeChats.length > 0
+                ? `참여 중인 대화방 ${activeChats.length}개${totalUnreadMsgs > 0 ? ` · 새 메시지 <b style="color:#287D62;">${totalUnreadMsgs}개</b>` : ""}`
+                : "매칭된 학우들과 안전하게 이야기를 나누세요"}
+            </p>
           </div>
-          <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 14px; border-radius:10px; font-size:12.5px; font-weight:700; color:#6B7684; border-color:#E5EAE7; background:#FFFFFF;" onclick="pullFromCloud(true)">새로고침</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${activeChats.length >= 2 && !showRoomList ? `
+              <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 13px; border-radius:10px; font-size:12.5px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3;" onclick="backToChatList()">
+                ← 대화 목록 (${activeChats.length})
+              </button>
+            ` : ""}
+            <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 14px; border-radius:10px; font-size:12.5px; font-weight:700; color:#6B7684; border-color:#E5EAE7; background:#FFFFFF;" onclick="pullFromCloud(true)">새로고침</button>
+          </div>
         </div>
 
-        <div style="background:#EEF8F3; border-radius:12px; padding:11px 16px; margin-bottom:14px; display:flex; align-items:center; gap:8px; font-size:13px; color:#191F28; font-weight:500;">
-          <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
-          <span>외부 연락처(카톡·전화번호) 교환 없이 인앱에서 안전하게 대화하세요</span>
+        <div style="background:#EEF8F3; border-radius:12px; padding:11px 16px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:13px; color:#191F28; font-weight:500;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
+            <span>외부 연락처(카톡·전화번호) 교환 없이 인앱에서 안전하게 대화하세요</span>
+          </div>
+          <span style="font-size:11.5px; font-weight:700; color:#287D62;">말풍선 터치 시 공감 리액션 가능</span>
         </div>
 
         ${pendingHost.length > 0 ? `
           <div class="uldaemo-card">
-            <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:10px;">수락 대기 중인 참여 신청</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-size:15px; font-weight:800; color:#191F28;">수락 대기 중인 참여 신청</div>
+              <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">${pendingHost.length}건 대기</span>
+            </div>
             ${pendingHost.map(a => {
               const u = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, mbti: "INFP", manner_temp: 36.5 };
               const p = DB.posts.find(post => Number(post.id) === Number(a.post_id));
@@ -5255,102 +5441,276 @@
             <div style="font-weight:700; font-size:15px; color:#191F28;">진행 중인 대화가 없습니다</div>
             <div style="font-size:13px; color:#6B7684; margin-top:4px;">번개 모임에 참여 신청 후 방장이 수락하면 안전한 대화방이 열립니다.</div>
           </div>
-        ` : activeChats.map(({ post, partnerId, otherIds, totalMembers }) => {
-          const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
-          const partnerBadges = renderVerifiedBadgePills(partnerId, 2);
-          const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
-          const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(post.id));
+        ` : showRoomList ? `
+          <!-- 카카오톡 / 인스타 DM 스타일 대화방 목록 -->
+          <div>
+            ${activeChats.map(room => {
+              const { post, partnerId, otherIds, totalMembers, unreadInRoom, lastMsg } = room;
+              const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
+              const partnerBadges = renderVerifiedBadgePills(partnerId, 1);
+              const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+              const previewText = lastMsg
+                ? (lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : lastMsg.text)
+                : `${otherNames || partner.nickname}님과 첫 인사를 나눠보세요`;
+              const previewTime = lastMsg
+                ? (lastMsg.created_at || formatMsgTime(lastMsg.id))
+                : `${post.meet_time || ""}`;
 
-          let markedRead = false;
-          msgs.forEach(m => {
-            if (String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
-              m.is_read = 1;
-              m.updated_at = Date.now();
-              markedRead = true;
-            }
-          });
-          if (markedRead) {
-            setTimeout(() => saveDB(false), 100);
-          }
-
-          const isActionOpen = Boolean(state[`chat_action_open_${post.id}`]);
-
-          return `
-            <div class="uldaemo-card" style="padding:18px; margin-bottom:14px; border:1px solid #E5EAE7;">
-              <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid #F2F4F3;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <div style="width:40px; height:40px; border-radius:50%; background:#EEF8F3; border:1.5px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
-                    ${partner.avatar.split(" ")[0]}
-                  </div>
-                  <div>
-                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                      <span style="font-weight:800; font-size:14.5px; color:#191F28;">${escHtml(otherNames || partner.nickname)}</span>
-                      <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">${(partner.manner_temp || 36.5).toFixed(1)}°C</span>
-                      ${partnerBadges}
-                      ${totalMembers > 2 ? `<span style="font-size:11px; font-weight:700; color:#6B7684; background:#F7F9F8; padding:2px 8px; border-radius:999px; border:1px solid #E5EAE7;">${totalMembers}명 참여</span>` : ""}
+              return `
+                <div class="chat-room-item ${unreadInRoom > 0 ? 'has-unread' : ''}" onclick="openChatRoom(${post.id})">
+                  <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+                    <div style="position:relative; width:46px; height:46px; border-radius:50%; background:#EEF8F3; border:1.5px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:21px; flex-shrink:0;">
+                      ${partner.avatar.split(" ")[0]}
+                      ${totalMembers > 2 ? `<span style="position:absolute; bottom:-3px; right:-4px; background:#191F28; color:#FFFFFF; font-size:10px; font-weight:800; padding:1px 5px; border-radius:999px; border:1.5px solid #FFFFFF;">${totalMembers}</span>` : ""}
                     </div>
-                    <div style="font-size:12px; color:#6B7684; margin-top:2px; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="openDetailModal(${post.id})">
-                      <span style="font-weight:600; color:#191F28;">${escHtml(post.title)}</span>
-                      <span style="color:#287D62; font-size:11.5px; font-weight:700;">상세 보기 ›</span>
+                    <div style="min-width:0; flex:1;">
+                      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <span style="font-weight:800; font-size:14.5px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
+                        <span style="font-size:11px; font-weight:700; color:#287D62; background:#FFFFFF; border:1px solid #C5E6D6; padding:1px 7px; border-radius:999px;">${(partner.manner_temp || 36.5).toFixed(1)}°C</span>
+                        ${partnerBadges}
+                      </div>
+                      <div style="font-size:12px; color:#287D62; font-weight:700; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        ${escHtml(post.title)} · <span style="color:#6B7684; font-weight:500;">${escHtml(post.location)} (${escHtml(post.meet_time)})</span>
+                      </div>
+                      <div style="font-size:13px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '700' : '500'}; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        ${escHtml(previewText)}
+                      </div>
                     </div>
                   </div>
+                  <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;">
+                    <span style="font-size:11px; color:#6B7684; font-weight:600;">${escHtml(previewTime)}</span>
+                    ${unreadInRoom > 0
+                      ? `<span style="background:#287D62; color:#FFFFFF; font-size:11px; font-weight:800; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;">${unreadInRoom}</span>`
+                      : `<span style="font-size:11px; color:#287D62; font-weight:700;">입장 ›</span>`}
+                  </div>
                 </div>
-
-                <div style="display:flex; align-items:center; gap:6px;">
-                  <span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;">
-                    <span style="width:6px; height:6px; border-radius:50%; background:#287D62; display:inline-block;"></span>
-                    안심 보호중
-                  </span>
-                </div>
-              </div>
-
-              <div class="chat-box" id="chat_box_${post.id}">
-                ${renderChatMessagesInner(post.id)}
-              </div>
-
-              <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; margin-bottom:10px;">
-                <input id="chat_in_${post.id}" class="input" style="margin-bottom:0; border-radius:12px;" autocomplete="off" placeholder="메시지를 입력하세요 (외부 연락처 공유 차단)" onkeydown="handleChatInputKeydown(event, ${post.id})" />
-                <button type="button" class="btn btn-primary" style="min-width:72px; border-radius:12px; font-weight:700;" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendChatMessage(${post.id})">전송</button>
-              </div>
-
-              <div style="display:flex; justify-content:space-between; align-items:center; padding-top:2px;">
-                <div style="display:flex; gap:6px;">
-                  <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:600; background:#F7F9F8; border:1px solid #E5EAE7; color:#191F28;" onmousedown="event.preventDefault()" onclick="triggerAiIcebreaker(${post.id})">
-                    대화 주제 추천
+              `;
+            }).join("")}
+          </div>
+        ` : activeRoom ? `
+          ${activeChats.length >= 2 ? `
+            <!-- 상단 원터치 대화방 스위처 바 -->
+            <div class="chat-quick-bar" style="margin-bottom:10px;">
+              ${activeChats.map(r => {
+                const isCur = Number(r.post.id) === Number(activeRoom.post.id);
+                const pUser = DB.users[r.partnerId] || { avatar: "🐶", nickname: r.partnerId };
+                return `
+                  <button type="button" class="chat-quick-chip" style="background:${isCur ? '#287D62' : '#FFFFFF'}; color:${isCur ? '#FFFFFF' : '#191F28'}; border-color:${isCur ? '#287D62' : '#E5EAE7'}; font-weight:700;" onclick="openChatRoom(${r.post.id})">
+                    ${pUser.avatar.split(" ")[0]} ${escHtml(r.post.title.slice(0, 12))}${r.unreadInRoom > 0 && !isCur ? ` (${r.unreadInRoom})` : ""}
                   </button>
-                  <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:600; background:${isActionOpen ? '#EEF8F3' : '#FFFFFF'}; border:1px solid ${isActionOpen ? '#287D62' : '#E5EAE7'}; color:${isActionOpen ? '#287D62' : '#6B7684'};" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">
-                    ${isActionOpen ? '매너 평가 · 신고 닫기' : '매너 평가 · 신고'}
-                  </button>
+                `;
+              }).join("")}
+            </div>
+          ` : ""}
+          ${renderSingleChatRoomCard(activeRoom)}
+        ` : ""}
+      `;
+    }
+
+    function renderSingleChatRoomCard(room) {
+      const myId = String(state.user_id);
+      const { post, partnerId, otherIds, totalMembers, msgs } = room;
+      const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
+      const partnerBadges = renderVerifiedBadgePills(partnerId, 2);
+      const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+
+      // 실제로 이 방을 열었을 때만 읽음 처리!
+      let markedRead = false;
+      msgs.forEach(m => {
+        if (String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
+          m.is_read = 1;
+          m.updated_at = Date.now();
+          markedRead = true;
+        }
+      });
+      if (markedRead) {
+        setTimeout(() => saveDB(false), 80);
+      }
+
+      const isActionOpen = Boolean(state[`chat_action_open_${post.id}`]);
+      const evalTargetId = (state[`chat_eval_target_${post.id}`] && otherIds.includes(String(state[`chat_eval_target_${post.id}`])))
+        ? String(state[`chat_eval_target_${post.id}`])
+        : partnerId;
+      const evalTargetUser = DB.users[evalTargetId] || partner;
+      const alreadyPraisedTarget = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId && String(r.to_id) === String(evalTargetId));
+
+      return `
+        <div class="uldaemo-card" style="padding:18px; margin-bottom:14px; border:1px solid #E5EAE7;">
+          <!-- 대화방 상단 프로필 헤더 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:10px; border-bottom:1px solid #F2F4F3;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:42px; height:42px; border-radius:50%; background:#EEF8F3; border:1.5px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;">
+                ${partner.avatar.split(" ")[0]}
+              </div>
+              <div>
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span style="font-weight:800; font-size:15px; color:#191F28;">${escHtml(otherNames || partner.nickname)}</span>
+                  <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">${(partner.manner_temp || 36.5).toFixed(1)}°C</span>
+                  ${partnerBadges}
+                  ${totalMembers > 2 ? `<span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">단톡 ${totalMembers}명</span>` : ""}
                 </div>
-                <span style="font-size:11.5px; color:#6B7684;">익명 보호 적용</span>
+                <div style="font-size:12px; color:#6B7684; margin-top:2px;">
+                  ${escHtml(partner.department || "울산대")} · 블라인드 안심 프로필
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;">
+                <span style="width:6px; height:6px; border-radius:50%; background:#287D62; display:inline-block;"></span>
+                안심 보호중
+              </span>
+            </div>
+          </div>
+
+          <!-- 카톡 오픈채팅/당근형 상단 약속 고정 공지 바 -->
+          <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:10px 13px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div style="font-size:12px; color:#191F28; line-height:1.45;">
+              <div style="font-weight:800; color:#191F28; margin-bottom:2px;">📌 ${escHtml(post.title)}</div>
+              <div style="color:#6B7684;">
+                장소 <b style="color:#191F28;">${escHtml(post.location)}</b> · 일시 <b style="color:#287D62;">${escHtml(post.meet_date || "오늘")} ${escHtml(post.meet_time)}</b> · ${escHtml(post.meeting_style || "편하게 소통")}
+              </div>
+            </div>
+            <button type="button" class="btn" style="width:auto; min-height:30px; padding:0 10px; font-size:11.5px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3;" onclick="openDetailModal(${post.id})">
+              모임 상세 ›
+            </button>
+          </div>
+
+          <!-- 채팅 메시지 박스 -->
+          <div class="chat-box" id="chat_box_${post.id}">
+            ${renderChatMessagesInner(post.id)}
+          </div>
+
+          <!-- 번개 전용 원터치 퀵 메시지 칩 -->
+          <div class="chat-quick-bar">
+            ${QUICK_CHAT_PHRASES.map(phrase => `
+              <button type="button" class="chat-quick-chip" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
+            `).join("")}
+          </div>
+
+          <!-- 메시지 입력창 -->
+          <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; margin-bottom:10px;">
+            <input id="chat_in_${post.id}" class="input" style="margin-bottom:0; border-radius:12px;" autocomplete="off" placeholder="메시지를 입력하세요 (외부 연락처 공유 차단)" onkeydown="handleChatInputKeydown(event, ${post.id})" />
+            <button type="button" class="btn btn-primary" style="min-width:72px; border-radius:12px; font-weight:700;" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendChatMessage(${post.id})">전송</button>
+          </div>
+
+          <!-- 하단 유틸리티 바 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:2px; flex-wrap:wrap; gap:6px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:600; background:#F7F9F8; border:1px solid #E5EAE7; color:#191F28;" onmousedown="event.preventDefault()" onclick="triggerAiIcebreaker(${post.id})">
+                대화 주제 추천
+              </button>
+              <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:600; background:${isActionOpen ? '#EEF8F3' : '#FFFFFF'}; border:1px solid ${isActionOpen ? '#287D62' : '#E5EAE7'}; color:${isActionOpen ? '#287D62' : '#6B7684'};" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">
+                ${isActionOpen ? '매너 평가 · 신고 닫기' : `매너 평가 · 신고${otherIds.length > 1 ? ` (${otherIds.length}명)` : ""}`}
+              </button>
+            </div>
+            <span style="font-size:11.5px; color:#6B7684;">말풍선 클릭 시 공감(❤️·👍·🙌)</span>
+          </div>
+
+          ${isActionOpen ? `
+            <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:14px; margin-top:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px;">
+                <span style="font-size:12.5px; font-weight:700; color:#191F28;">만남 완료 후 참여 학우의 매너를 평가해 주세요</span>
+                <span style="font-size:11px; color:#287D62; font-weight:700;">온도 +0.5°C & 15회 인증 뱃지 반영</span>
               </div>
 
-              ${isActionOpen ? `
-                <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:14px; margin-top:10px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:6px;">
-                    <span style="font-size:12.5px; font-weight:700; color:#191F28;">만남 완료 후 상대 학우의 매너를 평가해 주세요</span>
-                    <span style="font-size:11px; color:#287D62; font-weight:700;">온도 +0.5°C & 15회 인증 뱃지 반영</span>
-                  </div>
-                  <div style="font-size:11.5px; color:#6B7684; margin-bottom:10px;">
-                    호평이 15회 누적되면 상대방에게 <b style="color:#191F28;">[검증된 안심 메이트] · [대화가 즐거운 사람] · [약속 칼지킴이]</b> 공식 인증 뱃지가 수여됩니다.
-                  </div>
-                  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:10px;">
-                    <button class="btn" style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '시간 약속을 잘 지켜요')">시간 약속 준수</button>
-                    <button class="btn" style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '친절해요')">친절한 매너</button>
-                    <button class="btn" style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${partnerId}', '대화가 즐거워요')">즐거운 대화</button>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                    <span style="font-size:11px; color:#6B7684;">노쇼 · 비매너 신고 시 상대방의 모든 인증 뱃지가 즉시 회수됩니다.</span>
-                    <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; min-height:30px; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:600; cursor:pointer;" onclick="reportNoShow('${partnerId}')">
-                      노쇼 · 비매너 신고 (-3.0°C · 뱃지 박탈)
-                    </button>
+              ${otherIds.length > 1 ? `
+                <div style="margin-bottom:10px;">
+                  <div style="font-size:11.5px; font-weight:700; color:#6B7684; margin-bottom:6px;">평가 또는 신고할 참여 학우 선택 (${otherIds.length}명)</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${otherIds.map(uid => {
+                      const uObj = DB.users[uid] || { avatar: "🐶", nickname: uid, manner_temp: 36.5 };
+                      const isSel = String(uid) === String(evalTargetId);
+                      const praisedDone = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId && String(r.to_id) === String(uid));
+                      return `
+                        <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:700; border-radius:999px; background:${isSel ? '#287D62' : '#FFFFFF'}; color:${isSel ? '#FFFFFF' : '#191F28'}; border:1px solid ${isSel ? '#287D62' : '#E5EAE7'};" onclick="selectChatEvalTarget(${post.id}, '${uid}')">
+                          ${uObj.avatar.split(" ")[0]} ${escHtml(uObj.nickname)} (${(uObj.manner_temp || 36.5).toFixed(1)}°C)${praisedDone ? ' · 평가완료' : ''}
+                        </button>
+                      `;
+                    }).join("")}
                   </div>
                 </div>
               ` : ""}
+
+              <div style="font-size:11.5px; color:#6B7684; margin-bottom:10px;">
+                현재 선택된 대상: <b style="color:#287D62;">${evalTargetUser.avatar.split(" ")[0]} ${escHtml(evalTargetUser.nickname)}</b>
+                ${alreadyPraisedTarget ? `<span style="color:#287D62; font-weight:700;">(이 모임에서 이미 칭찬을 완료했습니다)</span>` : `— 호평 15회 누적 시 공식 인증 뱃지가 수여됩니다.`}
+              </div>
+              <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:10px;">
+                <button class="btn" ${alreadyPraisedTarget ? "disabled" : ""} style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${evalTargetId}', '시간 약속을 잘 지켜요')">시간 약속 준수</button>
+                <button class="btn" ${alreadyPraisedTarget ? "disabled" : ""} style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${evalTargetId}', '친절해요')">친절한 매너</button>
+                <button class="btn" ${alreadyPraisedTarget ? "disabled" : ""} style="min-height:36px; padding:4px 8px; font-size:12px; background:#FFFFFF; border-color:#E5EAE7; color:#191F28; font-weight:600;" onclick="submitMannerPraise(${post.id}, '${evalTargetId}', '대화가 즐거워요')">즐거운 대화</button>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                <span style="font-size:11px; color:#6B7684;">노쇼 · 비매너 신고 시 <b>${escHtml(evalTargetUser.nickname)}</b>님의 모든 인증 뱃지가 즉시 회수됩니다.</span>
+                <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; min-height:30px; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:600; cursor:pointer;" onclick="reportNoShow('${evalTargetId}')">
+                  ${escHtml(evalTargetUser.nickname)} 노쇼 · 비매너 신고 (-3.0°C)
+                </button>
+              </div>
             </div>
-          `;
-        }).join("")}
+          ` : ""}
+        </div>
       `;
+    }
+
+    function toggleMsgReaction(msgId, emoji, postId) {
+      const myId = String(state.user_id || "");
+      if (!myId) return;
+      const msg = (DB.messages || []).find(m => Number(m.id) === Number(msgId));
+      if (!msg) return;
+      msg.reactions = msg.reactions || {};
+      const curList = Array.isArray(msg.reactions[emoji]) ? msg.reactions[emoji].map(String) : [];
+      if (curList.includes(myId)) {
+        msg.reactions[emoji] = curList.filter(u => u !== myId);
+        if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+      } else {
+        msg.reactions[emoji] = [...curList, myId];
+      }
+      msg.updated_at = Date.now();
+      if (!updateChatBoxDOM(postId, false)) {
+        render();
+      }
+      saveDB(true);
+    }
+
+    function sendQuickChatPhrase(postId, phrase) {
+      const input = document.getElementById(`chat_in_${postId}`);
+      if (!input) return;
+      input.value = phrase;
+      sendChatMessage(postId);
+    }
+
+    function renderMsgReactionsHtml(m, postId, isMe) {
+      const myId = String(state.user_id || "");
+      const reactions = m.reactions || {};
+      const emojis = ["❤️", "👍", "🙌"];
+      const activeEntries = Object.entries(reactions).filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
+      const isPickerOpen = Number(state.open_react_msg_id) === Number(m.id);
+
+      if (activeEntries.length === 0 && !isPickerOpen) return "";
+
+      return `
+        <div class="chat-react-bar" style="justify-content:${isMe ? 'flex-end' : 'flex-start'};">
+          ${activeEntries.map(([emo, arr]) => {
+            const mine = arr.map(String).includes(myId);
+            return `<span class="chat-react-pill ${mine ? 'active' : ''}" onclick="event.stopPropagation(); toggleMsgReaction(${m.id}, '${emo}', ${postId})">${emo} ${arr.length}</span>`;
+          }).join("")}
+          ${isPickerOpen ? emojis.map(emo => `
+            <span class="chat-react-pill" onclick="event.stopPropagation(); state.open_react_msg_id=null; toggleMsgReaction(${m.id}, '${emo}', ${postId})">${emo}</span>
+          `).join("") : ""}
+        </div>
+      `;
+    }
+
+    function toggleMsgReactionPicker(msgId, postId) {
+      if (Number(state.open_react_msg_id) === Number(msgId)) {
+        state.open_react_msg_id = null;
+      } else {
+        state.open_react_msg_id = Number(msgId);
+      }
+      if (!updateChatBoxDOM(postId, false)) {
+        render();
+      }
     }
 
     function renderChatMessagesInner(postId) {
@@ -5382,48 +5742,79 @@
 
       if (msgs.length === 0) {
         return `
-          <div style="text-align:center; color:#6B7684; font-size:13px; padding:44px 0;">
-            <b style="color:#191F28;">${escHtml(otherNames || partner.nickname)}</b>님과 첫 인사를 나눠보세요.
+          <div style="text-align:center; color:#6B7684; font-size:13px; padding:44px 12px;">
+            <div style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:4px 12px; font-size:11.5px; color:#6B7684; margin-bottom:10px;">
+              안심 대화방이 개설되었습니다
+            </div>
+            <div><b style="color:#191F28;">${escHtml(otherNames || partner.nickname)}</b>님과 아래 빠른 문구 칩으로 첫 인사를 나눠보세요.</div>
           </div>
         `;
       }
 
-      return msgs.map(m => {
+      const getTimeLabel = (m) => {
+        if (!m) return "";
+        return m.created_at
+          ? (m.created_at.includes("오전") || m.created_at.includes("오후") ? m.created_at : (m.created_at.split(" ")[1] || m.created_at))
+          : formatMsgTime(m.id);
+      };
+
+      const dateHeaderHtml = `
+        <div style="text-align:center; margin:2px 0 8px;">
+          <span style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600; color:#6B7684;">
+            ${escHtml(post.meet_date || getTodayStr())} · 안심 대화
+          </span>
+        </div>
+      `;
+
+      return dateHeaderHtml + msgs.map((m, idx) => {
         if (m.sender_id === "AI_BOT") {
           return `<div class="chat-bubble-ai">${m.text}</div>`;
         }
 
         const isMe = String(m.sender_id) === myId;
         const senderUser = DB.users[m.sender_id] || partner;
-        const timeStr = m.created_at ? (m.created_at.includes("오전") || m.created_at.includes("오후") ? m.created_at : (m.created_at.split(" ")[1] || m.created_at)) : formatMsgTime(m.id);
+        const timeStr = getTimeLabel(m);
+        const prevMsg = idx > 0 ? msgs[idx - 1] : null;
+        const nextMsg = idx < msgs.length - 1 ? msgs[idx + 1] : null;
+
+        // 카톡/인스타 DM식 연속 메시지 그룹핑: 같은 발신자가 같은 분(minute)에 연달아 보낸 경우
+        const isSameAsPrev = Boolean(prevMsg && prevMsg.sender_id !== "AI_BOT" && String(prevMsg.sender_id) === String(m.sender_id) && getTimeLabel(prevMsg) === timeStr);
+        const isSameAsNext = Boolean(nextMsg && nextMsg.sender_id !== "AI_BOT" && String(nextMsg.sender_id) === String(m.sender_id) && getTimeLabel(nextMsg) === timeStr);
+
         const isRead = isMe ? Boolean(m.is_read || (m.id <= lastPartnerTime)) : true;
+        const showMeta = !isSameAsNext;
+        const reactionsHtml = renderMsgReactionsHtml(m, postId, isMe);
 
         if (isMe) {
           return `
-            <div class="chat-msg-row me">
+            <div class="chat-msg-row me ${isSameAsPrev ? 'grouped' : ''}">
               <div class="chat-bubble-col me">
                 <div class="chat-bubble-wrap me">
                   <div class="chat-meta me">
-                    <span class="chat-read-badge">${isRead ? '읽음' : '<span style="color:#287D62; font-weight:700;">1</span>'}</span>
-                    <span>${timeStr}</span>
+                    <span class="chat-read-badge">${isRead ? (showMeta ? '읽음' : '') : '<span style="color:#287D62; font-weight:700;">1</span>'}</span>
+                    ${showMeta ? `<span>${timeStr}</span>` : ""}
                   </div>
-                  <div class="chat-bubble-me">${escHtml(m.text)}</div>
+                  <div class="chat-bubble-me" title="클릭하여 공감 남기기" onclick="toggleMsgReactionPicker(${m.id}, ${postId})">${escHtml(m.text)}</div>
                 </div>
+                ${reactionsHtml}
               </div>
             </div>
           `;
         } else {
           return `
-            <div class="chat-msg-row other">
-              <div class="chat-avatar-mini">${(senderUser.avatar || "🐶").split(" ")[0]}</div>
+            <div class="chat-msg-row other ${isSameAsPrev ? 'grouped' : ''}">
+              ${!isSameAsPrev
+                ? `<div class="chat-avatar-mini">${(senderUser.avatar || "🐶").split(" ")[0]}</div>`
+                : `<div class="chat-avatar-spacer"></div>`}
               <div class="chat-bubble-col other">
-                <div class="chat-sender-name">${escHtml(senderUser.nickname || m.sender_id)}</div>
+                ${!isSameAsPrev ? `<div class="chat-sender-name">${escHtml(senderUser.nickname || m.sender_id)}</div>` : ""}
                 <div class="chat-bubble-wrap other">
-                  <div class="chat-bubble-other">${escHtml(m.text)}</div>
+                  <div class="chat-bubble-other" title="클릭하여 공감(❤️·👍·🙌) 남기기" onclick="toggleMsgReactionPicker(${m.id}, ${postId})">${escHtml(m.text)}</div>
                   <div class="chat-meta other">
-                    <span>${timeStr}</span>
+                    ${showMeta ? `<span>${timeStr}</span>` : ""}
                   </div>
                 </div>
+                ${reactionsHtml}
               </div>
             </div>
           `;
@@ -5453,30 +5844,13 @@
     }
 
     function tryPartialChatTabUpdate() {
-      const myId = String(state.user_id);
-      const myHostedApps = (DB.applications || []).filter(a => {
-        const p = (DB.posts || []).find(post => Number(post.id) === Number(a.post_id));
-        return p && String(p.author_id) === myId;
-      });
-      const myAppliedApps = (DB.applications || []).filter(a => String(a.applicant_id) === myId);
-      const pendingHost = myHostedApps.filter(a => a.status === "대기중");
-      if (pendingHost.length > 0) return false;
-
-      const activePostIds = new Set();
-      myHostedApps.filter(a => a.status === "승인됨").forEach(a => activePostIds.add(Number(a.post_id)));
-      myAppliedApps.filter(a => a.status === "승인됨").forEach(a => activePostIds.add(Number(a.post_id)));
-
-      const validPids = Array.from(activePostIds).filter(pid => (DB.posts || []).some(p => Number(p.id) === Number(pid)));
-      const renderedBoxes = document.querySelectorAll('[id^="chat_box_"]');
-      if (validPids.length === 0 || renderedBoxes.length !== validPids.length) return false;
-
-      for (const pid of validPids) {
-        if (!document.getElementById(`chat_box_${pid}`) || !document.getElementById(`chat_in_${pid}`)) {
-          return false;
-        }
-      }
-
-      validPids.forEach(pid => updateChatBoxDOM(pid, false));
+      if (state.chat_list_mode) return false;
+      const activePid = Number(state.active_chat_post_id || 0);
+      if (!activePid) return false;
+      const box = document.getElementById(`chat_box_${activePid}`);
+      const inp = document.getElementById(`chat_in_${activePid}`);
+      if (!box || !inp) return false;
+      updateChatBoxDOM(activePid, false);
       return true;
     }
 
