@@ -2756,19 +2756,7 @@
       render();
     }
 
-    function clearLogin() {
-      const curUser = state.user_id ? DB.users[state.user_id] : null;
-      if (curUser && !isAdminSid(state.user_id) && !curUser.pw_hash) {
-        const ok = confirm("아직 로그인 비밀번호가 설정되지 않았습니다.\n지금 내 프로필에서 비밀번호를 먼저 설정하시겠습니까?\n\n[확인] 내 프로필에서 바로 비밀번호 설정하기\n[취소] 그대로 로그아웃하기 (다음 로그인 시 이메일 인증 후 설정 가능)");
-        if (ok) {
-          switchTab(5);
-          setTimeout(() => {
-            const el = document.getElementById("edit_user_pw");
-            if (el) { el.focus(); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
-          }, 120);
-          return;
-        }
-      }
+    function executeLogoutNow() {
       state.user_id = "";
       state.verified_email = null;
       state.auth_code_sent = false;
@@ -2776,6 +2764,27 @@
       localStorage.removeItem(ADMIN_AUTH_KEY);
       document.cookie = "user_id=; path=/; max-age=0";
       render();
+    }
+
+    function clearLogin() {
+      const curUser = state.user_id ? DB.users[state.user_id] : null;
+      if (curUser && !isAdminSid(state.user_id) && !curUser.pw_hash) {
+        openConfirmDialog({
+          title: "비밀번호 설정 안내",
+          desc: "아직 로그인 비밀번호가 설정되지 않았습니다. 안전한 계정 보호를 위해 지금 비밀번호를 설정하시겠습니까?",
+          confirmText: "비밀번호 설정하기",
+          cancelText: "그대로 로그아웃",
+          onConfirm: () => {
+            switchTab('내정보');
+            setTimeout(() => {
+              const el = document.getElementById("edit_user_pw");
+              if (el) { el.focus(); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+            }, 120);
+          }
+        });
+        return;
+      }
+      executeLogoutNow();
     }
 
     function calcDistanceMeters(lat1, lng1, lat2, lng2) {
@@ -3760,6 +3769,7 @@
           <button id="btn-scroll-top" class="floating-top-btn" onclick="scrollToTop()" aria-label="맨 위로 가기" title="맨 위로 가기">
             ${getSvgIcon('chevron-up', 20, '#287D62', 2.6)}
           </button>
+          ${renderConfirmDialogHtml()}
         `;
 
         if (state.active_modal === "detail") {
@@ -4447,6 +4457,43 @@
       openDetailModal(postId);
     }
 
+    function isPostExpired(post) {
+      if (!post) return true;
+      if (post.status !== "모집중") return true;
+      if (!post.meet_date) return false;
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "23:59";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 모임 시작 시각 기준 1시간(60분) 경과 시 홈 피드에서 자동 마감/숨김
+        return now.getTime() > (postDate.getTime() + 60 * 60 * 1000);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function getPostTimeChip(post) {
+      if (!post || !post.meet_date) return "";
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "23:59";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return "";
+        const diffMs = postDate.getTime() - now.getTime();
+        const diffMin = Math.round(diffMs / (60 * 1000));
+        
+        if (diffMin < 0) {
+          return `<span style="font-size:10.5px; font-weight:700; color:#8B95A1; background:#F2F4F3; padding:2px 7px; border-radius:6px; flex-shrink:0;">진행중</span>`;
+        } else if (diffMin <= 40) {
+          return `<span style="font-size:10.5px; font-weight:700; color:#E53E3E; background:#FFF0F0; padding:2px 7px; border-radius:6px; flex-shrink:0;">🔥 ${diffMin <= 10 ? '곧 시작' : `${diffMin}분 뒤`}</span>`;
+        } else if (diffMin <= 240) {
+          return `<span style="font-size:10.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 7px; border-radius:6px; flex-shrink:0;">오늘 ${timeStr}</span>`;
+        }
+      } catch (e) {}
+      return "";
+    }
+
     function renderMeetupCard(post) {
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5 };
       const acceptedCnt = DB.applications.filter(a => a.post_id === post.id && a.status === "승인됨").length + 1;
@@ -4465,6 +4512,7 @@
           <div class="tk-feed-body">
             <div class="tk-feed-title-row">
               ${isOfficial ? `<span class="tk-official-badge">공식</span>` : ''}
+              ${getPostTimeChip(post)}
               <span class="tk-feed-title">${escHtml(post.title)}</span>
             </div>
             <div class="tk-feed-meta">${escHtml(post.location)} · ${escHtml(post.meet_time || '오늘')}${distText}</div>
@@ -4478,7 +4526,7 @@
     }
 
     function getFilteredHomePosts() {
-      let list = DB.posts.filter(p => p.status === "모집중");
+      let list = DB.posts.filter(p => p.status === "모집중" && !isPostExpired(p));
       if (state.home_cat !== "전체") {
         list = list.filter(p => p.category.includes(state.home_cat));
       }
@@ -4714,6 +4762,34 @@
       } catch (e) {}
     }
 
+    function getBroadCollege(dept) {
+      if (!dept) return "울산대학교";
+      if (/컴퓨터|IT|ICT|소프트웨어|AI|전기|전자|기계|화공|화학공|토목|신소재|건축|생명공|융합/i.test(dept)) return "공과·IT계열";
+      if (/경영|경제|글로벌/i.test(dept)) return "경영·사회계열";
+      if (/의|간호|약학/i.test(dept)) return "의료·보건계열";
+      if (/디자인|미술|음악|예술|체육|스포츠/i.test(dept)) return "예체능계열";
+      if (/국문|영문|인문|철학|역사|어문/i.test(dept)) return "인문대학";
+      if (/자연|수학|물리|생명과학/i.test(dept)) return "자연과학계열";
+      return "울산대학교";
+    }
+
+    function confirmDeletePost(postId) {
+      const p = (DB.posts || []).find(x => x.id === postId);
+      const postTitle = p ? p.title : "번개 모임";
+      const count = (DB.applications || []).filter(a => a.post_id === postId && a.applicant_id !== state.user_id).length;
+      const desc = count > 0
+        ? `참여 신청한 학우 ${count}명에게 취소 알림이 전달되며, [${postTitle}] 번개 모임이 완전히 삭제됩니다. 정말 취소할까요?`
+        : `[${postTitle}] 번개 모임이 삭제됩니다. 정말 취소할까요?`;
+      openConfirmDialog({
+        title: "번개 모임 취소",
+        desc: desc,
+        confirmText: "모임 취소하기",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => deletePost(postId)
+      });
+    }
+
     function renderDetailModal() {
       const post = DB.posts.find(p => p.id === state.selected_post_id);
       if (!post) { state.active_modal = null; return renderHomeTab(); }
@@ -4762,7 +4838,16 @@
                   <span style="font-size:15px; font-weight:800; color:#191F28;">${author.nickname}</span>
                   ${authorBadgesHtml || `<span style="font-size:11px; color:#6B7684; background:#F7F9F8; border:1px solid #E5EAE7; padding:2px 8px; border-radius:999px;">재학생 인증 완료</span>`}
                 </div>
-                <div style="font-size:12px; color:#6B7684; margin-top:3px;">${author.department} · ${author.mbti} · 누적 호평 ${authorSt.totalPraiseCnt}회</div>
+                ${(() => {
+                  const myApp = apps.find(a => a.applicant_id === state.user_id);
+                  const isAccepted = isAuthor || (myApp && myApp.status === "승인됨");
+                  const deptDisplay = isAccepted ? author.department : `${getBroadCollege(author.department)}`;
+                  const mbtiDisplay = isAccepted ? author.mbti : `MBTI 비공개`;
+                  return `
+                    <div style="font-size:12px; color:#6B7684; margin-top:3px;">${deptDisplay} · ${mbtiDisplay} · 누적 호평 ${authorSt.totalPraiseCnt}회</div>
+                    ${!isAccepted ? `<div style="font-size:11px; color:#287D62; font-weight:600; margin-top:3px;">🔒 상세 학과·MBTI는 방장 참여 수락 시 안전하게 공개됩니다.</div>` : ""}
+                  `;
+                })()}
               </div>
             </div>
             ${renderTempGauge(author.manner_temp, true)}
@@ -4791,7 +4876,7 @@
             }).join("")}
             <div class="row-2" style="margin-top:10px;">
               <button class="btn" onclick="closePostEarly(${post.id})">모집 마감하기</button>
-              <button class="btn btn-danger" onclick="deletePost(${post.id})">모임 삭제하기</button>
+              <button class="btn btn-danger" onclick="confirmDeletePost(${post.id})">모임 취소하기</button>
             </div>
           </div>
         ` : ""}
@@ -5443,6 +5528,9 @@
               </select>
             ` : ""}
           </div>
+          <div style="font-size:11.5px; color:#8B95A1; margin-top:6px;">
+            🔒 내 위치 정보는 기기 내에서만 사용되며, 타인에게 절대 공유되지 않고 번개 장소까지의 도보 거리 계산에만 안전하게 사용됩니다.
+          </div>
         </div>
 
         <div id="campus-map" style="border-radius:18px; overflow:hidden;"></div>
@@ -5611,30 +5699,42 @@
       const myId = String(state.user_id || "");
       const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
       if (!post || !myId) return;
-      if (String(post.author_id) === myId) {
-        if (!confirm("방장이 대화방을 나가면 해당 번개 모임이 마감 처리됩니다. 정말 나가시겠습니까?")) return;
-        post.status = "매칭완료";
-        post.updated_at = Date.now();
-        (DB.applications || []).forEach(a => {
-          if (Number(a.post_id) === Number(postId) && a.status === "승인됨") {
-            a.status = "종료됨";
-            a.updated_at = Date.now();
+      const isLeader = String(post.author_id) === myId;
+      const msg = isLeader
+        ? "방장이 대화방을 나가면 해당 번개 모임이 마감 처리됩니다. 정말 나가시겠습니까?"
+        : "이 대화방에서 나가시겠습니까?";
+
+      openConfirmDialog({
+        title: "대화방 나가기",
+        desc: msg,
+        confirmText: "나가기",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => {
+          if (isLeader) {
+            post.status = "매칭완료";
+            post.updated_at = Date.now();
+            (DB.applications || []).forEach(a => {
+              if (Number(a.post_id) === Number(postId) && a.status === "승인됨") {
+                a.status = "종료됨";
+                a.updated_at = Date.now();
+              }
+            });
+          } else {
+            (DB.applications || []).forEach(a => {
+              if (Number(a.post_id) === Number(postId) && String(a.applicant_id) === myId) {
+                a.status = "나감";
+                a.updated_at = Date.now();
+              }
+            });
           }
-        });
-      } else {
-        if (!confirm("이 대화방에서 나가시겠습니까?")) return;
-        (DB.applications || []).forEach(a => {
-          if (Number(a.post_id) === Number(postId) && String(a.applicant_id) === myId) {
-            a.status = "나감";
-            a.updated_at = Date.now();
-          }
-        });
-      }
-      state.chat_list_mode = true;
-      state.active_chat_post_id = null;
-      saveDB(true);
-      showToast("대화방에서 나갔습니다.");
-      render();
+          state.chat_list_mode = true;
+          state.active_chat_post_id = null;
+          saveDB(true);
+          showToast("대화방에서 나갔습니다.");
+          render();
+        }
+      });
     }
 
     function selectChatEvalTarget(postId, targetUid) {
@@ -5783,7 +5883,7 @@
             </div>
             <button type="button" class="tk-room-top-btn" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">평가·신고</button>
             <button type="button" class="tk-room-top-btn only-pc" onclick="backToChatList()">닫기</button>
-            <button type="button" class="tk-room-top-btn" onclick="leaveChatRoom(${post.id})">나가기</button>
+            <button type="button" class="tk-room-top-btn" style="color:#E53E3E; border-color:#FFD2D2; background:#FFF5F5;" onclick="leaveChatRoom(${post.id})">나가기</button>
           </div>
 
           <!-- 모바일 1줄 모임 요약 바 -->
@@ -6264,7 +6364,12 @@
             </div>
             ${leaderboard.map((item, idx) => {
               const isRewardTarget = idx < 3;
+              const isMe = item.uid === state.user_id;
               const itemBadges = renderVerifiedBadgePills(item.uid, 2);
+              const displayName = isMe ? escHtml(item.nickname) : `익명 학우 (${idx + 1}위)`;
+              const displayStats = isMe 
+                ? `만남 ${item.validMeets}회 · ${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일`
+                : `캠퍼스 활동 챌린저 · 안심 뱃지 보유`;
               return `
                 <div class="rank-row ${idx === 0 ? 'top1' : ''}">
                   <div style="display:flex; align-items:center; gap:10px;">
@@ -6272,12 +6377,12 @@
                     <span style="font-size:18px;">${item.avatar}</span>
                     <div>
                       <div style="font-size:13px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                        <span>${escHtml(item.nickname)}</span>
+                        <span>${displayName}</span>
                         ${itemBadges}
-                        ${item.uid === state.user_id ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 6px; border-radius:4px;">나</span>` : ""}
+                        ${isMe ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 6px; border-radius:4px;">나</span>` : ""}
                         ${isRewardTarget ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 7px; border-radius:999px;">리워드 대상</span>` : ""}
                       </div>
-                      <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">만남 ${item.validMeets}회 · ${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일</div>
+                      <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${displayStats}</div>
                     </div>
                   </div>
                   <div style="font-size:13px; font-weight:800; color:#287D62;">${item.rewardScore}점</div>
