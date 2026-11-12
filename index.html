@@ -1255,6 +1255,79 @@
         height: 46px;
       }
     }
+    /* =====================================================
+       토스 · 당근 스타일 테마 (플랫 · 여백 · 회색 위계 · 눌림 효과)
+       ===================================================== */
+    :root { --bg: #FFFFFF; --border: #F2F4F3; }
+    body { background: #FFFFFF; }
+    .uldaemo-card { background: #F7F9F8; border: none; box-shadow: none; border-radius: 20px; }
+    .uldaemo-card:hover { box-shadow: none; }
+
+    /* 번개 리스트: 박스 → 3줄 행 */
+    .meetup-accordion-card { background: transparent; border: none; border-bottom: 1px solid #F2F4F3; border-radius: 0; box-shadow: none; margin-bottom: 0 !important; overflow: hidden; }
+    .meetup-accordion-card:hover { background: transparent; border-bottom-color: #F2F4F3; box-shadow: none; }
+    .meetup-accordion-card.is-expanded { background: #F7F9F8; border: none; border-radius: 18px; box-shadow: none; margin-bottom: 6px !important; }
+    .pc-right .meetup-accordion-card { background: #F7F9F8; border-bottom: none; border-radius: 16px; margin-bottom: 10px !important; }
+    .pc-right .meetup-accordion-card:hover { background: #F2F4F3; }
+    .pc-right .meetup-accordion-card.is-expanded { background: #F7F9F8; border-radius: 16px; margin-bottom: 10px !important; }
+    .accordion-header:hover { background: transparent; }
+    .accordion-header:active { background: #F7F9F8; }
+    .accordion-body { border-top: none; }
+    .card-official { background: #F4FAF7 !important; border: none !important; border-radius: 18px !important; box-shadow: none !important; margin-bottom: 6px !important; }
+    .card-official::before { content: none !important; display: none !important; }
+    .mc-row { padding: 16px 6px !important; min-height: 0 !important; gap: 14px !important; justify-content: flex-start !important; }
+    .mc-thumb { width: 64px; height: 64px; border-radius: 18px; background: #F2F4F3; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .mc-main { min-width: 0; flex: 1; }
+    .mc-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .mc-title-text { font-size: 16px; font-weight: 600; color: #191F28; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mc-tag { background: #EEF8F3; color: #287D62; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; flex-shrink: 0; }
+    .mc-meta { font-size: 13px; color: #8B95A1; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mc-sub { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 14px; font-weight: 700; color: #191F28; }
+    .mc-temp { font-size: 12.5px; font-weight: 600; color: #287D62; }
+    .mc-verified { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: #287D62; }
+
+    /* 카테고리 칩: 검정 알약 */
+    .cat-btn { background: #F2F4F3; border: none; color: #4E5968; box-shadow: none; font-weight: 600; font-size: 14px; height: 38px; padding: 0 15px; }
+    .cat-btn:hover { border: none; color: #191F28; background: #E8EBEA; }
+    .cat-btn.active, .cat-btn.active:hover { background: #191F28; color: #FFFFFF; box-shadow: none; transform: none; }
+    .category-sticky-wrap { background: rgba(255, 255, 255, 0.94); }
+
+    /* 눌림 효과 */
+    .btn, .cat-btn, .dock-btn, .side-nav-btn, .campus-pill, .fab-create, .accordion-header, .chat-room-item { transition: transform 0.1s ease, background 0.15s ease, color 0.15s ease; }
+    .btn:active, .cat-btn:active, .dock-btn:active, .side-nav-btn:active, .campus-pill:active, .fab-create:active { transform: scale(0.97); }
+
+    /* 상단 헤더(모바일) */
+    .app-header { background: #FFFFFF; border: none; box-shadow: none; border-radius: 0; padding: 10px 2px; backdrop-filter: none; }
+    .campus-pill { background: #F2F4F3; border: none; color: #4E5968; }
+    .campus-pill:hover { background: #E8EBEA; color: #191F28; border: none; }
+    .campus-pill.active { background: #EEF8F3; color: #287D62; border: none; }
+
+    /* 하단 탭바(모바일): 플로팅 알약 → 평평한 바 */
+    .floating-dock-wrap { bottom: 0; }
+    .floating-dock { max-width: none; width: 100%; border-radius: 0; border: none; border-top: 1px solid #F2F4F3; box-shadow: none; background: rgba(255, 255, 255, 0.97); padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); gap: 0; }
+    .dock-btn { color: #B0B8C1; border-radius: 12px; font-weight: 600; font-size: 11.5px; }
+    .dock-btn.active { background: transparent; color: #191F28; box-shadow: none; transform: none; }
+    .dock-btn.active .dock-icon svg { stroke: #191F28; }
+    .dock-badge-dot { background: #287D62; }
+
+    /* 번개 만들기: 모바일은 플로팅 버튼, PC는 사이드바 버튼 */
+    .fab-create { position: fixed; right: 20px; bottom: calc(86px + env(safe-area-inset-bottom)); height: 52px; padding: 0 20px; border-radius: 999px; border: none; background: #287D62; color: #FFFFFF; font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 8px 20px rgba(40, 125, 98, 0.35); cursor: pointer; z-index: 90; }
+    .floating-top-btn { bottom: 150px; }
+    .side-create-btn { display: none; }
+
+    /* PC 사이드바 */
+    .side-logo { display: flex; align-items: center; gap: 10px; padding: 4px 8px; margin-bottom: 20px; cursor: pointer; }
+    .side-logo-sub { font-size: 12px; color: #8B95A1; font-weight: 600; margin-top: -2px; }
+    .side-nav-btn:hover { background: #F7F9F8; color: #191F28; }
+    .side-nav-btn.active { background: #F2F4F3; color: #191F28; }
+    .side-nav-btn.active .side-nav-icon svg { stroke: #191F28; }
+    .side-dot { background: #287D62; color: #FFFFFF; min-width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+    .side-user { background: transparent; border: none; border-top: 1px solid #F2F4F3; border-radius: 0; padding: 16px 8px 0; }
+    @media (min-width: 1024px) {
+      .fab-create { display: none; }
+      .side-create-btn { display: flex; align-items: center; justify-content: center; gap: 6px; height: 48px; margin-top: 18px; font-size: 15px; border-radius: 12px; }
+      .floating-top-btn { bottom: 32px; }
+    }
   </style>
 </head>
 <body>
@@ -2966,12 +3039,12 @@
 
       const sidebarHtml = `
         <aside class="pc-sidebar">
-          <div class="side-campus-card" onclick="switchTab('지도')">
+          <div class="side-logo" onclick="switchTab('홈')">
+            ${renderLogoSvg(34)}
             <div>
-              <div style="font-size:11px; font-weight:700; color:#287D62; letter-spacing:0.04em;">MY CAMPUS</div>
-              <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:2px;">울산대학교</div>
+              <div class="app-logo-title">울대모</div>
+              <div class="side-logo-sub">울산대학교</div>
             </div>
-            <span style="color:#6B7684; display:inline-flex; align-items:center;">${getSvgIcon('chevron-down', 16, '#6B7684')}</span>
           </div>
 
           <nav class="side-nav">
@@ -2983,6 +3056,10 @@
               </button>
             `).join("")}
           </nav>
+
+          <button type="button" class="btn btn-primary side-create-btn" onclick="state.active_modal='create'; render();">
+            ${getSvgIcon('plus', 16, '#FFFFFF', 2.6)}<span>번개 만들기</span>
+          </button>
 
           <div class="side-user" style="margin-top:24px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
@@ -2999,8 +3076,6 @@
               <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:11.5px; font-weight:600; padding:5px 10px; border-radius:8px; cursor:pointer; flex-shrink:0;" onclick="clearLogin()">로그아웃</button>
             </div>
           </div>
-
-          <div style="font-size:11.5px; color:#6B7684; padding:14px 8px 0;">울대모 · 캠퍼스에서 시작되는 연결</div>
         </aside>
       `;
 
@@ -3044,7 +3119,7 @@
       const userTempPct = Math.max(8, Math.min(100, Math.round((userTemp / 60.0) * 100)));
       const myMannerStats = getUserStatsAndBadges(state.user_id);
       const mannerCard = `
-        <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:16px; padding:18px; margin-bottom:12px;">
+        <div style="background:#F7F9F8; border-radius:16px; padding:18px; margin-bottom:12px;">
           <div style="font-size:13.5px; font-weight:700; color:#191F28; margin-bottom:14px;">나의 캠퍼스 매너</div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-size:13px; color:#6B7684; font-weight:500;">실시간 매너온도</span>
@@ -3081,7 +3156,6 @@
           ${mapCard}
           ${renderCafeteriaCard()}
           ${mannerCard}
-          <div style="padding:4px 8px; font-size:12px; color:#6B7684; cursor:pointer;" onclick="switchTab('마이')">안전한 만남을 위한 약속</div>
         </aside>
       `;
 
@@ -3094,7 +3168,6 @@
                 ${renderLogoSvg(32)}
                 <div>
                   <div class="app-logo-title">울대모</div>
-                  <div style="font-size:11px; color:#6B7684; font-weight:600; margin-top:-3px;">우리 학교, 가볍게 모여!</div>
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
@@ -3127,6 +3200,12 @@
             `).join("")}
           </div>
         </div>
+
+        ${state.nav_tab === "홈" && !state.active_modal ? `
+          <button type="button" class="fab-create" onclick="state.active_modal='create'; render();">
+            ${getSvgIcon('plus', 18, '#FFFFFF', 2.6)}<span>번개 만들기</span>
+          </button>
+        ` : ""}
 
         <button id="btn-scroll-top" class="floating-top-btn" onclick="scrollToTop()" aria-label="맨 위로 가기" title="맨 위로 가기">
           ${getSvgIcon('chevron-up', 20, '#287D62', 2.6)}
@@ -3914,36 +3993,30 @@
       const topBadge = authorStats.badges && authorStats.badges[0] ? authorStats.badges[0] : null;
 
       return `
-        <div id="post-accordion-${post.id}" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''} ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}" style="border-radius:18px; margin-bottom:10px;">
+        <div id="post-accordion-${post.id}" class="meetup-accordion-card ${isExpanded ? 'is-expanded' : ''} ${isOfficial ? 'card-official' : ''} ${isJustCreated ? 'card-pop-new' : ''}">
           <!-- 요약 헤더 (클릭 시 펼침/접힘 토글) -->
-          <div class="accordion-header" style="padding:14px 18px; min-height:56px;" onclick="toggleMeetupAccordion(${post.id})">
-            <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
-              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
-                ${getSvgIcon(catIcon, 16, '#287D62')}
-              </span>
-              <div style="min-width:0; flex:1; display:flex; align-items:center; gap:6px;">
-                ${isOfficial ? `<span style="background:#EEF8F3; color:#287D62; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:6px; flex-shrink:0;">공식</span>` : ''}
-                <span style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${post.title}</span>
-                ${topBadge ? `<span style="background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; flex-shrink:0; display:inline-flex; align-items:center; gap:3px;">${getSvgIcon('shield', 10, '#287D62', 2.4)} ${escHtml(topBadge.label)}</span>` : ''}
+          <div class="accordion-header mc-row" onclick="toggleMeetupAccordion(${post.id})">
+            <div class="mc-thumb">${getSvgIcon(catIcon, 26, '#4E5968')}</div>
+            <div class="mc-main">
+              <div class="mc-title">
+                ${isOfficial ? `<span class="mc-tag">공식</span>` : ''}
+                <span class="mc-title-text">${escHtml(post.title)}</span>
+              </div>
+              <div class="mc-meta">${escHtml(post.location)} · ${escHtml(post.meet_time || '')}${distHtml}</div>
+              <div class="mc-sub">
+                <span>${acceptedCnt}/${post.max_participants}명</span>
+                <span class="mc-temp">${authorTemp.toFixed(1)}°C</span>
+                ${topBadge ? `<span class="mc-verified">${getSvgIcon('shield', 12, '#287D62', 2.4)} ${escHtml(topBadge.label)}</span>` : ''}
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
-              <span style="font-size:12px; color:#6B7684; font-weight:500;">${post.location}</span>
-              <span style="font-size:12.5px; font-weight:700; color:#287D62;">
-                ${acceptedCnt}/${post.max_participants}명
-              </span>
-              <span class="accordion-chevron">
-                ${getSvgIcon('chevron-down', 16, 'currentColor')}
-              </span>
-            </div>
+            <span class="accordion-chevron">${getSvgIcon('chevron-down', 18, 'currentColor')}</span>
           </div>
 
           <!-- 확장 상세 바디 (펼쳐졌을 때만 노출) -->
           ${isExpanded ? `
-            <div class="accordion-body" style="padding:14px 18px 18px; border-top:1px solid #F2F4F3;">
+            <div class="accordion-body" style="padding:2px 6px 18px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <span style="font-size:11.5px; font-weight:700; color:#287D62;">${cleanCatName}${isOfficial ? ' · 공식 모임' : ''}</span>
-                <span style="font-size:11.5px; color:#6B7684;">익명 프로필 보호</span>
               </div>
 
               <div style="font-size:13.5px; color:#6B7684; line-height:1.5; margin-bottom:12px;">
@@ -3961,7 +4034,7 @@
                 </span>
               </div>
 
-              <div style="background:#F7F9F8; border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+              <div style="background:#FFFFFF; border-radius:14px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
                 <div style="min-width:0; flex:1;">
                   <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     <span style="font-size:11.5px; color:#6B7684; font-weight:500;">방장</span>
@@ -3975,7 +4048,6 @@
                   <div style="height:6px; background:#E5EAE7; border-radius:999px; overflow:hidden;">
                     <div style="width:${authorTempPct}%; height:100%; background:linear-gradient(90deg, #B8DECB 0%, #287D62 100%); border-radius:999px;"></div>
                   </div>
-                  <div style="font-size:10px; color:#6B7684; margin-top:3px;">실시간 매너 점수표</div>
                 </div>
               </div>
 
@@ -4030,14 +4102,11 @@
             <span style="font-size:15px; font-weight:800; color:#287D62;">${list.length}</span>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
-            <select class="select" style="width:auto; min-width:118px; height:34px; padding:0 10px; margin-bottom:0; font-size:12px; font-weight:600; color:#6B7684; border-radius:8px; border:1px solid #E5EAE7;" onchange="state.sort_opt=this.value; render();">
+            <select class="select" style="width:auto; min-width:118px; height:34px; padding:0 10px; margin-bottom:0; font-size:12.5px; font-weight:600; color:#6B7684; border-radius:10px; border:none; background:#F2F4F3;" onchange="state.sort_opt=this.value; render();">
               <option value="마감 임박순" ${state.sort_opt.includes('마감') ? 'selected' : ''}>마감 임박순</option>
               <option value="가까운 순" ${state.sort_opt.includes('가까운') ? 'selected' : ''}>가까운 순</option>
               <option value="매너온도 순" ${state.sort_opt.includes('매너온도') ? 'selected' : ''}>매너온도 순</option>
             </select>
-            <button type="button" style="height:34px; border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:12px; font-weight:600; padding:0 11px; border-radius:8px; cursor:pointer;" onclick="toggleAllAccordions(${list.length})">
-              ${expCount > 0 ? '모두 접기' : '모두 펼치기'}
-            </button>
           </div>
         </div>
 
@@ -4062,40 +4131,13 @@
       }, 60);
     }
 
-    function renderHomeRewardStrip() {
-      const st = getUserStatsAndBadges(state.user_id);
-      return `
-        <div style="background:#EEF8F3; border-radius:12px; padding:11px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-          <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:#191F28; font-weight:500;">
-            <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
-            <span>실시간 매너온도와 공식 인증 뱃지로 검증된 학우들과 안전하게 만나요</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="handleDailyCheckin()">
-              ${st.checkedInToday ? `출석 ${st.streakDays}일째 완료` : `출석체크 (리워드 +3점)`}
-            </span>
-            <span style="color:#C5E6D6;">|</span>
-            <span style="font-size:12px; font-weight:700; color:#287D62; cursor:pointer;" onclick="openUlsanNoticesModal(event)">
-              캠퍼스 공지 →
-            </span>
-          </div>
-        </div>
-      `;
-    }
-
     function renderHomeTab() {
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">오늘, 같이 할래요?</h1>
           </div>
-          <button class="btn btn-primary" style="width:auto; min-height:42px; padding:0 18px; border-radius:12px; font-size:13.5px; font-weight:700; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;" onclick="state.active_modal='create'; render();">
-            ${getSvgIcon('plus', 15, '#FFFFFF', 2.5)}
-            <span>번개 만들기</span>
-          </button>
         </div>
-
-        
 
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
@@ -4105,7 +4147,7 @@
           <span style="position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#6B7684; pointer-events:none; display:inline-flex;">
             ${getSvgIcon('search', 15, '#6B7684')}
           </span>
-          <input id="home-search-input" class="input" style="margin-bottom:0; padding-left:36px; height:40px; border-radius:12px; border:1px solid #E5EAE7; font-size:13px;" placeholder="찾고 싶은 모임이나 장소를 검색해보세요" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
+          <input id="home-search-input" class="input" style="margin-bottom:0; padding-left:36px; height:44px; border-radius:12px; border:none; background:#F2F4F3; font-size:14px;" placeholder="찾고 싶은 모임이나 장소를 검색해보세요" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
         </div>
 
         <div id="home-feed-list-wrap">
@@ -4605,13 +4647,13 @@
       const items = mode === "reward" ? REWARD_WHEEL_ITEMS : MENU_WHEEL_ITEMS;
 
       return `
-        <div class="uldaemo-card" style="border:1px solid #E5EAE7; background:#FFFFFF; margin-bottom:16px;">
+        <div class="uldaemo-card" style="margin-bottom:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62;">
                 ${getSvgIcon('check', 15, '#287D62')}
               </span>
-              <span style="font-size:15px; font-weight:800; color:#191F28;">일일 출석 & 리워드 룰렛</span>
+              <span style="font-size:15px; font-weight:800; color:#191F28;">출석 · 룰렛</span>
             </div>
             <button type="button" style="border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:12px; font-weight:600; padding:5px 11px; border-radius:8px; cursor:pointer;" onclick="state.roulette_collapsed=!state.roulette_collapsed; render();">
               ${state.roulette_collapsed ? "펼치기" : "접기"}
@@ -4624,9 +4666,7 @@
               <span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="state.roulette_collapsed=false; render();">룰렛 열기 →</span>
             </div>
           ` : `
-            <div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">
-              매일 출석 체크 시 <b style="color:#287D62;">활동 리워드 +3점</b>과 추첨 티켓이 지급됩니다. (연속 <b style="color:#191F28;">${st.streakDays}일째</b> · 매너온도는 실제 만남 후기로만 변동)
-            </div>
+            <div style="font-size:13px; color:#8B95A1; margin-bottom:10px;">연속 <b style="color:#191F28;">${st.streakDays}일째</b></div>
             <div class="stamp-grid">
               ${[1, 2, 3, 4, 5, 6, 7].map(d => {
                 const isStamped = d <= stampedCnt;
@@ -4657,9 +4697,6 @@
                     오늘의 공강 메뉴 추천
                   </button>
                 </div>
-                <span style="font-size:11.5px; color:#6B7684;">
-                  ${mode === 'reward' ? '티켓 1장으로 리워드 점수 · 추첨권 획득' : '점심·저녁 메뉴를 가볍게 골라보세요'}
-                </span>
               </div>
 
               <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); align-items:center; gap:14px; background:#F7F9F8; border:1px solid #E5EAE7; border-radius:16px; padding:14px;">
@@ -5891,13 +5928,13 @@
         </div>
 
         ${needsInitialPw ? `
-          <div class="uldaemo-card" style="background:#EEF8F3; border:1.5px solid #287D62;">
+          <div class="uldaemo-card" style="background:#EEF8F3;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
               <div style="font-size:14.5px; font-weight:800; color:#287D62;">기존 가입 학우 로그인 비밀번호 최초 설정</div>
               <span style="font-size:11px; font-weight:700; color:#FFFFFF; background:#287D62; padding:2px 8px; border-radius:999px;">보안 권장</span>
             </div>
             <div style="font-size:12.5px; color:#191F28; line-height:1.5; margin-bottom:10px;">
-              타인의 학번 도용을 막기 위해 학번+비밀번호 로그인이 도입되었습니다. 현재 자동 로그인 상태이므로 <b>이메일 인증 없이 아래에서 바로 비밀번호를 등록</b>해 두실 수 있습니다.
+              학번 도용을 막기 위해 비밀번호를 등록해 주세요.
             </div>
             <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
               <input id="quick_init_pw" type="password" class="input" style="margin-bottom:0; background:#FFFFFF;" placeholder="사용할 비밀번호 입력 (4자리 이상)" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('quick_init_pw')" />
@@ -5908,7 +5945,7 @@
 
         <div class="uldaemo-card">
           <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
-            <div style="width:60px; height:60px; border-radius:50%; background:#EEF8F3; border:1.5px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0;">
+            <div style="width:60px; height:60px; border-radius:50%; background:#F2F4F3; display:flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0;">
               ${user.avatar.split(" ")[0]}
             </div>
             <div>
@@ -5918,7 +5955,6 @@
                 ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:#EEF8F3; color:#287D62; font-weight:700; padding:2px 8px; border-radius:6px;">운영진</span>` : ""}
               </div>
               <div style="font-size:13px; color:#6B7684; margin-top:2px;">울산대학교 · ${user.department} · ${user.mbti}</div>
-              <div style="margin-top:6px;"><span class="privacy-pill-mini">이메일 · 실명 비공개 보호중</span></div>
             </div>
           </div>
 
@@ -5926,30 +5962,28 @@
             "${user.bio || "공강 시간에 함께 소통할 학우들을 환영합니다."}"
           </div>
 
-          <!-- 1) 매너온도: 실시간 매너 점수표 -->
-          <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:12px; padding:14px; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
-              <span style="font-size:13px; font-weight:800; color:#191F28;">실시간 매너온도 (과정 · 점수표)</span>
-              <span style="font-size:11.5px; color:#6B7684;">누적 만남 호평 <b style="color:#287D62;">${myStats.totalPraiseCnt}회</b></span>
+          <!-- 1) 매너온도: 큰 숫자 + 얇은 게이지 -->
+          <div style="padding:16px 2px 20px;">
+            <div style="font-size:13px; font-weight:600; color:#8B95A1;">매너온도</div>
+            <div style="display:flex; align-items:flex-end; gap:2px; margin-top:2px;">
+              <span style="font-size:46px; font-weight:800; color:#287D62; line-height:1; letter-spacing:-0.03em;">${parseFloat(user.manner_temp || 36.5).toFixed(1)}</span>
+              <span style="font-size:20px; font-weight:700; color:#287D62; margin-bottom:3px;">°C</span>
+              <span style="margin-left:auto; font-size:13px; color:#8B95A1; margin-bottom:4px;">누적 호평 <b style="color:#191F28;">${myStats.totalPraiseCnt}회</b></span>
             </div>
-            ${renderTempGauge(user.manner_temp, false)}
-            <div style="font-size:11.5px; color:#6B7684; margin-top:6px;">
-              모든 학우가 36.5°C에서 시작하며, 실제 번개 모임 후 상대방의 칭찬(+0.5°C)과 노쇼 신고(-3.0°C)로만 변동됩니다.
+            <div style="height:8px; background:#F2F4F3; border-radius:999px; overflow:hidden; margin-top:12px;">
+              <div style="width:${Math.max(8, Math.min(100, Math.round((parseFloat(user.manner_temp || 36.5) / 60.0) * 100)))}%; height:100%; background:#287D62; border-radius:999px; transition:width .6s cubic-bezier(.2,.8,.2,1);"></div>
             </div>
           </div>
 
           <!-- 2) 공식 인증 뱃지: 완전히 인증된 사람에게만 부여되는 보증 타이틀 -->
-          <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:14px;">
+          <div style="background:#F7F9F8; border-radius:16px; padding:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 15, '#287D62')}</span>
                 <span style="font-size:13.5px; font-weight:800; color:#191F28;">공식 안심 인증 뱃지 (${myStats.badges.length}/4)</span>
               </div>
-              <span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 8px; border-radius:999px;">완전 검증 보증서</span>
             </div>
-            <div style="font-size:12px; color:#6B7684; margin-bottom:12px;">
-              출석·단순 참여로는 획득할 수 없으며, <b>40.0°C 달성</b> 또는 <b>만남 후 좋은 평가 15회 이상</b>을 받은 검증된 학우에게만 수여됩니다.
-            </div>
+            <div style="font-size:12.5px; color:#8B95A1; margin-bottom:12px;">40.0°C 달성 또는 좋은 평가 15회 이상이면 받을 수 있어요</div>
 
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
               ${myStats.badgeCatalog.map(b => `
@@ -5969,9 +6003,6 @@
                   </div>
                 </div>
               `).join("")}
-            </div>
-            <div style="font-size:11px; color:#6B7684; margin-top:10px;">
-              * 노쇼 또는 비매너 신고가 1회라도 접수되면 보유 중인 모든 공식 인증 뱃지가 즉시 회수됩니다.
             </div>
           </div>
 
@@ -6016,11 +6047,8 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
               <div style="font-size:15px; font-weight:800; color:#191F28;">계정 보안 · 로그인 비밀번호 ${user.pw_hash ? "변경" : "설정"}</div>
               <span style="font-size:11px; font-weight:700; color:${user.pw_hash ? "#287D62" : "#6B7684"}; background:${user.pw_hash ? "#EEF8F3" : "#F7F9F8"}; padding:2px 8px; border-radius:999px;">
-                ${user.pw_hash ? "비밀번호 설정 완료 · 30일 자동로그인" : "비밀번호 미설정"}
+                ${user.pw_hash ? "설정 완료" : "미설정"}
               </span>
-            </div>
-            <div style="font-size:12.5px; color:#6B7684; margin-bottom:10px; line-height:1.45;">
-              로그아웃 후 다시 로그인하거나 새 기기에서 접속할 때 사용할 비밀번호(4자리 이상)를 ${user.pw_hash ? "변경" : "설정"}할 수 있습니다.
             </div>
             <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
               <input id="edit_user_pw" type="password" class="input" style="margin-bottom:0;" placeholder="${user.pw_hash ? "새 비밀번호 입력 (4자리 이상)" : "사용할 비밀번호 입력 (4자리 이상)"}" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('edit_user_pw')" />
