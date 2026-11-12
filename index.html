@@ -2860,6 +2860,7 @@
       state.confirm_dialog = opts || null;
       render();
     }
+    const openConfirmSheet = openConfirmDialog;
 
     function closeConfirmDialog() {
       state.confirm_dialog = null;
@@ -2907,9 +2908,9 @@
     function clearLogin() {
       const curUser = state.user_id ? DB.users[state.user_id] : null;
       if (curUser && !isAdminSid(state.user_id) && !curUser.pw_hash) {
-        openConfirmDialog({
+        openConfirmSheet({
           title: "비밀번호 설정 안내",
-          desc: "아직 로그인 비밀번호가 설정되지 않았습니다. 안전한 계정 보호를 위해 지금 비밀번호를 설정하시겠습니까?",
+          desc: "아직 로그인 비밀번호가 설정되지 않았어요. 안전한 계정 보호를 위해 지금 비밀번호를 설정할까요?",
           confirmText: "비밀번호 설정하기",
           cancelText: "그대로 로그아웃",
           onConfirm: () => {
@@ -2922,7 +2923,14 @@
         });
         return;
       }
-      executeLogoutNow();
+      openConfirmSheet({
+        title: "로그아웃할까요?",
+        desc: "30일간 유지되던 자동 로그인이 해제돼요.",
+        confirmText: "로그아웃",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => executeLogoutNow()
+      });
     }
 
     function calcDistanceMeters(lat1, lng1, lat2, lng2) {
@@ -4539,9 +4547,19 @@
     }
 
     function clearAllNotifs() {
-      DB.notifications = DB.notifications.filter(n => n.user_id !== state.user_id);
-      saveDB();
-      render();
+      openConfirmSheet({
+        title: "알림을 모두 지울까요?",
+        desc: "받은 알림 내역이 모두 삭제되며 복구할 수 없어요.",
+        confirmText: "지우기",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => {
+          DB.notifications = (DB.notifications || []).filter(n => String(n.user_id) !== String(state.user_id));
+          saveDB();
+          showToast("알림을 모두 지웠어요.");
+          render();
+        }
+      });
     }
 
     // =========================================================
@@ -4899,15 +4917,14 @@
 
     function confirmDeletePost(postId) {
       const p = (DB.posts || []).find(x => x.id === postId);
-      const postTitle = p ? p.title : "번개 모임";
       const count = (DB.applications || []).filter(a => a.post_id === postId && a.applicant_id !== state.user_id).length;
       const desc = count > 0
-        ? `참여 신청한 학우 ${count}명에게 취소 알림이 전달되며, [${postTitle}] 번개 모임이 완전히 삭제됩니다. 정말 취소할까요?`
-        : `[${postTitle}] 번개 모임이 삭제됩니다. 정말 취소할까요?`;
-      openConfirmDialog({
-        title: "번개 모임 취소",
+        ? `신청한 학우 ${count}명에게 취소 알림이 가요.`
+        : "등록한 번개 모임이 삭제되고 복구할 수 없어요.";
+      openConfirmSheet({
+        title: "번개를 취소할까요?",
         desc: desc,
-        confirmText: "모임 취소하기",
+        confirmText: "취소하기",
         cancelText: "돌아가기",
         isDanger: true,
         onConfirm: () => deletePost(postId)
@@ -5828,8 +5845,8 @@
       if (!post || !myId) return;
       const isLeader = String(post.author_id) === myId;
       const msg = isLeader
-        ? "방장이 대화방을 나가면 해당 번개 모임이 마감 처리됩니다. 정말 나가시겠습니까?"
-        : "이 대화방에서 나가시겠습니까?";
+        ? "방장이 대화방을 나가면 해당 번개 모임이 마감 처리돼요. 정말 나갈까요?"
+        : "이 대화방에서 나갈까요?";
 
       openConfirmDialog({
         title: "대화방 나가기",
@@ -6011,8 +6028,15 @@
             <button type="button" class="tk-room-top-btn" style="color:#287D62; border-color:#C5E6D6; background:#EEF8F3; font-weight:700;" onclick="triggerAiIcebreaker(${post.id})" title="AI 대화 주제 추천">✨ AI 추천</button>
             <button type="button" class="tk-room-top-btn" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">평가·신고</button>
             <button type="button" class="tk-room-top-btn only-pc" onclick="backToChatList()">닫기</button>
-            <button type="button" class="tk-room-top-btn" style="color:#E53E3E; border-color:#FFD2D2; background:#FFF5F5;" onclick="leaveChatRoom(${post.id})">나가기</button>
+            <button type="button" class="tk-room-top-btn" style="font-size:16px; font-weight:700; padding:0 10px;" onclick="state['chat_more_open_${post.id}']=!state['chat_more_open_${post.id}']; render();" title="더보기">⋯</button>
           </div>
+          ${state['chat_more_open_' + post.id] ? `
+            <div style="background:#FFFFFF; border-bottom:1px solid #EEF0EF; padding:8px 16px; display:flex; justify-content:flex-end; gap:8px; animation:slideDown 0.15s ease;">
+              <button type="button" class="btn" style="height:32px; font-size:12px; font-weight:700; color:#E53E3E; background:#FFF5F5; border:1px solid #FFD2D2; border-radius:8px; padding:0 12px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; leaveChatRoom(${post.id});">
+                🚪 대화방 나가기
+              </button>
+            </div>
+          ` : ""}
 
           <!-- 모바일 1줄 모임 요약 바 -->
           <div class="tk-room-notice only-mobile" onclick="openDetailModal(${post.id})">
