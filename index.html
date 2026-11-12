@@ -4599,12 +4599,12 @@
         ` : myNotifs.map(n => `
           <div class="uldaemo-card" style="background:${n.is_read ? '#FFFFFF' : '#EEF8F3'}; border-color:${n.is_read ? '#E5E8EB' : '#287D62'}; padding:13px 15px; margin-bottom:8px; cursor:pointer;" onclick="openNotifItem(${n.id})">
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-              <span style="background:${n.is_read ? '#F2F4F6' : '#287D62'}; color:${n.is_read ? '#8B95A1' : '#FFFFFF'}; font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:999px;">
+              <span style="background:${n.is_read ? '#F2F4F6' : '#287D62'}; color:${n.is_read ? '#8B95A1' : '#FFFFFF'}; font-size:10.5px; font-weight:${n.is_read ? '500' : '800'}; padding:2px 8px; border-radius:999px;">
                 ${n.is_read ? "읽음" : "🟢 새 알림"}
               </span>
-              <span style="font-size:11px; color:#8B95A1;">${n.created_at || ""}${n.post_id ? ' · <b style="color:#287D62;">번개 상세 보기 ›</b>' : ''}</span>
+              <span style="font-size:11px; color:#8B95A1;">${n.created_at || ""}${n.post_id ? ` · <b style="color:${n.is_read ? '#8B95A1' : '#287D62'};">번개 상세 보기 ›</b>` : ''}</span>
             </div>
-            <div style="font-size:13.5px; font-weight:700;">${n.message}</div>
+            <div style="font-size:13.5px; font-weight:${n.is_read ? '500' : '700'}; color:${n.is_read ? '#8B95A1' : '#191F28'}; line-height:1.4;">${n.message}</div>
           </div>
         `).join("")}
       `;
