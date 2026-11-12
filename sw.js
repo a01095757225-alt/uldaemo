@@ -8,6 +8,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "울대모", {
       body: data.body || "새로운 소식이 도착했어요!",
+      icon: "/icon-192.png",
+      badge: "/favicon.png",
       data: { url: data.url || "/" },
       vibrate: [120, 60, 120]
     })
