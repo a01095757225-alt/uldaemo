@@ -362,7 +362,7 @@ def _merge_list_by_id(server_list, client_list, deleted_ids=None):
 
 
 def sync_cloud_db(client_db: dict, deleted_post_ids=None):
-    current = load_cloud_db(force=True) or {
+    current = load_cloud_db(force=False) or {
         "users": {},
         "posts": [],
         "applications": [],
