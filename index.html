@@ -5351,6 +5351,37 @@
 
     function backToChatList() {
       state.chat_list_mode = true;
+      state.active_chat_post_id = null;
+      render();
+    }
+
+    function leaveChatRoom(postId) {
+      const myId = String(state.user_id || "");
+      const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
+      if (!post || !myId) return;
+      if (String(post.author_id) === myId) {
+        if (!confirm("방장이 대화방을 나가면 해당 번개 모임이 마감 처리됩니다. 정말 나가시겠습니까?")) return;
+        post.status = "매칭완료";
+        post.updated_at = Date.now();
+        (DB.applications || []).forEach(a => {
+          if (Number(a.post_id) === Number(postId) && a.status === "승인됨") {
+            a.status = "종료됨";
+            a.updated_at = Date.now();
+          }
+        });
+      } else {
+        if (!confirm("이 대화방에서 나가시겠습니까?")) return;
+        (DB.applications || []).forEach(a => {
+          if (Number(a.post_id) === Number(postId) && String(a.applicant_id) === myId) {
+            a.status = "나감";
+            a.updated_at = Date.now();
+          }
+        });
+      }
+      state.chat_list_mode = true;
+      state.active_chat_post_id = null;
+      saveDB(true);
+      showToast("대화방에서 나갔습니다.");
       render();
     }
 
@@ -5363,15 +5394,16 @@
       const myId = String(state.user_id);
       const { pendingHost, activeChats } = getMyActiveChatRooms();
 
-      if (activeChats.length === 1 && !state.active_chat_post_id) {
+      if (activeChats.length === 1 && !state.active_chat_post_id && !state.chat_list_mode) {
         state.active_chat_post_id = Number(activeChats[0].post.id);
         state.chat_list_mode = false;
       } else if (activeChats.length > 0 && state.active_chat_post_id && !activeChats.some(c => Number(c.post.id) === Number(state.active_chat_post_id))) {
-        state.active_chat_post_id = Number(activeChats[0].post.id);
+        state.active_chat_post_id = null;
+        state.chat_list_mode = true;
       }
 
-      // 대화방이 2개 이상이고 사용자가 목록 보기를 눌렀거나 아직 방을 안 골랐다면 카톡/인스타 DM형 목록 뷰 표시
-      const showRoomList = activeChats.length >= 2 && (state.chat_list_mode || !state.active_chat_post_id);
+      // 대화방이 1개 이상일 때, 사용자가 '대화창 닫기(목록으로)'를 눌렀거나 방을 아직 선택하지 않았다면 카톡/인스타 DM형 목록 뷰 표시
+      const showRoomList = activeChats.length >= 1 && (Boolean(state.chat_list_mode) || !state.active_chat_post_id);
       const activeRoom = !showRoomList && activeChats.length > 0
         ? (activeChats.find(c => Number(c.post.id) === Number(state.active_chat_post_id)) || activeChats[0])
         : null;
@@ -5389,7 +5421,7 @@
             </p>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
-            ${activeChats.length >= 2 && !showRoomList ? `
+            ${!showRoomList && activeChats.length >= 1 ? `
               <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 13px; border-radius:10px; font-size:12.5px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3;" onclick="backToChatList()">
                 ← 대화 목록 (${activeChats.length})
               </button>
@@ -5536,9 +5568,10 @@
 
       return `
         <div class="uldaemo-card" style="padding:18px; margin-bottom:14px; border:1px solid #E5EAE7;">
-          <!-- 대화방 상단 프로필 헤더 -->
-          <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:10px; border-bottom:1px solid #F2F4F3;">
+          <!-- 대화방 상단 프로필 헤더 (뒤로가기 / 대화창 닫기 버튼 포함) -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:10px; border-bottom:1px solid #F2F4F3; gap:8px; flex-wrap:wrap;">
             <div style="display:flex; align-items:center; gap:10px;">
+              <button type="button" class="btn" style="width:34px; height:34px; min-height:34px; padding:0; border-radius:10px; border:1px solid #E5EAE7; background:#F7F9F8; color:#191F28; font-weight:800; font-size:15px; flex-shrink:0;" title="대화창 닫기 (목록으로)" onclick="backToChatList()">←</button>
               <div style="width:42px; height:42px; border-radius:50%; background:#EEF8F3; border:1.5px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;">
                 ${partner.avatar.split(" ")[0]}
               </div>
@@ -5556,10 +5589,12 @@
             </div>
 
             <div style="display:flex; align-items:center; gap:6px;">
-              <span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:5px;">
-                <span style="width:6px; height:6px; border-radius:50%; background:#287D62; display:inline-block;"></span>
-                안심 보호중
-              </span>
+              <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; border-radius:8px; font-size:12px; font-weight:700; color:#191F28; border:1px solid #E5EAE7; background:#F7F9F8;" onclick="backToChatList()">
+                ✕ 대화창 닫기
+              </button>
+              <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 10px; border-radius:8px; font-size:11.5px; font-weight:600; color:#6B7684; border:1px solid #E5EAE7; background:#FFFFFF;" onclick="leaveChatRoom(${post.id})">
+                방 나가기
+              </button>
             </div>
           </div>
 
