@@ -1220,24 +1220,27 @@
     /* ===== 스크롤 개선: 플로팅 맨 위로 가기 버튼 ===== */
     .floating-top-btn {
       position: fixed;
-      right: 18px;
-      bottom: 82px;
-      width: 44px;
-      height: 44px;
+      right: 16px;
+      bottom: 78px; /* 하단 탭 바로 위 오른쪽 모서리 */
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       background: #FFFFFF;
       color: #287D62;
       border: 1px solid #C5E6D6;
-      box-shadow: 0 4px 14px rgba(40, 125, 98, 0.18);
+      box-shadow: 0 4px 12px rgba(40, 125, 98, 0.16);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      z-index: 85;
+      z-index: 75; /* 액션 버튼 및 입력창 아래, 하단 바 위 */
       opacity: 0;
       visibility: hidden;
-      transform: translateY(12px);
-      transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease, background 0.15s ease, box-shadow 0.15s ease;
+      transform: translateY(10px);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease, bottom 0.2s ease;
+    }
+    body.has-fab .floating-top-btn {
+      bottom: 148px; /* 홈 화면에 번개 만들기 플로팅 버튼이 있을 때만 위로 이동 */
     }
     .floating-top-btn.is-visible {
       opacity: 1;
@@ -1246,8 +1249,7 @@
     }
     .floating-top-btn:hover {
       background: #EEF8F3;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(40, 125, 98, 0.28);
+      box-shadow: 0 6px 16px rgba(40, 125, 98, 0.24);
     }
     .floating-top-btn:active {
       transform: scale(0.92);
@@ -1685,7 +1687,7 @@
       cursor: pointer;
       z-index: 90;
     }
-    .floating-top-btn { bottom: 154px; }
+    /* .floating-top-btn bottom handled by body.has-fab */
     .side-create-btn { display: none; }
 
     /* =====================================================
@@ -3924,9 +3926,12 @@
         if (state.nav_tab === "지도" && !state.active_modal) {
           setTimeout(initLeafletCampusMap, 60);
         }
-        if (document.getElementById("btn-scroll-top") && window.scrollY > 240) {
-          document.getElementById("btn-scroll-top").classList.add("is-visible");
+        if (state.nav_tab === "홈" && !state.active_modal) {
+          document.body.classList.add("has-fab");
+        } else {
+          document.body.classList.remove("has-fab");
         }
+        updateScrollTopButton();
       } catch (renderErr) {
         console.error("render() critical error:", renderErr);
         const root = document.getElementById("app");
@@ -3940,15 +3945,42 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  window.addEventListener("scroll", () => {
+  function updateScrollTopButton() {
     const btn = document.getElementById("btn-scroll-top");
     if (!btn) return;
-    if (window.scrollY > 240) {
+
+    // 모달이 열려있거나 대화방 내부인 경우 숨김
+    if (state.active_modal || state.active_chat_post_id) {
+      btn.classList.remove("is-visible");
+      return;
+    }
+
+    // 입력창(input, textarea) 포커스 상태 시 간섭 방지 숨김
+    const activeTag = document.activeElement ? document.activeElement.tagName : "";
+    if (activeTag === "INPUT" || activeTag === "TEXTAREA") {
+      btn.classList.remove("is-visible");
+      return;
+    }
+
+    // 광장 한줄 이야기 입력바가 화면 뷰포트에 걸쳐있으면 등록 버튼 보호 위해 숨김
+    const plazaIn = document.getElementById("plaza_talk_in");
+    if (plazaIn) {
+      const rect = plazaIn.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) {
+        btn.classList.remove("is-visible");
+        return;
+      }
+    }
+
+    // 320px 이상 스크롤 시에만 노출
+    if (window.scrollY > 320) {
       btn.classList.add("is-visible");
     } else {
       btn.classList.remove("is-visible");
     }
-  }, { passive: true });
+  }
+
+  window.addEventListener("scroll", updateScrollTopButton, { passive: true });
 
     // 백그라운드 동기화 시 지도를 파괴하지 않고 본문/알림 영역만 부드럽게 갱신
     function renderWithoutMapFlicker() {
