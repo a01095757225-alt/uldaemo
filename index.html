@@ -4938,14 +4938,15 @@
     }
 
     function getBroadCollege(dept) {
-      if (!dept) return "울산대학교";
-      if (/컴퓨터|IT|ICT|소프트웨어|AI|전기|전자|기계|화공|화학공|토목|신소재|건축|생명공|융합/i.test(dept)) return "공과·IT계열";
-      if (/경영|경제|글로벌/i.test(dept)) return "경영·사회계열";
-      if (/의|간호|약학/i.test(dept)) return "의료·보건계열";
-      if (/디자인|미술|음악|예술|체육|스포츠/i.test(dept)) return "예체능계열";
+      if (!dept) return "울산대 재학생";
+      if (/컴퓨터|IT|ICT|소프트웨어|AI|전기|전자|기계|화공|화학공|토목|신소재|건축|생명공|융합/i.test(dept)) return "공과대학";
+      if (/경영|경제|글로벌/i.test(dept)) return "경영대학";
+      if (/의|간호|약학/i.test(dept)) return "의과대학";
+      if (/디자인|미술|음악|예술|체육|스포츠/i.test(dept)) return "예술체육대학";
       if (/국문|영문|인문|철학|역사|어문/i.test(dept)) return "인문대학";
-      if (/자연|수학|물리|생명과학/i.test(dept)) return "자연과학계열";
-      return "울산대학교";
+      if (/자연|수학|물리|생명과학/i.test(dept)) return "자연과학대학";
+      if (/사회/i.test(dept)) return "사회과학대학";
+      return "울산대 재학생";
     }
 
     function confirmDeletePost(postId) {
@@ -5693,8 +5694,8 @@
         <div class="uldaemo-card" style="padding:14px 16px; margin-bottom:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#191F28; cursor:pointer;">
-              <input type="checkbox" ${state.gps_consent ? "checked" : ""} onchange="state.gps_consent=this.checked; render();" style="accent-color:#287D62;" />
-              <span>내 위치 표시 및 거리 계산 사용</span>
+              <input type="checkbox" ${state.gps_consent ? "checked" : ""} onchange="state.gps_consent=this.checked; if(this.checked){ showToast('내 위치는 나만 봐요. 번개까지 거리를 계산할 때만 써요.'); } render();" style="accent-color:#287D62;" />
+              <span>거리 계산에 내 위치 쓰기</span>
             </label>
             ${state.gps_consent ? `
               <select class="select" style="width:auto; min-width:200px; margin-bottom:0; height:36px; padding:0 12px; font-size:12.5px;" onchange="changeMyBuilding(this.value)">
@@ -5702,8 +5703,8 @@
               </select>
             ` : ""}
           </div>
-          <div style="font-size:11.5px; color:#8B95A1; margin-top:6px;">
-            🔒 내 위치 정보는 기기 내에서만 사용되며, 타인에게 절대 공유되지 않고 번개 장소까지의 도보 거리 계산에만 안전하게 사용됩니다.
+          <div style="font-size:12px; color:#287D62; font-weight:600; margin-top:6px;">
+            🔒 내 위치는 나만 봐요. 번개까지 거리를 계산할 때만 써요.
           </div>
         </div>
 
@@ -6606,31 +6607,48 @@
           </div>
 
           <div style="margin-top:14px; padding-top:12px; border-top:1px solid #F2F4F3;">
+            <!-- 내 순위 & 상위 % 하이라이트 배너 (사생활 안심 기본 표시) -->
+            <div style="background:#EEF8F3; border-radius:12px; padding:12px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:12px; color:#287D62; font-weight:700;">내 순위</div>
+                <div style="font-size:17px; font-weight:800; color:#191F28; margin-top:2px;">
+                  ${(() => {
+                    const fullList = getMonthlyLeaderboard();
+                    const myIdx = fullList.findIndex(x => x.uid === state.user_id);
+                    const myRank = myIdx >= 0 ? (myIdx + 1) : fullList.length + 1;
+                    const topPct = Math.max(1, Math.round((myRank / Math.max(1, fullList.length)) * 100));
+                    return `${myRank}위 <span style="font-size:12.5px; font-weight:600; color:#6B7684;">(상위 ${topPct}%)</span>`;
+                  })()}
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:12px; color:#6B7684; font-weight:600;">내 활동 점수</div>
+                <div style="font-size:17px; font-weight:800; color:#287D62; margin-top:2px;">${st.rewardScore}점</div>
+              </div>
+            </div>
+
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-size:14px; font-weight:800; color:#191F28;">이달의 활동 랭킹</span>
-              <span style="font-size:12px; color:#287D62; font-weight:700;">내 점수 ${st.rewardScore}점</span>
+              <span style="font-size:14px; font-weight:800; color:#191F28;">이달의 TOP 랭킹</span>
+              <span style="font-size:11.5px; color:#6B7684;">🔒 타 학우 사생활 보호 중</span>
             </div>
             ${leaderboard.map((item, idx) => {
               const isRewardTarget = idx < 3;
               const isMe = item.uid === state.user_id;
-              const itemBadges = renderVerifiedBadgePills(item.uid, 2);
+              // 사생활 보호: 본인이 아닌 경우 익명 학우로 고정, 타인의 매너온도/만남횟수/출석일수는 완전히 제외
               const displayName = isMe ? escHtml(item.nickname) : `익명 학우 (${idx + 1}위)`;
-              const displayStats = isMe 
-                ? `만남 ${item.validMeets}회 · ${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일`
-                : `캠퍼스 활동 챌린저 · 안심 뱃지 보유`;
+              const displayAvatar = isMe ? item.avatar : "🌱";
               return `
-                <div class="rank-row ${idx === 0 ? 'top1' : ''}">
+                <div class="rank-row ${idx === 0 ? 'top1' : ''}" style="padding:10px 0; border-bottom:1px solid #F7F9F8;">
                   <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:12.5px; font-weight:800; min-width:28px; color:${idx < 3 ? '#287D62' : '#6B7684'};">${idx + 1}위</span>
-                    <span style="font-size:18px;">${item.avatar}</span>
+                    <span style="font-size:18px;">${displayAvatar}</span>
                     <div>
                       <div style="font-size:13px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         <span>${displayName}</span>
-                        ${itemBadges}
                         ${isMe ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 6px; border-radius:4px;">나</span>` : ""}
                         ${isRewardTarget ? `<span style="font-size:10.5px; background:#EEF8F3; color:#287D62; font-weight:700; padding:1px 7px; border-radius:999px;">리워드 대상</span>` : ""}
                       </div>
-                      <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${displayStats}</div>
+                      ${isMe ? `<div style="font-size:11.5px; color:#6B7684; margin-top:2px;">내 기록 · 만남 ${item.validMeets}회 · ${item.manner_temp.toFixed(1)}°C · 출석 ${item.streakDays}일</div>` : ""}
                     </div>
                   </div>
                   <div style="font-size:13px; font-weight:800; color:#287D62;">${item.rewardScore}점</div>
