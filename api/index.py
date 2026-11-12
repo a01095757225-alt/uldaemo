@@ -328,6 +328,20 @@ def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
         merged["status"] = "매칭완료"
     if s_item.get("is_read") == 1 or c_item.get("is_read") == 1:
         merged["is_read"] = 1
+    if isinstance(s_item.get("replies"), list) or isinstance(c_item.get("replies"), list):
+        rmap = {}
+        for r in list(s_item.get("replies") or []) + list(c_item.get("replies") or []):
+            if not isinstance(r, dict) or not r.get("id"):
+                continue
+            prev = rmap.get(r["id"])
+            if prev:
+                nr = dict(prev)
+                nr.update(r)
+                nr["deleted"] = bool(prev.get("deleted") or r.get("deleted"))
+                rmap[r["id"]] = nr
+            else:
+                rmap[r["id"]] = r
+        merged["replies"] = sorted(rmap.values(), key=lambda x: x.get("id", 0))
     return merged
 
 
