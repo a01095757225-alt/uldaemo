@@ -188,7 +188,7 @@
       padding: 6px 10px;
       display: flex;
       gap: 6px;
-      max-width: 380px;
+      max-width: 430px;
       width: calc(100% - 32px);
     }
     .dock-btn {
@@ -197,8 +197,8 @@
       background: transparent;
       color: #6B7684;
       font-weight: 700;
-      font-size: 11.5px;
-      padding: 8px 4px;
+      font-size: 11.8px;
+      padding: 9px 2px;
       border-radius: 999px;
       cursor: pointer;
       display: flex;
@@ -294,121 +294,6 @@
       100% { transform: scale(2.2); opacity: 0; }
     }
 
-    /* 컨셉 3: 모던 iMessage형 안심 채팅방 버블 */
-    .chat-bubble-me {
-      background: linear-gradient(135deg, #287D62 0%, #1E634C 100%);
-      color: #FFFFFF;
-      padding: 10px 15px;
-      border-radius: 20px 20px 4px 20px;
-      max-width: 78%;
-      margin-left: auto;
-      margin-bottom: 9px;
-      font-size: 13.5px;
-      width: fit-content;
-      word-break: break-word;
-      box-shadow: 0 2px 6px rgba(40, 125, 98, 0.2);
-    }
-    .chat-bubble-other {
-      background: #FFFFFF;
-      color: var(--text-main);
-      border: 1px solid #E5E8EB;
-      padding: 10px 15px;
-      border-radius: 20px 20px 20px 4px;
-      max-width: 78%;
-      margin-right: auto;
-      margin-bottom: 9px;
-      font-size: 13.5px;
-      width: fit-content;
-      word-break: break-word;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-    }
-    .chat-bubble-ai {
-      background: linear-gradient(135deg, #EEF8F3 0%, #E2F5EC 100%);
-      color: var(--primary-dark);
-      border: 1px solid #C5E6D6;
-      padding: 12px 15px;
-      border-radius: 16px;
-      margin: 10px 0;
-      font-size: 12.8px;
-      line-height: 1.5;
-    }
-    .main-banner {
-      display: flex;
-      justify-content: space-between;
-      align-items: stretch;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    .main-banner-tag {
-      display: inline-block;
-      background: #FFFFFF;
-      color: var(--primary);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 999px;
-      margin-bottom: 8px;
-    }
-    .main-banner-title { font-size: 18px; font-weight: 800; color: var(--text-main); line-height: 1.35; }
-    .imp-notice {
-      flex: 1;
-      max-width: 60%;
-      background: linear-gradient(135deg, #FFFFFF 0%, #EEF8F3 100%);
-      border: 1.5px solid #C5E6D6;
-      border-radius: 18px;
-      padding: 12px 14px;
-      text-decoration: none;
-      color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 4px 14px rgba(40, 125, 98, 0.08);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .imp-notice:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(40, 125, 98, 0.14);
-      border-color: var(--primary);
-    }
-    .imp-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
-    }
-    .imp-tag {
-      display: inline-block;
-      background: var(--primary);
-      color: #FFFFFF;
-      font-size: 10.5px;
-      font-weight: 800;
-      padding: 2px 8px;
-      border-radius: 999px;
-    }
-    .imp-more {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--primary);
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .imp-title {
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--text-main);
-      line-height: 1.35;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      margin: 2px 0 4px;
-    }
-    .imp-meta {
-      font-size: 11px;
-      color: var(--text-sub);
-      font-weight: 600;
-    }
     .notice-item {
       display: block;
       text-decoration: none;
@@ -552,12 +437,6 @@
         font-size: 12px;
         font-weight: 700;
         color: #287D62;
-      }
-      .side-guide-card {
-        background: #EEF8F3;
-        border-radius: 16px;
-        padding: 16px;
-        margin-top: 10px;
       }
       .side-user {
         background: #FFFFFF;
@@ -722,32 +601,10 @@
       font-size: 11.5px;
       font-weight: 700;
     }
-    .urgent-badge {
-      display: inline-flex;
-      align-items: center;
-      background: #FFF0F0;
-      color: #E02020;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 6px;
-    }
     .temp-wrap { width: 100%; margin: 4px 0; }
     .temp-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
     .temp-track { width: 100%; background: #E5E8EB; height: 7px; border-radius: 999px; overflow: hidden; }
     .temp-fill { height: 100%; background: linear-gradient(90deg, #52B788, #287D62); border-radius: 999px; }
-    .praise-tag {
-      display: inline-block;
-      background: #EEF8F3;
-      color: var(--primary);
-      border: 1px solid #C5E6D6;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 600;
-      margin-right: 5px;
-      margin-top: 4px;
-    }
     .kakaomap-link {
       display: inline-flex;
       align-items: center;
@@ -990,9 +847,7 @@
     .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
     #campus-map { width: 100%; height: 320px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 10px; z-index: 1; }
 
-    /* ===== 비주얼 임팩트 & 애니메이션 (콘페티, 번개 플래시, 매너온도 아우라, 카드 꽂힘) ===== */
-    .floating-dock { max-width: 430px; }
-    .dock-btn { font-size: 11.8px; padding: 9px 2px; }
+    /* ===== 비주얼 임팩트 & 애니메이션 (콘페티, 번개 플래시, 카드 꽂힘) ===== */
     #confetti-canvas {
       position: fixed;
       inset: 0;
@@ -1018,14 +873,6 @@
     .card-pop-new {
       animation: popInCard 0.55s cubic-bezier(0.22, 1, 0.36, 1);
       border-color: var(--primary) !important;
-    }
-    @keyframes goldAuraPulse {
-      0%, 100% { box-shadow: 0 0 0 2px #FFD166, 0 0 12px rgba(255, 193, 7, 0.65); }
-      50% { box-shadow: 0 0 0 3.5px #FFB703, 0 0 20px rgba(255, 183, 3, 0.9); }
-    }
-    .aura-40 {
-      border: 2px solid #FFB703 !important;
-      animation: goldAuraPulse 2.2s infinite ease-in-out;
     }
 
     /* ===== 👑 운영진 공식 번개 전용 뱃지 & 프리미엄 테두리 ===== */
@@ -1088,12 +935,6 @@
     .card-bursting {
       animation: cardPoofBurst 0.65s cubic-bezier(0.36, 0, 0.66, -0.56) forwards !important;
       pointer-events: none !important;
-    }
-    .burst-smoke-screen {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 9999;
     }
 
     /* ===== 🏆 공식 안심 인증 뱃지 & 참여 챌린지 & 커피 랭킹 ===== */
@@ -1487,7 +1328,6 @@
 
     const AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"];
     const MBTIS = ["ENFP", "ENTP", "INFP", "INTP", "ESFJ", "ESTJ", "ISFJ", "ISTJ", "ENFJ", "ENTJ", "INFJ", "INTJ", "ESFP", "ESTP", "ISFP", "ISTP", "모름/비공개"];
-    const KW_OPTIONS = ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊", "적극적이에요 👍", "대화가 즐거워요 💬", "조용히 집중하기 좋아요 📚"];
 
     function getTodayStr() {
       const d = new Date();
@@ -2677,30 +2517,6 @@
       }
     }
 
-    function importantNotices() {
-      return NOTICES.items.filter(n => n.important);
-    }
-    function renderImportantNoticeCard() {
-      const imp = importantNotices();
-      const top = imp[0] || NOTICES.items[0];
-      if (!top) {
-        return `<a class="imp-notice" href="https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113" target="_blank" rel="noopener">
-          <div class="imp-top">
-            <span class="imp-tag">📢 울산대 공지</span>
-          </div>
-          <span class="imp-title">${NOTICES.loading ? "공지를 불러오는 중…" : "공식 공지 보러가기"}</span>
-        </a>`;
-      }
-      const totalCnt = NOTICES.items.length;
-      return `<a class="imp-notice" href="${escHtml(top.link)}" target="_blank" rel="noopener">
-        <div class="imp-top">
-          <span class="imp-tag">📌 중요 만남 공지</span>
-          <span class="imp-more" onclick="openUlsanNoticesModal(event)">전체 ${totalCnt}건 ›</span>
-        </div>
-        <div class="imp-title">${escHtml(top.title)}</div>
-        <div class="imp-meta">${escHtml(top.source)}${top.cat ? ` · ${escHtml(top.cat)}` : ""} · ${escHtml(top.date)}</div>
-      </a>`;
-    }
     function switchNotifTab(t) {
       state.notif_tab = t;
       if (t === "ulsan") markNoticesSeen();
@@ -3052,6 +2868,38 @@
       return window.innerWidth >= 1024;
     }
 
+    function renderPcRightNotifInnerHtml(unreadCnt, newNoticeCnt) {
+      const myNotifs = (DB.notifications || []).filter(n => n.user_id === state.user_id).slice(0, 4);
+      state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
+      const isNotifsExp = Boolean(state.pc_accordions.notifs);
+      return `
+        <div class="accordion-header" onclick="togglePcAccordion('notifs')">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:13.5px; color:#191F28;">내 알림</span>
+            <span style="font-size:13px; font-weight:700; color:#287D62;">${unreadCnt}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11.5px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
+              공지${newNoticeCnt > 0 ? ` ${newNoticeCnt}` : ""} ›
+            </span>
+            <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
+          </div>
+        </div>
+        ${isNotifsExp ? `
+          <div class="accordion-body" style="padding:10px 14px 14px;">
+            ${myNotifs.length === 0
+              ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새로운 알림이 없습니다.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 ${newNoticeCnt}건 확인하기 →</span>` : ""}</div>`
+              : myNotifs.map(n => `
+                <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
+                  <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
+                  <div style="font-size:10.5px; color:#6B7684; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
+                </div>
+              `).join("")}
+          </div>
+        ` : ''}
+      `;
+    }
+
     function render() {
       try {
         const root = document.getElementById("app");
@@ -3162,7 +3010,6 @@
         </aside>
       `;
 
-      const myNotifs = (DB.notifications || []).filter(n => n.user_id === state.user_id).slice(0, 4);
       const activeCnt = (DB.posts || []).filter(p => p.status === "모집중").length;
 
       state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
@@ -3171,30 +3018,7 @@
 
       const notifCard = `
         <div id="pc-right-notifs" class="meetup-accordion-card ${isNotifsExp ? 'is-expanded' : ''}" style="margin-bottom:12px;">
-          <div class="accordion-header" onclick="togglePcAccordion('notifs')">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-weight:700; font-size:13.5px; color:#191F28;">내 알림</span>
-              <span style="font-size:13px; font-weight:700; color:#287D62;">${unreadCnt}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:11.5px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
-                공지${newNoticeCnt > 0 ? ` ${newNoticeCnt}` : ""} ›
-              </span>
-              <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
-            </div>
-          </div>
-          ${isNotifsExp ? `
-            <div class="accordion-body" style="padding:10px 14px 14px;">
-              ${myNotifs.length === 0
-                ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새로운 알림이 없습니다.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 ${newNoticeCnt}건 확인하기 →</span>` : ""}</div>`
-                : myNotifs.map(n => `
-                  <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
-                    <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
-                    <div style="font-size:10.5px; color:#6B7684; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
-                  </div>
-                `).join("")}
-            </div>
-          ` : ''}
+          ${renderPcRightNotifInnerHtml(unreadCnt, newNoticeCnt)}
         </div>
       `;
 
@@ -3409,40 +3233,10 @@
 
       const rightNotifs = document.getElementById("pc-right-notifs");
       if (rightNotifs) {
-        const myNotifs = (DB.notifications || []).filter(n => n.user_id === state.user_id).slice(0, 4);
         state.pc_accordions = state.pc_accordions || { notifs: false, map: false, cafeteria: false };
         const isNotifsExp = Boolean(state.pc_accordions.notifs);
         rightNotifs.className = `meetup-accordion-card ${isNotifsExp ? 'is-expanded' : ''}`;
-        rightNotifs.innerHTML = `
-          <div class="accordion-header" onclick="togglePcAccordion('notifs')">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="width:28px; height:28px; border-radius:8px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; color:#287D62; flex-shrink:0;">
-                ${getSvgIcon('bell', 15, '#287D62')}
-              </span>
-              <span style="font-weight:800; font-size:13.5px; color:#191F28;">
-                내 알림 ${unreadCnt > 0 ? `<span class="count-chip">${unreadCnt}</span>` : ""}
-              </span>
-            </div>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; color:#287D62; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openUlsanNoticesModal(event)">
-                🏫 공지${newNoticeCnt > 0 ? ` <span class="count-chip">N${newNoticeCnt}</span>` : ""} ›
-              </span>
-              <span class="accordion-chevron">${getSvgIcon('chevron-down', 16, 'currentColor')}</span>
-            </div>
-          </div>
-          ${isNotifsExp ? `
-            <div class="accordion-body" style="padding:10px 14px 14px;">
-              ${myNotifs.length === 0
-                ? `<div style="font-size:12px; color:#8B95A1; padding:6px 0;">내 알림은 아직 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">👉 새 울산대 공지 ${newNoticeCnt}건이 있어요!</span>` : ""}</div>`
-                : myNotifs.map(n => `
-                  <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
-                    <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
-                    <div style="font-size:10.5px; color:#8B95A1; margin-top:2px;">${n.created_at || ""}${n.post_id ? ' · <span style="color:#287D62; font-weight:700;">바로 보기 ›</span>' : ''}</div>
-                  </div>
-                `).join("")}
-            </div>
-          ` : ''}
-        `;
+        rightNotifs.innerHTML = renderPcRightNotifInnerHtml(unreadCnt, newNoticeCnt);
       }
     }
 
@@ -3814,14 +3608,6 @@
       localStorage.setItem(failKey, "0");
       showToast("로그인 성공! 30일간 자동 로그인이 유지됩니다.");
       persistLogin(sid);
-    }
-
-    function saveSmtpSettings() {
-      state.smtp_sender = document.getElementById("smtp_sender_in").value.trim();
-      state.smtp_pw = document.getElementById("smtp_pw_in").value.trim();
-      localStorage.setItem("uldaemo_smtp_sender", state.smtp_sender);
-      localStorage.setItem("uldaemo_smtp_pw", state.smtp_pw);
-      showToast("발신 메일 설정이 저장되었습니다! 다시 [인증 요청]을 눌러주세요.");
     }
 
     async function requestEmailOtp() {
