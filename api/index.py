@@ -192,8 +192,21 @@ def _fetch_board(code: str, label: str):
     return items
 
 
+STUDENT_KEYWORDS = ["장학", "수강", "계절", "등록", "시험", "성적", "교환", "축제", "동아리", "봉사", "채용", "인턴", "대회", "학식"]
+
+
+def filter_student_notices(items, max_count=5):
+    """학생 관련 핵심 키워드 공지만 엄선, 0건 시 최신순 방어 반환"""
+    if not items:
+        return []
+    filtered = [it for it in items if any(k in it.get("title", "") for k in STUDENT_KEYWORDS)]
+    if filtered:
+        return filtered[:max_count]
+    return items[:max_count]
+
+
 def get_ulsan_notices():
-    """울산대 게시판에서 만남·모집·행사 위주 공지를 병렬로 수집(5분 캐시)."""
+    """울산대 게시판에서 학생 맞춤형 공지를 병렬로 수집(최대 5건, 5분 캐시)."""
     now = time.time()
     if _NOTICE_CACHE["items"] and now - _NOTICE_CACHE["ts"] < 300:
         return _NOTICE_CACHE["items"]
@@ -209,10 +222,9 @@ def get_ulsan_notices():
             seen.add(key)
             items.append(it)
     items.sort(key=lambda x: (1 if x["important"] else 0, x["date"]), reverse=True)
-    if items:
-        _NOTICE_CACHE.update({"ts": now, "items": items})
-        return items
-    return FALLBACK_NOTICES
+    selected = filter_student_notices(items if items else FALLBACK_NOTICES, 5)
+    _NOTICE_CACHE.update({"ts": now, "items": selected})
+    return selected
 
 
 _CAFETERIA_CACHE = {"ts": 0.0, "data": None}
