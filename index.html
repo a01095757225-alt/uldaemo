@@ -1071,11 +1071,12 @@
       left: 50%;
       top: 50%;
       transform-origin: 0 0;
-      font-size: 11px;
+      font-size: 12.5px;
       font-weight: 800;
       color: #191F28;
       white-space: nowrap;
       pointer-events: none;
+      letter-spacing: -0.01em;
     }
     .roulette-center-btn {
       position: absolute;
@@ -5461,14 +5462,27 @@
       { label: "리워드+5점", full: "오늘의 행운 리워드 점수 +5점!", type: "score", val: 5 }
     ];
 
-    const MENU_WHEEL_ITEMS = [
+    const MENU_WHEEL_ITEMS_SOLO = [
       { label: "🍚 학생회관 학식", full: "🍚 22호관 학생회관 가성비 학식", loc: "22호관 학생회관" },
       { label: "🍖 바사 국밥", full: "🍖 바보사거리 뜨끈한 돼지국밥", loc: "22호관 학생회관" },
+      { label: "🍔 수제버거", full: "🍔 육즙 가득 수제버거 & 감튀", loc: "22호관 학생회관" },
+      { label: "🍜 라멘·돈까스", full: "🍜 바보사거리 일본식 라멘 & 돈까스", loc: "22호관 학생회관" },
+      { label: "🍲 마라탕", full: "🍲 1인 마라탕 & 꿔바로우", loc: "22호관 학생회관" },
+      { label: "🥪 샌드위치·샐러드", full: "🥪 신선한 샌드위치 & 샐러드팩", loc: "22호관 학생회관" }
+    ];
+
+    const MENU_WHEEL_ITEMS_GROUP = [
       { label: "🍕 피자·파스타", full: "🍕 바보사거리 화덕피자 & 파스타", loc: "22호관 학생회관" },
       { label: "🍗 치킨·치밥", full: "🍗 바삭한 치킨 & 치밥 세트", loc: "22호관 학생회관" },
-      { label: "🍜 마라탕", full: "🍜 얼큰한 마라탕 & 꿔바로우", loc: "22호관 학생회관" },
-      { label: "🍔 수제버거", full: "🍔 육즙 가득 수제버거 & 감튀", loc: "22호관 학생회관" }
+      { label: "🥘 찜닭·닭볶음탕", full: "🥘 매콤달콤 안동찜닭 & 당면사리", loc: "22호관 학생회관" },
+      { label: "🥓 삼겹살·고깃집", full: "🥓 불판 위 노릇노릇 삼겹살 번개", loc: "22호관 학생회관" },
+      { label: "🍲 즉석 떡볶이", full: "🍲 보글보글 즉석 떡볶이 & 튀김", loc: "22호관 학생회관" },
+      { label: "🍱 퓨전 덮밥", full: "🍱 다함께 즐기는 퓨전 일식 덮밥", loc: "22호관 학생회관" }
     ];
+
+    function getActiveMenuItems() {
+      return (state.menu_people_filter === "group") ? MENU_WHEEL_ITEMS_GROUP : MENU_WHEEL_ITEMS_SOLO;
+    }
 
     let _isSpinningRoulette = false;
     let _currentWheelDeg = 0;
@@ -5488,7 +5502,7 @@
         u.coffee_tickets = Math.max(0, curTickets - 1);
       }
 
-      const items = mode === "reward" ? REWARD_WHEEL_ITEMS : MENU_WHEEL_ITEMS;
+      const items = mode === "reward" ? REWARD_WHEEL_ITEMS : getActiveMenuItems();
       const winIdx = Math.floor(Math.random() * items.length);
       const sliceDeg = 360 / items.length;
       // 각 섹션의 중심 각도가 상단 핀(0도)에 오도록 회전 각도 계산
@@ -5538,7 +5552,7 @@
       const st = getUserStatsAndBadges(state.user_id);
       const stampedCnt = Math.min(7, st.streakDays);
       const mode = state.roulette_mode || "reward";
-      const items = mode === "reward" ? REWARD_WHEEL_ITEMS : MENU_WHEEL_ITEMS;
+      const items = mode === "reward" ? REWARD_WHEEL_ITEMS : getActiveMenuItems();
 
       return `
         <div class="uldaemo-card" style="margin-bottom:20px; border:1px solid #E5EAE7; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
@@ -5593,7 +5607,7 @@
                   ${items.map((it, idx) => {
                     const angle = idx * 60 + 30 - 90;
                     const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
-                    return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(26px, -6px);">${cleanLabel}</div>`;
+                    return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(28px, -6px);">${cleanLabel}</div>`;
                   }).join("")}
                 </div>
                 <button class="roulette-center-btn" onclick="spinRouletteWheel()">
@@ -5602,8 +5616,16 @@
               </div>
 
               <div>
-                <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">
-                  ${mode === 'reward' ? '🎉 캠퍼스 리워드 룰렛' : '🍴 오늘의 공강 메뉴 룰렛'}
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                  <div style="font-size:14px; font-weight:800; color:#191F28;">
+                    ${mode === 'reward' ? '🎉 캠퍼스 리워드 룰렛' : '🍴 오늘의 공강 메뉴 룰렛'}
+                  </div>
+                  ${mode === 'menu' ? `
+                    <div style="display:flex; gap:4px;">
+                      <button type="button" class="quick-chip ${state.menu_people_filter !== 'group' ? 'active' : ''}" style="padding:3px 10px; font-size:11.5px;" onclick="state.menu_people_filter='solo'; render();">혼밥</button>
+                      <button type="button" class="quick-chip ${state.menu_people_filter === 'group' ? 'active' : ''}" style="padding:3px 10px; font-size:11.5px;" onclick="state.menu_people_filter='group'; render();">2~3명</button>
+                    </div>
+                  ` : ''}
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:12px;">
                   ${items.map((it, i) => {
@@ -5725,17 +5747,31 @@
                   <div style="font-size:20px; font-weight:800; color:#191F28; margin:4px 0 14px; line-height:1.35; letter-spacing:-0.02em;">${escHtml(cleanQ)}</div>
                   ${[['A', p.opt_a, pctA], ['B', p.opt_b, pctB]].map(([k, label, pct]) => {
                     const picked = (myPick === k);
-                    const fillW = myPick ? pct : 0;
+                    const fillW = (myPick && total >= 5) ? pct : (picked ? 100 : 0);
+                    let statusLabel = `<span style="font-size:13px; color:#8B95A1; font-weight:600;">선택</span>`;
+                    if (myPick) {
+                      if (total >= 5) {
+                        statusLabel = `<span>${pct}%</span>`;
+                      } else {
+                        statusLabel = `<span style="font-size:12px; font-weight:700; color:${picked ? '#287D62' : '#8B95A1'};">${picked ? '내 선택 ✓' : ''}</span>`;
+                      }
+                    }
                     return `
                       <button type="button" class="tk-balance-opt ${picked ? 'is-picked' : ''}" onclick="voteBalancePoll(${p.id}, '${k}')">
                         <div class="tk-balance-fill ${picked ? 'is-picked' : ''}" style="width:${fillW}%;"></div>
                         <div class="tk-balance-label">
                           <span>${escHtml(label)}</span>
-                          ${myPick ? `<span>${pct}%</span>` : `<span style="font-size:13px; color:#8B95A1; font-weight:600;">선택</span>`}
+                          ${statusLabel}
                         </div>
                       </button>
                     `;
                   }).join("")}
+                  ${myPick && total < 5 ? `
+                    <div style="font-size:12px; color:#287D62; font-weight:600; margin-top:6px; display:flex; align-items:center; gap:4px;">
+                      <span>📊</span>
+                      <span>${total === 1 ? '첫 번째 투표자예요! (5명이 모이면 비율이 공개돼요)' : `${total}명이 투표했어요 (5명이 모이면 비율이 공개돼요)`}</span>
+                    </div>
+                  ` : ""}
                   <div style="display:flex; justify-content:flex-end; margin-top:2px;">${renderReplyButton('p', p)}</div>
                   ${renderReplyThread('p', p)}
                 </div>
