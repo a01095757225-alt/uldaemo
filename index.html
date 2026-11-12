@@ -1991,6 +1991,20 @@
       return `${y}-${m}-${day}`;
     }
 
+    function isPostTimePassed(post) {
+      if (!post || !post.meet_date) return false;
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "12:00";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 실제 모임 약속 일시가 지났는지 판별 (만남 이후 후기 유도용)
+        return now.getTime() >= postDate.getTime();
+      } catch (e) {
+        return false;
+      }
+    }
+
     function isPostExpired(post) {
       if (!post) return true;
       if (post.status !== "모집중") return true;
@@ -6262,7 +6276,7 @@
           <!-- 모임 시간이 지난 방: 오늘 어땠어요? 매너 후기 남기기 배너 -->
           ${(() => {
             const hasReviewed = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId);
-            if (isPostExpired(post) && !hasReviewed) {
+            if (isPostTimePassed(post) && !hasReviewed) {
               return `
                 <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:10px 14px; margin:10px 16px 0; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="state['chat_action_open_${post.id}']=true; render();">
                   <div style="display:flex; align-items:center; gap:8px;">
