@@ -4305,7 +4305,7 @@
         };
         saveDB(true);
       }
-      showToast("운영진 계정으로 로그인되었습니다.");
+      showToast("운영진 계정으로 로그인되었어요.");
       persistLogin(sid);
     }
 
@@ -4361,7 +4361,7 @@
           })
         });
         const data = await res.json();
-        if (data.ok) showToast("메일함으로 6자리 인증번호가 발송되었습니다!");
+        if (data.ok) showToast("메일함으로 6자리 인증번호가 발송되었어요!");
         else showToast(`인증번호 [${otp}] 생성 완료!`);
       } catch (e) {
         showToast(`인증번호 [${otp}] 생성 완료!`);
@@ -4479,7 +4479,7 @@
         });
         const data = await res.json();
         state.smtp_sent_live = Boolean(data.ok);
-        if (data.ok) showToast("메일함으로 6자리 인증번호가 발송되었습니다!");
+        if (data.ok) showToast("메일함으로 6자리 인증번호가 발송되었어요!");
         else showToast(`인증번호 [${otp}] 생성 완료!`);
       } catch (e) {
         state.smtp_sent_live = false;
@@ -4492,7 +4492,7 @@
       const code = document.getElementById("signup_otp_code").value.trim();
       if (code === state.generated_otp || code === "123456") {
         state.verified_email = state.pending_email;
-        showToast("이메일 본인 인증이 완료되었습니다!");
+        showToast("이메일 본인 인증이 완료되었어요!");
         render();
       } else {
         showToast("인증번호가 일치하지 않습니다.");
@@ -4587,7 +4587,7 @@
         <div class="row-3" style="margin-bottom:12px;">
           <button class="btn btn-primary" ${unreadCnt === 0 ? "disabled" : ""} onclick="markAllNotifsRead()">✅ 모두 읽음</button>
           <button class="btn" onclick="markAllNotifsRead(); switchTab('채팅');">💬 채팅/신청 관리</button>
-          <button class="btn" ${myNotifs.length === 0 ? "disabled" : ""} onclick="clearAllNotifs()">🗑️ 알림 비우기</button>
+          <button class="btn" ${myNotifs.length === 0 ? "disabled" : ""} onclick="clearAllNotifs()">🗑️ 알림 모두 지우기</button>
         </div>
         ${myNotifs.length === 0 ? `
           <div class="uldaemo-card" style="text-align:center; padding:30px;">
@@ -5174,7 +5174,7 @@
         ${isAuthor ? `
           <div class="uldaemo-card">
             <h4 style="margin-bottom:8px;">방장 전용: 신청자 수락 및 모임 관리</h4>
-            ${apps.length === 0 ? `<div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">아직 참여를 신청한 학우가 없습니다.</div>` : apps.map(a => {
+            ${apps.length === 0 ? `<div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">아직 신청한 학우가 없어요.</div>` : apps.map(a => {
               const apUser = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, department: "울산대", mbti: "INFP", manner_temp: 36.5 };
               const apBadges = renderVerifiedBadgePills(a.applicant_id, 2);
               return `
@@ -5207,7 +5207,7 @@
       app.updated_at = Date.now();
       const post = DB.posts.find(p => Number(p.id) === Number(app.post_id));
       if (post) {
-        notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었습니다! 안심 채팅방을 확인하세요.`, post.id);
+        notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었어요! 안심 대화방을 확인해 보세요.`, post.id);
         checkAndGrantFirstMeetupReward(post.author_id);
         state.active_chat_post_id = Number(post.id);
         state.chat_list_mode = false;
@@ -5245,7 +5245,7 @@
         fireConfetti();
         showToast("투표 완료! 캠퍼스 소통 참여로 활동 리워드 점수 +2점 획득!");
       } else {
-        showToast("투표가 반영되었습니다!");
+        showToast("투표가 반영되었어요!");
       }
       saveDB(true);
       render();
@@ -5276,7 +5276,7 @@
       state.show_poll_form = false;
       saveDB(true);
       fireConfetti();
-      showToast("⚖️ 새 밸런스 게임이 등록되었습니다!");
+      showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
       render();
     }
 
@@ -5300,7 +5300,7 @@
       state.plaza_poll_cat = "전체";
       saveDB(true);
       fireConfetti();
-      showToast("🎲 네이버·SNS 화제의 레전드 밸런스 질문이 새로 추가되었습니다!");
+      showToast("🎲 새로운 밸런스 질문이 추가되었어요!");
       render();
     }
 
@@ -5324,7 +5324,7 @@
       });
       saveDB(true);
       triggerLightningFlash();
-      showToast("🌱 잔디톡이 등록되었습니다!");
+      showToast("🌱 한줄 이야기가 등록되었어요!");
       render();
     }
 
@@ -5380,7 +5380,7 @@
       state.open_replies = state.open_replies || {};
       state.open_replies[kind + id] = true;
       saveDB(true);
-      showToast("답글이 등록되었습니다.");
+      showToast("답글이 등록되었어요.");
       render();
     }
 
@@ -5786,7 +5786,7 @@
       // 모임에 참여 신청했던 학우들에게 '모임 취소' 알림 전송
       (DB.applications || []).filter(a => a.post_id === postId).forEach(a => {
         if (a.applicant_id !== state.user_id) {
-          notifyUser(a.applicant_id, `[${postTitle}] 번개 모임이 방장에 의해 취소되었습니다.`);
+          notifyUser(a.applicant_id, `[${postTitle}] 번개 모임이 방장에 의해 취소되었어요.`);
         }
       });
 
@@ -5801,7 +5801,7 @@
       }
 
       fireBurstExplosion(burstX, burstY);
-      showToast("번개 모임이 취소되었습니다.");
+      showToast("번개 모임이 취소되었어요.");
 
       setTimeout(() => {
         if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
@@ -5868,7 +5868,7 @@
       navigator.geolocation.getCurrentPosition(pos => {
         state.my_lat = pos.coords.latitude;
         state.my_lng = pos.coords.longitude;
-        showToast("현위치가 지도에 반영되었습니다.");
+        showToast("현위치가 지도에 반영되었어요.");
         render();
       }, () => {
         showToast("위치 권한이 거부되어 선택한 호관 기준으로 표시합니다.");
@@ -6378,7 +6378,7 @@
         return `
           <div style="text-align:center; color:#6B7684; font-size:13px; padding:44px 12px;">
             <div style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:4px 12px; font-size:11.5px; color:#6B7684; margin-bottom:10px;">
-              안심 대화방이 개설되었습니다
+              안심 대화방이 열렸어요
             </div>
             <div><b style="color:#191F28;">${escHtml(otherNames || partner.nickname)}</b>님과 상단 <b>✨ AI 추천</b>이나 아래 빠른 문구 칩으로 첫 인사를 나눠보세요.</div>
           </div>
@@ -6540,7 +6540,7 @@
       const emailRe = /[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/;
       if (banned.some(b => txt.toLowerCase().includes(b)) || phoneRe.test(txt) || emailRe.test(txt)) {
         input.focus();
-        return showToast("사적인 외부 연락처(카톡/전화번호/이메일) 공유가 감지되어 차단되었습니다.");
+        return showToast("외부 연락처(카톡/전화번호/이메일) 공유는 안전을 위해 제한돼요.");
       }
 
       // 입력창 즉시 초기화 및 높이 리셋
@@ -6582,7 +6582,7 @@
           DB.messages = (DB.messages || []).filter(m => m.id !== msgId);
           updateChatBoxDOM(postId, true);
           saveDB(true);
-          showToast("부적절한 언행 또는 외부 연락처 요구가 감지되어 차단되었습니다.");
+          showToast("부적절한 언행 또는 연락처 공유는 안전을 위해 제한돼요.");
         }
       }).catch(() => {});
 
@@ -6612,7 +6612,7 @@
         autoResizeChatInput(input);
         input.focus();
       }
-      showToast("추천 문구가 입력창에 복사되었습니다!");
+      showToast("추천 문구가 입력창에 복사되었어요!");
     }
 
     async function triggerAiIcebreaker(postId) {
@@ -6642,7 +6642,7 @@
       // 상대방 화면에는 절대 전송되지 않고 본인 기기 화면에만 비밀 힌트로 표시
       state['ai_hint_' + postId] = reply;
       render();
-      showToast("🔒 나에게만 보이는 AI 추천 팁이 생성되었습니다.");
+      showToast("🔒 나에게만 보이는 대화 팁이 도착했어요.");
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput) curInput.focus();
     }
@@ -7047,7 +7047,7 @@
     }
     function finishEditFavCats() {
       state.editing_fav_cats = false;
-      showToast("✅ 관심 카테고리 설정이 저장되었습니다!");
+      showToast("✅ 관심 카테고리가 저장되었어요!");
       refreshFavSection();
     }
     function refreshFavSection() {
@@ -7136,7 +7136,7 @@
       u.bio = bio;
       u.updated_at = Date.now();
       saveDB(true);
-      showToast("✅ 프로필이 업데이트되었습니다!");
+      showToast("✅ 프로필이 수정되었어요!");
       render();
     }
 
@@ -7149,7 +7149,7 @@
       u.pw_hash = await hashUserPw(state.user_id, pw);
       u.updated_at = Date.now();
       saveDB(true);
-      showToast("✅ 로그인 비밀번호가 안전하게 저장되었습니다!");
+      showToast("✅ 비밀번호가 안전하게 저장되었어요!");
       render();
     }
 
