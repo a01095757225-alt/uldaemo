@@ -775,25 +775,19 @@
     }
     .chat-room-item {
       background: #FFFFFF;
-      border: 1px solid #E5EAE7;
-      border-radius: 16px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 10px;
+      margin: 0 -10px 2px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: background 0.15s ease, transform 0.1s ease;
     }
-    .chat-room-item:hover {
-      border-color: #287D62;
-      background: #F7F9F8;
-    }
-    .chat-room-item.has-unread {
-      border-color: #287D62;
-      background: #EEF8F3;
-    }
+    .chat-room-item:hover { background: #F7F9F8; }
+    .chat-room-item:active { background: #F2F4F3; transform: scale(0.985); }
+    .chat-room-item.has-unread { background: #FFFFFF; }
     .chat-meta {
       display: flex;
       flex-direction: column;
@@ -3782,18 +3776,12 @@
     function switchTab(tab) {
       state.nav_tab = tab;
       state.active_modal = null;
-      render();
       if (tab === "채팅") {
-        setTimeout(() => {
-          document.querySelectorAll('[id^="chat_box_"]').forEach(box => {
-            box.scrollTop = box.scrollHeight;
-          });
-          if (isPC()) {
-            const firstInput = document.querySelector('input[id^="chat_in_"]');
-            if (firstInput) firstInput.focus();
-          }
-        }, 30);
+        // 대화 탭을 누르면 항상 대화방이 접힌 목록 상태로 시작
+        state.chat_list_mode = true;
+        state.active_chat_post_id = null;
       }
+      render();
       if (tab === "채팅" || tab === "홈") {
         pullFromCloud(true);
       }
@@ -4100,7 +4088,6 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">오늘, 같이 할래요?</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">공강도 점심도, 우리 학교 친구와 함께</p>
           </div>
           <button class="btn btn-primary" style="width:auto; min-height:42px; padding:0 18px; border-radius:12px; font-size:13.5px; font-weight:700; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;" onclick="state.active_modal='create'; render();">
             ${getSvgIcon('plus', 15, '#FFFFFF', 2.5)}
@@ -4108,7 +4095,7 @@
           </button>
         </div>
 
-        ${renderHomeRewardStrip()}
+        
 
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
@@ -4752,7 +4739,6 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">캠퍼스 광장</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">출석체크와 밸런스 투표, 실시간 한줄 이야기로 소통해요</p>
           </div>
           <button class="btn btn-primary" style="width:auto; min-height:42px; padding:0 18px; border-radius:12px; font-size:13.5px; font-weight:700; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;" onclick="state.polls_collapsed=false; state.show_poll_form=!state.show_poll_form; render();">
             ${getSvgIcon('plus', 15, '#FFFFFF', 2.5)}
@@ -4953,7 +4939,6 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">캠퍼스 지도</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">울산대학교 호관별 모집 중인 번개를 한눈에 확인하세요</p>
           </div>
           <button class="btn" style="width:auto; min-height:40px; padding:0 14px; border-radius:12px; font-size:12.5px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;" onclick="requestRealGps()">
             ${getSvgIcon('location', 14, '#287D62')}
@@ -5180,10 +5165,7 @@
       const myId = String(state.user_id);
       const { pendingHost, activeChats } = getMyActiveChatRooms();
 
-      if (activeChats.length === 1 && !state.active_chat_post_id && !state.chat_list_mode) {
-        state.active_chat_post_id = Number(activeChats[0].post.id);
-        state.chat_list_mode = false;
-      } else if (activeChats.length > 0 && state.active_chat_post_id && !activeChats.some(c => Number(c.post.id) === Number(state.active_chat_post_id))) {
+      if (activeChats.length > 0 && state.active_chat_post_id && !activeChats.some(c => Number(c.post.id) === Number(state.active_chat_post_id))) {
         state.active_chat_post_id = null;
         state.chat_list_mode = true;
       }
@@ -5200,11 +5182,6 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">대화</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">
-              ${activeChats.length > 0
-                ? `참여 중인 대화방 ${activeChats.length}개${totalUnreadMsgs > 0 ? ` · 새 메시지 <b style="color:#287D62;">${totalUnreadMsgs}개</b>` : ""}`
-                : "매칭된 학우들과 안전하게 이야기를 나누세요"}
-            </p>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
             ${!showRoomList && activeChats.length >= 1 ? `
@@ -5214,14 +5191,6 @@
             ` : ""}
             <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 14px; border-radius:10px; font-size:12.5px; font-weight:700; color:#6B7684; border-color:#E5EAE7; background:#FFFFFF;" onclick="pullFromCloud(true)">새로고침</button>
           </div>
-        </div>
-
-        <div style="background:#EEF8F3; border-radius:12px; padding:11px 16px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:13px; color:#191F28; font-weight:500;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
-            <span>외부 연락처(카톡·전화번호) 교환 없이 인앱에서 안전하게 대화하세요</span>
-          </div>
-          <span style="font-size:11.5px; font-weight:700; color:#287D62;">말풍선 터치 시 공감 리액션 가능</span>
         </div>
 
         ${pendingHost.length > 0 ? `
@@ -5256,8 +5225,8 @@
             <div style="width:44px; height:44px; border-radius:12px; background:#EEF8F3; color:#287D62; display:inline-flex; align-items:center; justify-content:center; margin-bottom:10px;">
               ${getSvgIcon('chat', 22, '#287D62')}
             </div>
-            <div style="font-weight:700; font-size:15px; color:#191F28;">진행 중인 대화가 없습니다</div>
-            <div style="font-size:13px; color:#6B7684; margin-top:4px;">번개 모임에 참여 신청 후 방장이 수락하면 안전한 대화방이 열립니다.</div>
+            <div style="font-weight:700; font-size:15px; color:#191F28;">아직 대화가 없어요</div>
+            <div style="font-size:13px; color:#8B95A1; margin-top:4px;">번개에 참여하면 여기에 대화방이 생겨요</div>
           </div>
         ` : showRoomList ? `
           <!-- 카카오톡 / 인스타 DM 스타일 대화방 목록 -->
@@ -5276,31 +5245,20 @@
 
               return `
                 <div class="chat-room-item ${unreadInRoom > 0 ? 'has-unread' : ''}" onclick="openChatRoom(${post.id})">
-                  <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
-                    <div style="position:relative; width:46px; height:46px; border-radius:50%; background:#EEF8F3; border:1.5px solid #287D62; display:flex; align-items:center; justify-content:center; font-size:21px; flex-shrink:0;">
-                      ${partner.avatar.split(" ")[0]}
-                      ${totalMembers > 2 ? `<span style="position:absolute; bottom:-3px; right:-4px; background:#191F28; color:#FFFFFF; font-size:10px; font-weight:800; padding:1px 5px; border-radius:999px; border:1.5px solid #FFFFFF;">${totalMembers}</span>` : ""}
+                  <div style="position:relative; width:48px; height:48px; border-radius:50%; background:#F2F4F3; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">
+                    ${partner.avatar.split(" ")[0]}
+                    ${totalMembers > 2 ? `<span style="position:absolute; bottom:-2px; right:-2px; background:#191F28; color:#FFFFFF; font-size:10px; font-weight:700; min-width:18px; height:18px; padding:0 4px; border-radius:999px; border:2px solid #FFFFFF; display:inline-flex; align-items:center; justify-content:center;">${totalMembers}</span>` : ""}
+                  </div>
+                  <div style="min-width:0; flex:1;">
+                    <div style="display:flex; align-items:baseline; gap:6px; min-width:0;">
+                      <span style="font-weight:700; font-size:15px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
+                      <span style="font-size:12px; color:#8B95A1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(post.location)} · ${escHtml(previewTime)}</span>
                     </div>
-                    <div style="min-width:0; flex:1;">
-                      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                        <span style="font-weight:800; font-size:14.5px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
-                        <span style="font-size:11px; font-weight:700; color:#287D62; background:#FFFFFF; border:1px solid #C5E6D6; padding:1px 7px; border-radius:999px;">${(partner.manner_temp || 36.5).toFixed(1)}°C</span>
-                        ${partnerBadges}
-                      </div>
-                      <div style="font-size:12px; color:#287D62; font-weight:700; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        ${escHtml(post.title)} · <span style="color:#6B7684; font-weight:500;">${escHtml(post.location)} (${escHtml(post.meet_time)})</span>
-                      </div>
-                      <div style="font-size:13px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '700' : '500'}; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        ${escHtml(previewText)}
-                      </div>
+                    <div style="font-size:14px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '600' : '400'}; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                      ${escHtml(previewText)}
                     </div>
                   </div>
-                  <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;">
-                    <span style="font-size:11px; color:#6B7684; font-weight:600;">${escHtml(previewTime)}</span>
-                    ${unreadInRoom > 0
-                      ? `<span style="background:#287D62; color:#FFFFFF; font-size:11px; font-weight:800; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;">${unreadInRoom}</span>`
-                      : `<span style="font-size:11px; color:#287D62; font-weight:700;">입장 ›</span>`}
-                  </div>
+                  ${unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${unreadInRoom}</span>` : ""}
                 </div>
               `;
             }).join("")}
@@ -5928,7 +5886,6 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
           <div>
             <h1 style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">내 프로필</h1>
-            <p style="font-size:13.5px; color:#6B7684; margin-top:4px; font-weight:500;">실시간 매너온도와 공식 안심 인증 뱃지를 관리하세요</p>
           </div>
           <button type="button" class="btn" style="width:auto; min-height:38px; padding:0 14px; border-radius:10px; font-size:12.5px; font-weight:700; color:#6B7684; border-color:#E5EAE7; background:#FFFFFF;" onclick="clearLogin()">로그아웃</button>
         </div>
