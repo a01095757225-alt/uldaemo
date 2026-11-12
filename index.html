@@ -1528,8 +1528,8 @@
         question: "⚖️ [연애 세기의 논쟁] 내 애인이 내 절친에게 해줘도 되는 마지노선은?",
         opt_a: "🦐 손에 양념 묻히며 새우 껍질 정성껏 까주기",
         opt_b: "🧥 추운 날 목까지 패딩 지퍼 직접 올려주기",
-        votes_a: ["20241001", "20241003"],
-        votes_b: ["20241002"]
+        votes_a: [],
+        votes_b: []
       },
       {
         id: 502,
@@ -1537,8 +1537,8 @@
         question: "⚖️ [극악의 연애] 둘 중 한 명과 무조건 1년 사귀어야 한다면?",
         opt_a: "📵 연락 6시간마다 한 번 되는 집돌이·집순이 애인",
         opt_b: "🍻 연락은 1분 칼답인데 이성 친구와 단둘이 술 마시는 애인",
-        votes_a: ["20241001", "20241002"],
-        votes_b: ["20241003"]
+        votes_a: [],
+        votes_b: []
       },
       {
         id: 503,
@@ -1546,8 +1546,8 @@
         question: "⚖️ [음식 세기의 대결] 평생 단 하나의 탄수화물만 먹어야 한다면?",
         opt_a: "🍜 라면·파스타·짜장면·냉면 등 평생 '면 요리'만 먹기",
         opt_b: "🍚 국밥·삼겹살볶음밥·치밥·초밥 등 평생 '밥 요리'만 먹기",
-        votes_a: ["20241003"],
-        votes_b: ["20241001", "20241002"]
+        votes_a: [],
+        votes_b: []
       },
       {
         id: 504,
@@ -1555,8 +1555,8 @@
         question: "⚖️ [인생 딜레마] 당장 통장에 세후 5천만 원 입금! 대신 조건은?",
         opt_a: "⏰ 졸업 때까지 월화수목금 9시 1교시 풀강 (지각·결석 시 전액 환수)",
         opt_b: "💸 안 받고 지금처럼 원하는 시간표 짜서 공강 즐기기",
-        votes_a: ["20241001", "20241003"],
-        votes_b: ["20241002"]
+        votes_a: [],
+        votes_b: []
       },
       {
         id: 505,
@@ -1564,8 +1564,8 @@
         question: "⚖️ [팀플 지옥] 조별과제 팀원으로 만나면 더 스트레스받는 유형은?",
         opt_a: "🗣️ 친절하고 매일 모이자고 하는데 결과물이 처참한 열정 팀원",
         opt_b: "👻 단톡방 다 읽씹하고 잠수타다가 마감 직전에 A+급 자료 던지는 팀원",
-        votes_a: ["20241002"],
-        votes_b: ["20241001", "20241003"]
+        votes_a: [],
+        votes_b: []
       },
       {
         id: 506,
@@ -1573,8 +1573,8 @@
         question: "⚖️ [초능력 선택] 지금 당장 단 한 번의 기회가 주어진다면?",
         opt_a: "⏪ 지금 기억과 지식 그대로 10년 전 과거로 돌아가기",
         opt_b: "🎱 타임머신은 없지만 이번 주 로또 1등 당첨 번호 받기 (약 25억)",
-        votes_a: ["20241001"],
-        votes_b: ["20241002", "20241003"]
+        votes_a: [],
+        votes_b: []
       }
     ];
 
@@ -1617,32 +1617,7 @@
       }
     ];
 
-    const DEFAULT_PLAZA_TALKS = [
-      {
-        id: 201,
-        author_id: "20241001",
-        text: "지금 22호관 학생식당 줄 많이 긴가요? 공강이라 밥 먹으러 가는 중입니다!",
-        category: "🍚 밥약",
-        created_at: "방금 전",
-        likes: ["20241002"]
-      },
-      {
-        id: 202,
-        author_id: "20241002",
-        text: "아산도서관 신관 2층 자리 꽤 여유 있어요! 같이 조용히 카공하실 분 번개 올렸어요 📚",
-        category: "☕ 카공",
-        created_at: "12분 전",
-        likes: ["20241001", "20241003"]
-      },
-      {
-        id: 203,
-        author_id: "20241003",
-        text: "오늘 저녁 7시에 아산스포츠센터 트랙 가볍게 3바퀴 뛰실 분 계신가요? 🏃",
-        category: "🏃 운동",
-        created_at: "28분 전",
-        likes: ["20241001"]
-      }
-    ];
+    const DEFAULT_PLAZA_TALKS = [];
 
     function ensurePlazaDefaults(dbObj) {
       if (!Array.isArray(dbObj.polls)) {
@@ -1657,7 +1632,7 @@
           }
         });
       }
-      if (!Array.isArray(dbObj.plaza_talks) || dbObj.plaza_talks.length === 0) {
+      if (!Array.isArray(dbObj.plaza_talks)) {
         dbObj.plaza_talks = JSON.parse(JSON.stringify(DEFAULT_PLAZA_TALKS));
       }
       return dbObj;
@@ -1666,6 +1641,31 @@
     // =========================================================
     // 2. 데이터베이스 상태 초기화 및 30일 영구 저장 (localStorage + 쿠키)
     // =========================================================
+    // 체험(데모) 계정 ID: 앱에서 완전히 제거되며 로컬/클라우드 어디서 들어와도 자동 정리됩니다.
+    const DEMO_USER_IDS = ["20241001", "20241002", "20241003"];
+    function purgeDemoData(db) {
+      if (!db || typeof db !== "object") return db;
+      const isDemo = (id) => DEMO_USER_IDS.includes(String(id));
+      if (db.users) DEMO_USER_IDS.forEach(id => { delete db.users[id]; });
+      const demoPostIds = new Set((db.posts || []).filter(p => p && isDemo(p.author_id)).map(p => p.id));
+      db.posts = (db.posts || []).filter(p => p && !isDemo(p.author_id));
+      db.applications = (db.applications || []).filter(a => a && !isDemo(a.applicant_id) && !demoPostIds.has(a.post_id));
+      db.messages = (db.messages || []).filter(m => m && !isDemo(m.sender_id) && !demoPostIds.has(m.post_id));
+      db.notifications = (db.notifications || []).filter(n => n && !isDemo(n.user_id));
+      db.reviews = (db.reviews || []).filter(r => r && !isDemo(r.from_id) && !isDemo(r.to_id));
+      if (Array.isArray(db.plaza_talks)) {
+        db.plaza_talks = db.plaza_talks.filter(t => t && !isDemo(t.author_id));
+        db.plaza_talks.forEach(t => { t.likes = (t.likes || []).filter(u => !isDemo(u)); });
+      }
+      if (Array.isArray(db.polls)) {
+        db.polls.forEach(pl => {
+          pl.votes_a = (pl.votes_a || []).filter(u => !isDemo(u));
+          pl.votes_b = (pl.votes_b || []).filter(u => !isDemo(u));
+        });
+      }
+      return db;
+    }
+
     function loadDB() {
       const today = getTodayStr();
       const raw = localStorage.getItem("uldaemo_db_v5");
@@ -1676,27 +1676,17 @@
           Object.values(parsed.users || {}).forEach(u => {
             if (u.avatar && u.avatar.includes(" ")) u.avatar = u.avatar.split(" ")[0];
           });
-          return ensurePlazaDefaults(parsed);
+          return ensurePlazaDefaults(purgeDemoData(parsed));
         } catch (e) {}
       }
       const initial = ensurePlazaDefaults({
         users: {
-          "20261275": { student_id: "20261275", email: "user@ulsan.ac.kr", nickname: "사과", avatar: "🐶", gender: "남성", department: "컴퓨터공학과", mbti: "모름/비공개", manner_temp: 36.5, report_count: 0, bio: "반갑습니다! 공강 시간에 같이 소통해요 🌱", keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊"] },
-          "20241001": { student_id: "20241001", email: "cloud@ulsan.ac.kr", nickname: "구름한점", avatar: "🐶", gender: "남성", department: "컴퓨터공학과", mbti: "ENFP", manner_temp: 38.5, report_count: 0, bio: "공강 시간에 학식이나 카공 같이 할 학우 환영해요! 🌱", keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊", "적극적이에요 👍"] },
-          "20241002": { student_id: "20241002", email: "sunset@ulsan.ac.kr", nickname: "노을이", avatar: "🐱", gender: "여성", department: "전자공학과", mbti: "INFP", manner_temp: 37.2, report_count: 0, bio: "조용히 도서관에서 같이 공부해요 📚", keywords: ["조용히 집중하기 좋아요 📚", "시간 약속을 잘 지켜요 ⏰"] },
-          "20241003": { student_id: "20241003", email: "runner@ulsan.ac.kr", nickname: "민트러너", avatar: "🦊", gender: "남성", department: "기계공학부", mbti: "ESTP", manner_temp: 40.2, report_count: 0, bio: "저녁 러닝 메이트 언제나 환영합니다!", keywords: ["적극적이에요 👍", "대화가 즐거워요 💬"] }
+          "20261275": { student_id: "20261275", email: "user@ulsan.ac.kr", nickname: "사과", avatar: "🐶", gender: "남성", department: "컴퓨터공학과", mbti: "모름/비공개", manner_temp: 36.5, report_count: 0, bio: "반갑습니다! 공강 시간에 같이 소통해요 🌱", keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊"] }
         },
-        posts: [
-          { id: 1, author_id: "20241001", title: "학식 같이 먹고 다음 수업 가요!", category: "🍚 밥약", meet_date: today, meet_time: "23:30", location: "22호관 학생회관", max_participants: 4, meeting_style: "간단한 스몰토크 환영", status: "모집중" },
-          { id: 2, author_id: "20241002", title: "도서관에서 두 시간 집중할 분!", category: "☕ 카공", meet_date: today, meet_time: "23:45", location: "16호관 아산도서관", max_participants: 3, meeting_style: "이어폰 꽂고 조용히 각자 할일", status: "모집중" },
-          { id: 3, author_id: "20241003", title: "저녁에 운동장 가볍게 러닝하실 분!", category: "🏃 운동", meet_date: today, meet_time: "23:50", location: "39호관 아산스포츠센터", max_participants: 5, meeting_style: "텐션 높게 E처럼 놀아요", status: "모집중" },
-          { id: 4, author_id: "20241001", title: "식후 캠퍼스 산책하며 커피 마셔요", category: "🚶 산책", meet_date: today, meet_time: "23:55", location: "34호관 식물원", max_participants: 2, meeting_style: "간단한 스몰토크 환영", status: "모집중" }
-        ],
+        posts: [],
         applications: [],
         messages: [],
-        notifications: [
-          { id: 1, user_id: "20241001", message: "🌱 울대모에 오신 것을 환영합니다! 공강 번개를 안전하게 시작해보세요.", is_read: 0, created_at: today + " 09:00" }
-        ],
+        notifications: [],
         reviews: []
       });
       localStorage.setItem("uldaemo_db_v5", JSON.stringify(initial));
@@ -1799,6 +1789,7 @@
         changed = true;
       }
 
+      purgeDemoData(DB);
       if (changed) {
         localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
       }
@@ -1915,14 +1906,22 @@
 
     let DB = loadDB();
 
-    // 운영진(관리자) 권한 판별: 20261275, 20241001, admin 또는 is_admin 플래그를 가진 계정만 공식 번개 개설 가능
-    const ADMIN_STUDENT_IDS = ["20261275", "20241001", "admin"];
+    // 운영진(관리자) 권한: 학번 20261275 단 1개 계정 + 전용 비밀번호 인증을 통과한 경우에만 부여됩니다.
+    // (비밀번호 원문은 코드에 저장하지 않고 SHA-256 해시만 보관합니다.)
+    const ADMIN_STUDENT_IDS = ["20261275"];
+    const ADMIN_PW_HASH = "5c65b8dd1f680328747169adb8037b14dd9b88fea82a48bba5033dd209d93cb6";
+    const ADMIN_AUTH_KEY = "uldaemo_admin_auth";
+    async function hashAdminPw(pw) {
+      const buf = new TextEncoder().encode("uldaemo-admin::" + pw);
+      const digest = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+    function isAdminAuthed() {
+      try { return localStorage.getItem(ADMIN_AUTH_KEY) === ADMIN_PW_HASH; } catch (e) { return false; }
+    }
     function isCurrentUserAdmin() {
       if (!state || !state.user_id) return false;
-      const u = (DB && DB.users) ? DB.users[state.user_id] : null;
-      if (ADMIN_STUDENT_IDS.includes(String(state.user_id))) return true;
-      if (u && (u.is_admin || u.role === "admin" || (u.email && u.email.toLowerCase().startsWith("admin@")))) return true;
-      return false;
+      return ADMIN_STUDENT_IDS.includes(String(state.user_id)) && isAdminAuthed();
     }
 
     // =========================================================
@@ -1957,14 +1956,11 @@
       });
 
       // 데모/초기 데이터 자연스러운 기본 실적 보정
-      if (uid === "20241003" && validMeets < 15) validMeets = 15;
-      if (uid === "20241001" && validMeets < 12) validMeets = 12;
-      if (uid === "20241002" && validMeets < 3) validMeets = 3;
 
       // 2) 번개 만남 후 받은 호평(칭찬 스티커) 누적 집계
-      let talkPraiseCnt = (uid === "20241003" ? 15 : uid === "20241001" ? 2 : uid === "20241002" ? 1 : 0);
-      let timePraiseCnt = (uid === "20241003" ? 2 : uid === "20241001" ? 9 : uid === "20241002" ? 2 : 1);
-      let kindPraiseCnt = (uid === "20241003" ? 1 : uid === "20241001" ? 6 : uid === "20241002" ? 1 : 1);
+      let talkPraiseCnt = 0;
+      let timePraiseCnt = 0;
+      let kindPraiseCnt = 0;
 
       (DB.reviews || []).forEach(r => {
         if (String(r.to_id) === String(uid)) {
@@ -1982,7 +1978,7 @@
       const isCleanRecord = (reportCnt === 0);
 
       const today = getTodayStr();
-      const streakDays = u.streak_days || (uid === "20241003" ? 5 : uid === "20241001" ? 4 : 1);
+      const streakDays = u.streak_days || 1;
       const checkedInToday = (u.last_checkin === today);
       const weeklyMeets = Math.min(validMeets, u.weekly_meets || validMeets);
       const firstMeetupDone = Boolean(u.first_reward_claimed || validMeets >= 1);
@@ -2175,7 +2171,12 @@
     }
 
     const state = {
-      user_id: localStorage.getItem("uldaemo_uid") || ((function(){ try { return window.self !== window.top ? "20241001" : ""; } catch(e) { return "20241001"; } })()),
+      user_id: (function () {
+        const saved = localStorage.getItem("uldaemo_uid") || "";
+        if (DEMO_USER_IDS.includes(saved)) return "";
+        if (ADMIN_STUDENT_IDS.includes(saved) && !isAdminAuthed()) return "";
+        return saved;
+      })(),
       login_tab: "login",
       nav_tab: "홈",
       active_modal: null,
@@ -2212,6 +2213,7 @@
       state.verified_email = null;
       state.auth_code_sent = false;
       localStorage.removeItem("uldaemo_uid");
+      localStorage.removeItem(ADMIN_AUTH_KEY);
       document.cookie = "user_id=; path=/; max-age=0";
       render();
     }
@@ -3404,17 +3406,11 @@
           <div class="uldaemo-card">
             <div style="font-size:15px; font-weight:800; margin-bottom:4px;">기존 학우 로그인</div>
             <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">한 번 로그인하면 30일간 자동 로그인 상태가 유지됩니다.</div>
-            <input id="login_sid" class="input" placeholder="학번 입력 (예: 20241001)" />
-            <button class="btn btn-primary" onclick="handleLoginSubmit()">울대모 시작하기</button>
-          </div>
-
-          <div class="uldaemo-card">
-            <div style="font-size:13.5px; font-weight:800; color:#287D62; margin-bottom:4px;">⚡ 원클릭 데모 계정으로 바로 체험하기</div>
-            <div style="font-size:12px; color:#6B7684; margin-bottom:10px;">방장/참여자 화면과 매너 온도 시스템을 1초 만에 테스트해 볼 수 있습니다.</div>
-            <div class="row-2">
-              <button class="btn" onclick="persistLogin('20241001')">🐶 구름한점 (38.5°C)<br><span style="font-size:11px; color:#6B7684;">컴공 · ENFP</span></button>
-              <button class="btn" onclick="persistLogin('20241002')">🐱 노을이 (37.2°C)<br><span style="font-size:11px; color:#6B7684;">전자 · INFP</span></button>
+            <input id="login_sid" class="input" placeholder="학번 입력" oninput="toggleAdminPwField(this.value)" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
+            <div id="login_pw_wrap" style="display:none;">
+              <input id="login_pw" type="password" class="input" placeholder="관리자 전용 비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
             </div>
+            <button class="btn btn-primary" onclick="handleLoginSubmit()">울대모 시작하기</button>
           </div>
         ` : `
           <div class="uldaemo-card">
@@ -3486,9 +3482,53 @@
       `;
     }
 
+    function toggleAdminPwField(val) {
+      const wrap = document.getElementById("login_pw_wrap");
+      if (wrap) wrap.style.display = ADMIN_STUDENT_IDS.includes(String(val).trim()) ? "block" : "none";
+    }
+
+    async function handleAdminLogin(sid) {
+      const pwEl = document.getElementById("login_pw");
+      const pw = pwEl ? pwEl.value : "";
+      const lockUntil = Number(localStorage.getItem("uldaemo_admin_lock") || 0);
+      if (Date.now() < lockUntil) {
+        return showToast("비밀번호 오류가 누적되어 잠시 잠겼습니다. 5분 뒤 다시 시도해주세요.");
+      }
+      if (!pw) return showToast("관리자 전용 비밀번호를 입력해주세요.");
+      let h = "";
+      try { h = await hashAdminPw(pw); } catch (e) { return showToast("보안 연결(HTTPS)에서만 관리자 로그인이 가능합니다."); }
+      if (h !== ADMIN_PW_HASH) {
+        const fails = Number(localStorage.getItem("uldaemo_admin_fails") || 0) + 1;
+        localStorage.setItem("uldaemo_admin_fails", String(fails));
+        if (fails >= 5) {
+          localStorage.setItem("uldaemo_admin_lock", String(Date.now() + 5 * 60 * 1000));
+          localStorage.setItem("uldaemo_admin_fails", "0");
+        }
+        return showToast("비밀번호가 올바르지 않습니다.");
+      }
+      localStorage.setItem("uldaemo_admin_fails", "0");
+      localStorage.setItem(ADMIN_AUTH_KEY, h);
+      if (!DB.users[sid]) {
+        DB.users[sid] = {
+          student_id: sid, email: "", nickname: "운영진", avatar: "🐶", gender: "남성",
+          department: "운영진", mbti: "모름/비공개", manner_temp: 36.5, report_count: 0,
+          bio: "울대모 운영진입니다.", keywords: [], updated_at: Date.now()
+        };
+        saveDB(true);
+      }
+      showToast("운영진 계정으로 로그인되었습니다.");
+      persistLogin(sid);
+    }
+
     async function handleLoginSubmit() {
       const sid = document.getElementById("login_sid").value.trim();
       if (!sid) return showToast("학번을 입력해주세요.");
+      if (DEMO_USER_IDS.includes(sid)) {
+        return showToast("등록되지 않은 학번입니다. [신규 학우 가입] 탭에서 가입해주세요!");
+      }
+      if (ADMIN_STUDENT_IDS.includes(sid)) {
+        return handleAdminLogin(sid);
+      }
       if (DB.users[sid]) {
         persistLogin(sid);
         return;
@@ -3565,6 +3605,12 @@
       if (!sid) return showToast("학번(필수 항목)을 입력해주세요.");
       if (!state.verified_email) return showToast("먼저 Step 1 이메일 본인 인증을 완료해주세요.");
       if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 모두 입력해주세요.");
+      if (ADMIN_STUDENT_IDS.includes(sid) || DEMO_USER_IDS.includes(sid)) {
+        return showToast("사용할 수 없는 학번입니다.");
+      }
+      if (DB.users[sid]) {
+        return showToast("이미 가입된 학번입니다. [기존 학우 로그인]을 이용해주세요.");
+      }
 
       DB.users[sid] = {
         student_id: sid,
@@ -4357,8 +4403,8 @@
         question: pick.question,
         opt_a: pick.opt_a,
         opt_b: pick.opt_b,
-        votes_a: ["20241001"],
-        votes_b: ["20241002"]
+        votes_a: [],
+        votes_b: []
       });
       state.plaza_poll_cat = "전체";
       saveDB(true);
