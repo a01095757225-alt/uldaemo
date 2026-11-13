@@ -2005,6 +2005,20 @@
       }
     }
 
+    function isChatAutoArchived(post) {
+      if (!post || !post.meet_date) return false;
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "12:00";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 모임 일시 기준 24시간(86400000ms) 유예 후 자동 정리 (분실물·정산·신고 골든타임 보장)
+        return now.getTime() > (postDate.getTime() + 24 * 60 * 60 * 1000);
+      } catch (e) {
+        return false;
+      }
+    }
+
     function isPostExpired(post) {
       if (!post) return true;
       if (post.status !== "모집중") return true;
@@ -2664,7 +2678,7 @@
       let kindPraiseCnt = 0;
 
       (DB.reviews || []).forEach(r => {
-        if (String(r.to_id) === String(uid)) {
+        if (String(r.to_id) === String(uid) && !r.is_none) {
           const kw = String(r.keyword || "");
           if (kw.includes("대화")) talkPraiseCnt++;
           else if (kw.includes("시간")) timePraiseCnt++;
@@ -2822,21 +2836,58 @@
       render();
     }
 
-    function submitMannerPraise(postId, partnerId, keyword) {
+    function selectReviewKeyword(postId, kw) {
+      state['review_kw_' + postId] = kw;
+      render();
+    }
+
+    function submitDetailedMannerReview(postId, partnerId) {
+      const kw = state['review_kw_' + postId] || '시간 약속을 잘 지켜요';
+      const detailEl = document.getElementById('review_detail_' + postId);
+      const detail = detailEl ? detailEl.value.trim().slice(0, 150) : '';
+      const isNone = (kw === '후기없음');
+
+      if (!isNone && detail && typeof checkContactLeak === 'function' && checkContactLeak(detail)) {
+        return showToast("후기 내용에 연락처나 외부 SNS 아이디를 적을 수 없어요.");
+      }
+
+      submitMannerPraise(postId, partnerId, kw, detail, isNone);
+    }
+
+    function submitMannerPraise(postId, partnerId, keyword, detail = "", isNone = false) {
       if (!state.user_id || !partnerId) return;
       if (partnerId === state.user_id) {
-        return showToast("[어뷰징 방지] 본인에게는 매너 평가를 남길 수 없습니다.");
+        return showToast("[어뷰징 방지] 본인에게는 매너 평가를 남길 수 없어요.");
       }
       DB.reviews = DB.reviews || [];
-      const alreadyThisPost = DB.reviews.some(r => r.post_id === postId && r.from_id === state.user_id && r.to_id === partnerId);
+      const alreadyThisPost = DB.reviews.some(r => Number(r.post_id) === Number(postId) && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(partnerId));
       if (alreadyThisPost) {
-        return showToast("이 번개 모임에서 이미 상대 학우에게 매너 칭찬을 보냈습니다.");
+        return showToast("이 번개 모임에서 이미 후기를 완료했어요.");
+      }
+
+      if (isNone) {
+        // 후기 없음 선택: 상대방 알림/온도 변동 없이 조용히 완료 기록
+        DB.reviews.push({
+          id: Date.now(),
+          post_id: postId,
+          from_id: state.user_id,
+          to_id: partnerId,
+          keyword: "후기없음",
+          detail: "",
+          is_none: true,
+          created_at: getTodayStr()
+        });
+        state['chat_action_open_' + postId] = false;
+        saveDB(true);
+        showToast("후기 없이 모임을 깔끔하게 마무리했어요.");
+        render();
+        return;
       }
 
       // 어뷰징 방지: 동일 학우 간 반복 평가는 월 최대 2회까지만 인정
-      const samePairCount = DB.reviews.filter(r => r.from_id === state.user_id && r.to_id === partnerId).length;
+      const samePairCount = DB.reviews.filter(r => !r.is_none && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(partnerId)).length;
       if (samePairCount >= 2) {
-        return showToast("[어뷰징 방지] 동일한 학우와의 반복 평가는 월 최대 2회까지만 매너온도 및 인증 뱃지 실적에 반영됩니다.");
+        return showToast("[어뷰징 방지] 동일한 학우와의 반복 평가는 월 최대 2회까지만 매너온도 및 인증 뱃지 실적에 반영돼요.");
       }
 
       DB.reviews.push({
@@ -2845,6 +2896,8 @@
         from_id: state.user_id,
         to_id: partnerId,
         keyword: keyword || "친절해요",
+        detail: detail || "",
+        is_none: false,
         created_at: getTodayStr()
       });
 
@@ -2855,7 +2908,8 @@
         partner.keywords = partner.keywords || [];
         if (keyword && !partner.keywords.includes(keyword)) partner.keywords.push(keyword);
         partner.updated_at = Date.now();
-        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 평가를 남겨 매너온도 +0.5°C 상승 및 공식 인증 뱃지 호평 횟수(+1회)가 누적되었습니다!`, postId);
+        const detailMsg = detail ? ` ("${detail}")` : "";
+        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 후기를 남겨 매너온도 +0.5°C 상승했어요!${detailMsg}`, postId);
       }
       if (me) {
         me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.2) * 10) / 10);
@@ -2865,9 +2919,10 @@
       checkAndGrantFirstMeetupReward(state.user_id);
       checkAndGrantFirstMeetupReward(partnerId);
 
+      state['chat_action_open_' + postId] = false;
       fireConfetti();
       saveDB(true);
-      showToast(`매너 평가 완료! 상대방 매너온도 +0.5°C & 인증 뱃지 호평 +1회 반영 (내 온도 +0.2°C)`);
+      showToast("매너 후기를 보냈어요! (상대방 +0.5°C, 내 온도 +0.2°C)");
       render();
     }
 
@@ -6015,6 +6070,8 @@
       activePostIds.forEach(pid => {
         const post = (DB.posts || []).find(p => Number(p.id) === Number(pid));
         if (!post) return;
+        // 만남 일시로부터 24시간이 지난 대화방은 사생활 보호를 위해 대화 목록에서 자동 정리
+        if (isChatAutoArchived(post)) return;
         const approvedApps = (DB.applications || []).filter(a => Number(a.post_id) === Number(pid) && a.status === "승인됨");
         const allMemberIds = [String(post.author_id), ...approvedApps.map(a => String(a.applicant_id))];
         const uniqueOthers = Array.from(new Set(allMemberIds.filter(uid => uid && uid !== myId)));
@@ -6273,7 +6330,7 @@
             <span style="color:#8B95A1; flex-shrink:0; margin-left:8px;">${escHtml(post.location)}</span>
           </div>
 
-          <!-- 모임 시간이 지난 방: 오늘 어땠어요? 매너 후기 남기기 배너 -->
+          <!-- 모임 시간이 지난 방: 후기 남기기 배너 또는 종료 안내 -->
           ${(() => {
             const hasReviewed = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId);
             if (isPostTimePassed(post) && !hasReviewed) {
@@ -6289,12 +6346,32 @@
                   <button type="button" class="btn btn-primary" style="min-height:28px; height:28px; padding:0 10px; font-size:11.5px; border-radius:8px;">후기 남기기 ›</button>
                 </div>
               `;
+            } else if (isPostTimePassed(post) && hasReviewed) {
+              return `
+                <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:10px; padding:7px 12px; margin:8px 16px 0; font-size:11.5px; color:#6B7684; display:flex; align-items:center; justify-content:space-between;">
+                  <span>🏁 모임이 완료되었어요 · 분실물·정산 문의를 위해 24시간 뒤 자동 정리돼요</span>
+                </div>
+              `;
             }
             return "";
           })()}
 
-          ${isActionOpen ? `
-            <div style="background:#F7F9F8; border-radius:14px; padding:14px; margin:10px 16px 0;">
+          ${isActionOpen ? (() => {
+            const selKw = state['review_kw_' + post.id] || '시간 약속을 잘 지켜요';
+            const isNoneSel = (selKw === '후기없음');
+            const kwList = [
+              ['시간 약속을 잘 지켜요', '⏰ 시간 약속 준수'],
+              ['친절해요', '😊 친절한 매너'],
+              ['대화가 즐거워요', '💬 즐거운 대화'],
+              ['배려심이 넘쳐요', '🫶 배려심 최고'],
+              ['후기없음', '😶 후기 없음']
+            ];
+            return `
+            <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:14px; padding:14px; margin:10px 16px 0;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:13px; font-weight:800; color:#191F28;">${escHtml(evalTargetUser.nickname)}님과의 만남 후기</span>
+                <button type="button" style="border:none; background:none; font-size:15px; color:#8B95A1; cursor:pointer; padding:0 4px;" onclick="state['chat_action_open_${post.id}']=false; render();">✕</button>
+              </div>
               ${otherIds.length > 1 ? `
                 <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
                   ${otherIds.map(uid => {
@@ -6308,17 +6385,43 @@
                   }).join("")}
                 </div>
               ` : ""}
-              <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:8px;">
-                <button class="btn" ${alreadyPraisedTarget ? "disabled" : ""} style="min-height:36px; padding:4px 8px; font-size:12px;" onclick="submitMannerPraise(${post.id}, '${evalTargetId}', '시간 약속을 잘 지켜요')">시간 약속 준수</button>
-                <button class="btn" ${alreadyPraisedTarget ? "disabled" : ""} style="min-height:36px; padding:4px 8px; font-size:12px;" onclick="submitMannerPraise(${post.id}, '${evalTargetId}', '친절해요')">친절한 매너</button>
-                <button class="btn" ${alreadyPraisedTarget ? "disabled" : ""} style="min-height:36px; padding:4px 8px; font-size:12px;" onclick="submitMannerPraise(${post.id}, '${evalTargetId}', '대화가 즐거워요')">즐거운 대화</button>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:12px; color:#8B95A1;">대상: ${escHtml(evalTargetUser.nickname)} (+0.5°C)</span>
+
+              ${alreadyPraisedTarget ? `
+                <div style="padding:10px; background:#FFFFFF; border-radius:10px; text-align:center; font-size:12.5px; color:#287D62; font-weight:700;">
+                  ✅ 이미 이 학우와의 후기를 작성했어요
+                </div>
+              ` : `
+                <!-- 칭찬 키워드 + 후기 없음 선택 칩 -->
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+                  ${kwList.map(([kwVal, kwLabel]) => {
+                    const active = (selKw === kwVal);
+                    return `
+                      <button type="button" class="quick-chip ${active ? 'active' : ''}" style="font-size:12px; padding:5px 11px;" onclick="selectReviewKeyword(${post.id}, '${kwVal}')">${kwLabel}</button>
+                    `;
+                  }).join("")}
+                </div>
+
+                <!-- 디테일한 후기 작성 칸 (후기 없음이 아닐 때 표시) -->
+                ${isNoneSel ? `
+                  <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:10px; padding:10px 12px; font-size:12px; color:#6B7684; margin-bottom:10px;">
+                    상대방에게 별도 알림이나 후기 글을 남기지 않고 조용히 모임을 완료해요.
+                  </div>
+                ` : `
+                  <textarea id="review_detail_${post.id}" class="input" rows="2" maxlength="150" style="min-height:60px; padding:10px 12px; font-size:13px; background:#FFFFFF; margin-bottom:10px; resize:none;" placeholder="디테일한 후기를 남겨보세요! (예: 공강 시간에 맛집 같이 가서 너무 좋았어요. 다음에도 또 만나요!)"></textarea>
+                `}
+
+                <button type="button" class="btn btn-primary" style="min-height:38px; font-size:13px; font-weight:700;" onclick="submitDetailedMannerReview(${post.id}, '${evalTargetId}')">
+                  ${isNoneSel ? '후기 없이 완료하기' : '매너 후기 보내기 (+0.5°C)'}
+                </button>
+              `}
+
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid #E5EAE7;">
+                <span style="font-size:11.5px; color:#8B95A1;">사생활 보호를 위해 연락처 작성은 제한돼요</span>
                 <button type="button" style="border:none; background:none; color:#E02020; font-size:12px; font-weight:600; cursor:pointer;" onclick="reportNoShow('${evalTargetId}')">노쇼 · 비매너 신고</button>
               </div>
             </div>
-          ` : ""}
+            `;
+          })() : ""}
 
           <!-- 메시지 목록 -->
           <div class="chat-box tk-chat-messages" id="chat_box_${post.id}">
@@ -6886,7 +6989,7 @@
       const gaugePct = Math.max(8, Math.min(100, Math.round(((userTemp - 30) / 20) * 100)));
       const sec = state.profile_sec || null;
       const myPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id));
-      const myReviews = (DB.reviews || []).filter(r => String(r.to_id) === String(state.user_id));
+      const myReviews = (DB.reviews || []).filter(r => String(r.to_id) === String(state.user_id) && !r.is_none);
 
       return `
         <div style="max-width:560px;">
@@ -6956,7 +7059,12 @@
               <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
                 ${myReviews.length === 0
                   ? `<div style="font-size:13.5px; color:#8B95A1;">아직 받은 후기가 없어요</div>`
-                  : myReviews.map(r => `<div style="padding:8px 0; font-size:14px; font-weight:600; color:#191F28; border-bottom:1px solid #EEF0EF;">👍 ${escHtml(r.tag || "매너가 좋아요")}</div>`).join("")}
+                  : myReviews.map(r => `
+                    <div style="padding:10px 0; border-bottom:1px solid #EEF0EF;">
+                      <div style="font-size:13.5px; font-weight:700; color:#191F28;">👍 ${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
+                      ${r.detail ? `<div style="font-size:12.5px; color:#4E5968; margin-top:4px; background:#FFFFFF; padding:8px 10px; border-radius:8px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
+                    </div>
+                  `).join("")}
               </div>
             ` : ''}
 
