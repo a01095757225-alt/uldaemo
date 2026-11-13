@@ -2238,13 +2238,13 @@
       },
       {
         tag: "💸 인생·만약에",
-        question: "⚖️ [현대인 고문] 평생 스마트폰을 이 상태로만 써야 한다면?",
+        question: "⚖️ 평생 스마트폰을 이 상태로만 써야 한다면?",
         opt_a: "🔋 아무리 충전해도 최대 배터리가 15%까지만 차는 폰",
         opt_b: "🐢 모든 앱과 영상이 무조건 5초씩 버퍼링 걸리는 폰"
       },
       {
         tag: "💘 연애 레전드",
-        question: "⚖️ [절친 논쟁] 10년 지기 절친이 내 전 애인과 사귄다고 고백한다면?",
+        question: "⚖️ 10년 지기 절친이 내 전 애인과 사귄다고 고백한다면?",
         opt_a: "🤬 절대 용서 못 함, 둘 다 당장 손절",
         opt_b: "🤝 이미 끝난 인연인데 어쩔 수 없지, 쿨하게 인정"
       },
@@ -2305,7 +2305,7 @@
           {
             id: 101,
             author_id: "20261275",
-            title: "[공식] 중앙도서관 3층 카공 & 스터디 메이트 ☕",
+            title: "중앙도서관 3층 카공 메이트",
             category: "☕ 카공",
             meet_date: date1,
             meet_time: `${t1H}:${t1M}`,
@@ -2319,7 +2319,7 @@
           {
             id: 102,
             author_id: "20261275",
-            title: "[공식] 학생회관 밥약 메이트 (소규모 번개) 🍚",
+            title: "학생회관 밥약 메이트 (소규모 번개) 🍚",
             category: "🍚 밥약",
             meet_date: date2,
             meet_time: `${t2H}:${t2M}`,
@@ -2333,7 +2333,7 @@
           {
             id: 103,
             author_id: "20261275",
-            title: "[공식] 저녁 아산스포츠센터 가벼운 트랙 러닝 🏃",
+            title: "저녁 트랙 러닝 · 아산스포츠센터",
             category: "🏃 운동",
             meet_date: date3,
             meet_time: "18:00",
@@ -2444,7 +2444,9 @@
           ? Object.assign({}, cloudIt, localIt)
           : Object.assign({}, localIt, cloudIt);
         // 한 번 '승인됨' 또는 '매칭완료'가 된 상태는 로컬의 이전 '대기중'/'모집중' 캐시로 절대 되돌아가지 않도록 보호
-        if (localIt.status === "승인됨" || cloudIt.status === "승인됨") {
+        if (localIt.status === "취소됨" || cloudIt.status === "취소됨") {
+          merged.status = "취소됨";
+        } else if (localIt.status === "승인됨" || cloudIt.status === "승인됨") {
           merged.status = "승인됨";
         } else if (localIt.status === "매칭완료" || cloudIt.status === "매칭완료") {
           merged.status = "매칭완료";
@@ -2518,8 +2520,14 @@
       return changed;
     }
 
+    let _lastSyncedPayloadSig = "";
     async function syncToCloud(immediate = false) {
+      const curPayloadSig = getDbStateSignature() + "|" + JSON.stringify(_deletedPostIds || []);
+      if (curPayloadSig === _lastSyncedPayloadSig && !immediate) return;
+
       const runSync = async () => {
+        const snapSig = getDbStateSignature() + "|" + JSON.stringify(_deletedPostIds || []);
+        if (snapSig === _lastSyncedPayloadSig) return;
         try {
           const res = await fetch("/api/index", {
             method: "POST",
@@ -2531,8 +2539,9 @@
             })
           });
           const data = await res.json();
-          if (data && data.ok && data.db) {
-            mergeCloudDBIntoLocal(data.db);
+          if (data && data.ok) {
+            _lastSyncedPayloadSig = snapSig;
+            if (data.db) mergeCloudDBIntoLocal(data.db);
           }
         } catch (e) {}
       };
@@ -2541,7 +2550,7 @@
         await runSync();
       } else {
         clearTimeout(_syncTimer);
-        _syncTimer = setTimeout(runSync, 250);
+        _syncTimer = setTimeout(runSync, 600);
       }
     }
 
@@ -2587,7 +2596,7 @@
               a => String(a.applicant_id) === String(state.user_id) && a.status === "승인됨" && !prevApprovedIds.has(a.id)
             );
             if (newlyApproved.length > 0) {
-              showToast("🎉 방장이 참여 신청을 수락하여 안심 채팅방이 열렸습니다!");
+              showToast("🎉 참여 신청이 수락되어 대화방이 열렸어요");
             }
             const newlyArrived = (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id) && !n.is_read && !prevNotifIds.has(n.id));
             if (newlyArrived.length > 0 && newlyApproved.length === 0) {
@@ -2921,7 +2930,7 @@
         if (keyword && !partner.keywords.includes(keyword)) partner.keywords.push(keyword);
         partner.updated_at = Date.now();
         const detailMsg = detail ? ` ("${detail}")` : "";
-        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 후기를 남겨 매너온도 +0.5°C 상승했어요!${detailMsg}`, postId);
+        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 후기를 남겨 매너온도가 0.5°C 올랐어요${detailMsg}`, postId);
       }
       if (me) {
         me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.2) * 10) / 10);
@@ -3007,8 +3016,8 @@
       if (!state.confirm_dialog) return "";
       const d = state.confirm_dialog;
       return `
-        <div class="modal-backdrop" style="z-index:99999; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); animation:fadeIn 0.18s ease-out;" onclick="if(event.target===this) closeConfirmDialog();">
-          <div style="background:#FFFFFF; width:100%; max-width:440px; border-radius:24px 24px 0 0; padding:24px 20px 28px; box-shadow:0 -4px 24px rgba(0,0,0,0.18); animation:slideUp 0.22s cubic-bezier(0.16,1,0.3,1); max-height:85vh; overflow-y:auto;">
+        <div class="modal-backdrop" style="position:fixed; inset:0; z-index:99999; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); animation:fadeIn 0.18s ease-out;" onclick="if(event.target===this) closeConfirmDialog();">
+          <div style="background:#FFFFFF; width:100%; max-width:440px; border-radius:24px 24px 0 0; padding:24px 20px calc(28px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -4px 24px rgba(0,0,0,0.18); animation:slideUp 0.22s cubic-bezier(0.16,1,0.3,1); max-height:85vh; overflow-y:auto;">
             <div style="font-size:18px; font-weight:800; color:#191F28; margin-bottom:8px; line-height:1.35;">${escHtml(d.title || "확인")}</div>
             <div style="font-size:14.5px; color:#4E5968; line-height:1.55; margin-bottom:22px; word-break:keep-all;">${escHtml(d.desc || "")}</div>
             <div style="display:flex; gap:10px;">
@@ -3779,7 +3788,7 @@
         ${isNotifsExp ? `
           <div class="accordion-body" style="padding:10px 14px 14px;">
             ${myNotifs.length === 0
-              ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새로운 알림이 없습니다.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 ${newNoticeCnt}건 확인하기 →</span>` : ""}</div>`
+              ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새로운 알림이 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 ${newNoticeCnt}건 확인하기 →</span>` : ""}</div>`
               : myNotifs.map(n => `
                 <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
                   <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
@@ -4672,10 +4681,10 @@
         <h3 style="margin-bottom:10px;">🔔 실시간 알림 센터</h3>
         ${tabsHtml}
         ${pushBtnHtml()}
-        <div class="row-3" style="margin-bottom:12px;">
-          <button class="btn btn-primary" ${unreadCnt === 0 ? "disabled" : ""} onclick="markAllNotifsRead()">✅ 모두 읽음</button>
-          <button class="btn" onclick="markAllNotifsRead(); switchTab('채팅');">💬 채팅/신청 관리</button>
-          <button class="btn" ${myNotifs.length === 0 ? "disabled" : ""} onclick="clearAllNotifs()">🗑️ 알림 모두 지우기</button>
+        <div style="display:flex; gap:6px; margin-bottom:12px;">
+          <button class="btn btn-primary" style="flex:1; min-height:38px; font-size:12.5px; white-space:nowrap;" ${unreadCnt === 0 ? "disabled" : ""} onclick="markAllNotifsRead()">모두 읽음</button>
+          <button class="btn" style="flex:1; min-height:38px; font-size:12.5px; white-space:nowrap;" onclick="markAllNotifsRead(); switchTab('채팅');">대화/신청</button>
+          <button class="btn" style="flex:1; min-height:38px; font-size:12.5px; white-space:nowrap; color:#6B7684;" ${myNotifs.length === 0 ? "disabled" : ""} onclick="clearAllNotifs()">모두 지우기</button>
         </div>
         ${myNotifs.length === 0 ? `
           <div class="uldaemo-card" style="text-align:center; padding:30px;">
@@ -4935,7 +4944,7 @@
         const map = L.map("home-mugeo-map", {
           zoomControl: true,
           attributionControl: false,
-          scrollWheelZoom: isExpanded,
+          scrollWheelZoom: false,
           minZoom: 15,
           maxZoom: 19,
           maxBounds: mugeoBounds,
@@ -4947,7 +4956,7 @@
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
         // 별점 4.6점 이상 실제 무거동 맛집만 지도에 표시
-        const qualifiedSpots = MUGEO_FOOD_SPOTS.filter(s => s.rating >= 4.6);
+        const qualifiedSpots = MUGEO_FOOD_SPOTS.filter(s => s.rating >= 4.6).slice(0, isExpanded ? 8 : 5);
 
         qualifiedSpots.forEach(s => {
           const kakaoUrl = `https://map.kakao.com/link/search/${encodeURIComponent(s.kakaoQuery)}`;
@@ -4993,7 +5002,7 @@
       return `
         <div style="position:relative; border-radius:16px; overflow:hidden; border:1px solid #E5EAE7; margin: 6px 0 18px; box-shadow:0 2px 10px rgba(0,0,0,0.04); background:#F2F4F3;">
           <!-- 당근 스타일: 지도 속에 실제 별점 4.6+ 가게 핀이 바로 보이는 미니 위젯 -->
-          <div id="home-mugeo-map" style="width:100%; height:${mapHeight}; transition:height 0.25s ease;"></div>
+          <div id="home-mugeo-map" style="width:100%; height:${mapHeight}; transition:height 0.25s ease; background:repeating-linear-gradient(45deg, #EEF2F0 0px, #EEF2F0 14px, #F6F8F7 14px, #F6F8F7 28px);"></div>
 
           <!-- 우측 상단 플로팅 알약 버튼 ('내 주변 맛집 ↗' 스타일) -->
           <button type="button" onclick="toggleHomeFoodMapExpand()" style="position:absolute; top:12px; right:12px; z-index:450; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:7px 14px; font-size:12.5px; font-weight:800; color:#191F28; box-shadow:0 3px 10px rgba(0,0,0,0.12); display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
@@ -5004,7 +5013,7 @@
 
           <!-- 좌측 하단 은은한 안내 칩 -->
           <div style="position:absolute; bottom:10px; left:10px; z-index:450; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); border-radius:999px; padding:4px 10px; font-size:10.5px; font-weight:700; color:#4E5968; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-            핀을 누르면 카카오맵 확인 · 바로 밥약 가능
+            카카오맵 평점 기준 · 핀 클릭 시 상세/밥약
           </div>
         </div>
       `;
@@ -5043,10 +5052,9 @@
           applicant_id: state.user_id,
           status: "대기중"
         });
-        notifyUser(post.author_id, `[${post.title}] 모임에 ${DB.users[state.user_id].nickname}님이 참여를 신청했습니다!`);
+        notifyUser(post.author_id, `[${post.title}] 모임에 ${DB.users[state.user_id].nickname}님이 참여를 신청했어요`);
         saveDB(true);
-        fireConfetti();
-        showToast("🎉 참여 신청 완료! 방장이 수락하면 안심 채팅이 열립니다.");
+        showToast("참여를 신청했어요. 수락되면 대화방이 열려요");
         render();
       }
     }
@@ -5123,9 +5131,9 @@
           <label class="label" style="font-weight:700;">어떤 모임인가요?</label>
           <input id="c_title" class="input" value="${escHtml(prefillTitle)}" placeholder="예: 학식 같이 먹어요" style="font-size:15px;" />
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin: -4px 0 16px;">
-            <button type="button" class="quick-chip" onclick="setCreateTitle('학식 같이 먹어요', '🍚 밥약')">🍚 학식 같이 먹어요</button>
-            <button type="button" class="quick-chip" onclick="setCreateTitle('도서관 카공', '☕ 카공')">☕ 도서관 카공</button>
-            <button type="button" class="quick-chip" onclick="setCreateTitle('헬스 같이 가요', '🏃 운동')">💪 헬스 같이 가요</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('학식 같이 먹어요', '🍚 밥약')">학식 같이 먹어요</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('도서관 카공', '☕ 카공')">도서관 카공</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('헬스 같이 가요', '🏃 운동')">헬스 같이 가요</button>
           </div>
 
           <!-- 2. 카테고리 칩 (기타 선택 시만 직접 입력) -->
@@ -5143,10 +5151,10 @@
           <!-- 3. 모임 시간 (빠른 칩 & 날짜·시간) -->
           <label class="label" style="font-weight:700; margin-top:8px;">언제 만날까요?</label>
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
-            <button type="button" id="time_chip_now" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('now')">⚡ 지금</button>
-            <button type="button" id="time_chip_30min" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('30min')">🕒 30분 뒤</button>
-            <button type="button" id="time_chip_dinner" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('dinner')">🌙 오늘 저녁</button>
-            <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('tomorrow_lunch')">☀️ 내일 점심</button>
+            <button type="button" id="time_chip_now" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('now')">지금</button>
+            <button type="button" id="time_chip_30min" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('30min')">30분 뒤</button>
+            <button type="button" id="time_chip_dinner" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('dinner')">오늘 저녁</button>
+            <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('tomorrow_lunch')">내일 점심</button>
           </div>
           <div class="row-2" style="margin-bottom:16px;">
             <div>
@@ -5213,7 +5221,7 @@
       const is_official = (isCurrentUserAdmin() && document.getElementById("c_official")) ? document.getElementById("c_official").checked : false;
 
       if (title.length < 2) return showToast("모집 제목은 최소 2글자 이상 입력해주세요.");
-      if (meet_date < getTodayStr()) return showToast("과거 날짜로는 번개 모임을 등록할 수 없습니다.");
+      if (meet_date < getTodayStr()) return showToast("과거 날짜로는 번개 모임을 등록할 수 없어요.");
       if (!category || !location || !style) return showToast("카테고리, 장소, 성향 태그를 모두 입력해주세요.");
 
       const newId = Date.now();
@@ -5234,9 +5242,7 @@
       window._justCreatedPostId = newId;
       state.prefill_title = ""; state.prefill_loc = "";
       saveDB(true);
-      triggerLightningFlash();
-      fireConfetti();
-      showToast("⚡ 번개가 등록되었어요!");
+      showToast("번개를 올렸어요");
       state.active_modal = null;
       state.nav_tab = "홈";
       render();
@@ -5412,7 +5418,7 @@
 
     function closePostEarly(postId) {
       const post = DB.posts.find(p => Number(p.id) === Number(postId));
-      if (post) { post.status = "매칭완료"; post.updated_at = Date.now(); saveDB(true); showToast("모집이 마감 처리되었습니다."); render(); }
+      if (post) { post.status = "매칭완료"; post.updated_at = Date.now(); saveDB(true); showToast("모집이 마감 처리되었어요."); render(); }
     }
 
     // =========================================================
@@ -5433,7 +5439,6 @@
       if (me && !window["_voted_" + pollId]) {
         window["_voted_" + pollId] = true;
         me.bonus_score = (me.bonus_score || 0) + 2;
-        fireConfetti();
         showToast("투표 완료! 캠퍼스 소통 참여로 활동 리워드 점수 +2점 획득!");
       } else {
         showToast("투표가 반영되었어요!");
@@ -5466,7 +5471,6 @@
       });
       state.show_poll_form = false;
       saveDB(true);
-      fireConfetti();
       showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
       render();
     }
@@ -5490,7 +5494,6 @@
       });
       state.plaza_poll_cat = "전체";
       saveDB(true);
-      fireConfetti();
       showToast("🎲 새로운 밸런스 질문이 추가되었어요!");
       render();
     }
@@ -5514,7 +5517,6 @@
         likes: []
       });
       saveDB(true);
-      triggerLightningFlash();
       showToast("🌱 한줄 이야기가 등록되었어요!");
       render();
     }
@@ -5528,7 +5530,6 @@
       if (idx >= 0) t.likes.splice(idx, 1);
       else {
         t.likes.push(state.user_id);
-        fireConfetti();
       }
       saveDB(true);
       render();
@@ -5720,7 +5721,6 @@
           state.last_roulette_menu = won;
           showToast(`오늘의 공강 메뉴 추천: ${won.full}!`);
         }
-        fireConfetti();
         saveDB(true);
         render();
       }, 2850);
@@ -5794,7 +5794,7 @@
                   ${items.map((it, idx) => {
                     const angle = idx * 60 + 30 - 90;
                     const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
-                    return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(28px, -6px);">${cleanLabel}</div>`;
+                    return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(58px, 0) rotate(${-angle}deg) translate(-50%, -50%); text-align:center; font-size:11px; background:rgba(255,255,255,0.88); padding:2px 6px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">${escHtml(cleanLabel)}</div>`;
                   }).join("")}
                 </div>
                 <button class="roulette-center-btn" onclick="spinRouletteWheel()">
@@ -6016,27 +6016,15 @@
         }
       });
 
-      const cardEl = document.getElementById(`post-card-${postId}`);
-      let burstX = window.innerWidth * 0.5;
-      let burstY = window.innerHeight * 0.45;
-      if (cardEl) {
-        const rect = cardEl.getBoundingClientRect();
-        burstX = rect.left + rect.width * 0.5;
-        burstY = rect.top + rect.height * 0.5;
-        cardEl.classList.add("card-bursting");
+      if (p) {
+        p.status = "취소됨";
+        p.updated_at = Date.now();
       }
-
-      fireBurstExplosion(burstX, burstY);
+      if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
+      saveDB(true);
+      if (state.selected_post_id === postId) state.active_modal = null;
       showToast("번개 모임이 취소되었어요.");
-
-      setTimeout(() => {
-        if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
-        DB.posts = DB.posts.filter(p => p.id !== postId);
-        DB.applications = DB.applications.filter(a => a.post_id !== postId);
-        saveDB(true);
-        state.active_modal = null;
-        render();
-      }, 420);
+      render();
     }
 
     // =========================================================
@@ -6109,6 +6097,7 @@
       const map = L.map("campus-map", {
         minZoom: 15,
         maxZoom: 19,
+        scrollWheelZoom: false,
         maxBounds: campusBounds,
         maxBoundsViscosity: 1.0
       }).setView([state.my_lat, state.my_lng], 16);
@@ -6195,7 +6184,7 @@
         const post = (DB.posts || []).find(p => Number(p.id) === Number(pid));
         if (!post) return;
         // 만남 일시로부터 24시간이 지난 대화방은 사생활 보호를 위해 대화 목록에서 자동 정리
-        if (isChatAutoArchived(post)) return;
+        if (post.status === "취소됨" || isChatAutoArchived(post)) return;
         const approvedApps = (DB.applications || []).filter(a => Number(a.post_id) === Number(pid) && a.status === "승인됨");
         const allMemberIds = [String(post.author_id), ...approvedApps.map(a => String(a.applicant_id))];
         const uniqueOthers = Array.from(new Set(allMemberIds.filter(uid => uid && uid !== myId)));
@@ -6435,7 +6424,7 @@
               <div style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</div>
               <div class="tk-room-sub">${escHtml(post.title)} · ${escHtml(post.location)}</div>
             </div>
-            <button type="button" class="tk-room-top-btn" style="color:#287D62; border-color:#C5E6D6; background:#EEF8F3; font-weight:700;" onclick="triggerAiIcebreaker(${post.id})" title="AI 대화 주제 추천">✨ AI 추천</button>
+            <button type="button" class="tk-room-top-btn" style="color:#287D62; border-color:#C5E6D6; background:#EEF8F3; font-weight:700;" onclick="triggerAiIcebreaker(${post.id})" title="AI 대화 주제 추천">대화 주제 추천</button>
             <button type="button" class="tk-room-top-btn" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">평가·신고</button>
             <button type="button" class="tk-room-top-btn only-pc" onclick="backToChatList()">닫기</button>
             <button type="button" class="tk-room-top-btn" style="font-size:16px; font-weight:700; padding:0 10px;" onclick="state['chat_more_open_${post.id}']=!state['chat_more_open_${post.id}']; render();" title="더보기">⋯</button>
@@ -6461,7 +6450,7 @@
               return `
                 <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:10px 14px; margin:10px 16px 0; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="state['chat_action_open_${post.id}']=true; render();">
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:18px;">✨</span>
+                    
                     <div>
                       <div style="font-size:13px; font-weight:700; color:#287D62;">오늘 어땠어요? 매너 후기 남기기</div>
                       <div style="font-size:11.5px; color:#6B7684;">서로의 매너온도를 올려보세요</div>
@@ -6558,7 +6547,7 @@
               <div class="ai-secret-hint-card" style="margin-bottom:10px; padding:12px 14px; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:14px; box-shadow:0 2px 8px rgba(40,125,98,0.08);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                   <span style="font-size:12px; font-weight:800; color:#287D62; display:flex; align-items:center; gap:5px;">
-                    🔒 나에게만 보이는 AI 대화 팁
+                    대화 팁
                   </span>
                   <button type="button" style="border:none; background:none; font-size:16px; color:#8B95A1; cursor:pointer; padding:0 4px; line-height:1;" onclick="dismissAiHint(${post.id})" title="닫기">✕</button>
                 </div>
@@ -6680,7 +6669,7 @@
             <div style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:4px 12px; font-size:11.5px; color:#6B7684; margin-bottom:10px;">
               안심 대화방이 열렸어요
             </div>
-            <div><b style="color:#191F28;">${escHtml(otherNames || partner.nickname)}</b>님과 상단 <b>✨ AI 추천</b>이나 아래 빠른 문구 칩으로 첫 인사를 나눠보세요.</div>
+            <div><b style="color:#191F28;">${escHtml(otherNames || partner.nickname)}</b>님과 상단 <b>대화 주제 추천</b>이나 아래 빠른 문구 칩으로 첫 인사를 나눠보세요.</div>
           </div>
         `;
       }
@@ -6918,7 +6907,7 @@
     async function triggerAiIcebreaker(postId) {
       const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
       if (!post) return;
-      showToast("✨ 나에게만 보이는 AI 대화 팁을 생성하고 있어요...");
+      showToast("대화 주제를 찾고 있어요");
       let reply = "";
       try {
         const res = await fetch("/api/index", {
@@ -6942,7 +6931,7 @@
       // 상대방 화면에는 절대 전송되지 않고 본인 기기 화면에만 비밀 힌트로 표시
       state['ai_hint_' + postId] = reply;
       render();
-      showToast("🔒 나에게만 보이는 대화 팁이 도착했어요.");
+      showToast("대화 팁을 준비했어요");
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput) curInput.focus();
     }
@@ -6952,7 +6941,7 @@
       const myId = String(state.user_id);
       const targetId = String(partnerId);
       if (myId === targetId) {
-        return showToast("본인 계정은 신고할 수 없습니다.");
+        return showToast("본인 계정은 신고할 수 없어요.");
       }
       if (ADMIN_STUDENT_IDS.includes(targetId)) {
         return showToast("운영진 공식 계정은 신고 대상에서 제외됩니다.");
@@ -6962,7 +6951,7 @@
 
       target.reported_by = Array.isArray(target.reported_by) ? target.reported_by.map(String) : [];
       if (target.reported_by.includes(myId)) {
-        return showToast("동일한 학우에게 중복 신고할 수 없습니다.");
+        return showToast("동일한 학우에게 중복 신고할 수 없어요.");
       }
 
       target.reported_by.push(myId);
@@ -7006,7 +6995,7 @@
                 <h4 style="margin:0; font-size:15.5px; font-weight:800; color:#191F28;">캠퍼스 활동 챌린지</h4>
               </div>
               <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">
-                꾸준한 만남과 출석으로 활동 점수를 모은 TOP 3 학우에게 커피 쿠폰을 드립니다.
+                이번 달 TOP 3에게 커피 쿠폰을 드려요.
               </div>
             </div>
             <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:12px; padding:7px 12px; text-align:right;">
@@ -7112,7 +7101,9 @@
       const userTemp = parseFloat(user.manner_temp || 36.5);
       const gaugePct = Math.max(8, Math.min(100, Math.round(((userTemp - 30) / 20) * 100)));
       const sec = state.profile_sec || null;
-      const myPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id));
+      const myAllPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id) && p.status !== "취소됨");
+      const myPosts = myAllPosts.filter(p => !isPostExpired(p));
+      const myPastPosts = myAllPosts.filter(p => isPostExpired(p));
       const myReviews = (DB.reviews || []).filter(r => String(r.to_id) === String(state.user_id) && !r.is_none);
 
       return `
@@ -7202,13 +7193,26 @@
             ${sec === 'myposts' ? `
               <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
                 ${myPosts.length === 0
-                  ? `<div style="font-size:13.5px; color:#8B95A1;">내가 만든 번개가 없어요</div>`
+                  ? `<div style="font-size:13.5px; color:#8B95A1;">진행 중인 번개가 없어요</div>`
                   : myPosts.map(p => `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
                       <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(p.title)}</span>
                       <span style="font-size:12px; color:#287D62; font-weight:700;">${escHtml(p.status)} ›</span>
                     </div>
                   `).join("")}
+                ${myPastPosts.length > 0 ? `
+                  <details style="margin-top:10px; padding-top:10px; border-top:1px solid #E5EAE7;">
+                    <summary style="font-size:12.5px; font-weight:700; color:#6B7684; cursor:pointer;">지난 번개 ${myPastPosts.length}건 보기</summary>
+                    <div style="margin-top:6px;">
+                      ${myPastPosts.map(p => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
+                          <span style="font-size:13px; color:#6B7684;">${escHtml(p.title)}</span>
+                          <span style="font-size:11.5px; color:#8B95A1;">종료 ›</span>
+                        </div>
+                      `).join("")}
+                    </div>
+                  </details>
+                ` : ""}
               </div>
             ` : ''}
 
@@ -7431,7 +7435,7 @@
       const avatar = document.getElementById("edit_avatar").value;
       const mbti = document.getElementById("edit_mbti").value;
       const bio = document.getElementById("edit_bio").value.trim();
-      if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 비워둘 수 없습니다.");
+      if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 비워둘 수 없어요.");
 
       const u = DB.users[state.user_id];
       u.nickname = nick;
@@ -7463,12 +7467,12 @@
       clearTimeout(_cloudPollTimer);
       _cloudPollTimer = setTimeout(async () => {
         const isChatActive = Boolean(state.active_chat_post_id) || (state.nav_tab === "채팅" && !state.chat_list_mode);
-        let nextDelay = 4000;
         if (document.hidden) {
-          nextDelay = 8000;
-        } else if (isChatActive) {
-          nextDelay = 1000; // 활성 대화방에 진입한 경우 1초 고속 폴링으로 즉시 수신
+          // 백그라운드 상태에서는 서버 폴링을 중단하여 불필요한 호출 방지
+          scheduleNextCloudPull(15000);
+          return;
         }
+        const nextDelay = isChatActive ? 2000 : 15000;
         try {
           await pullFromCloud(isChatActive);
         } catch (e) {}
