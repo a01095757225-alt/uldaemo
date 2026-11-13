@@ -1980,6 +1980,18 @@
       "무거동 대학로 (바보사거리 카페거리)": [35.542600, 129.260800, "☕"]
     };
 
+    // 무거동(울산대 앞·바보사거리·후문) 한정 실존 상권 맛집 지도 데이터 + 카카오맵 연동
+    const MUGEO_FOOD_SPOTS = [
+      { id: "m1", name: "바보사거리 돼지국밥 골목", emoji: "🍖", cat: "🍚 밥약", filter: "밥약", tag: "#든든한한끼 #혼밥가능", lat: 35.5432, lng: 129.2602, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 국밥 같이 먹어요!", kakaoQuery: "울산 무거동 바보사거리 돼지국밥" },
+      { id: "m2", name: "바보사거리 마라탕·중식", emoji: "🍜", cat: "🍚 밥약", filter: "밥약", tag: "#바사대표맛집 #2~3명추천", lat: 35.5428, lng: 129.2610, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 마라탕 파티원 구해요!", kakaoQuery: "울산 무거동 바보사거리 마라탕" },
+      { id: "m3", name: "대학로 화덕피자 & 파스타", emoji: "🍕", cat: "🍚 밥약", filter: "밥약", tag: "#분위기맛집 #공강점심", lat: 35.5425, lng: 129.2615, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "대학로 파스타 같이 갈 분!", kakaoQuery: "울산 무거동 대학로 파스타" },
+      { id: "m4", name: "울대 정문 돈까스·일식", emoji: "🍛", cat: "🍚 밥약", filter: "밥약", tag: "#가성비 #바삭한일식", lat: 35.5435, lng: 129.2597, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "정문 앞 돈까스 같이 먹어요", kakaoQuery: "울산 무거동 울산대 돈까스" },
+      { id: "m5", name: "22호관 학생회관 학식", emoji: "🍚", cat: "🍚 밥약", filter: "밥약", tag: "#초가성비 #캠퍼스내", lat: 35.544589, lng: 129.258501, locName: "22호관 학생회관", defaultTitle: "학식 같이 먹어요!", kakaoQuery: "울산대학교 학생회관" },
+      { id: "m6", name: "바보사거리 카공 스터디 카페", emoji: "☕", cat: "☕ 카공", filter: "카페", tag: "#콘센트많음 #조용한카공", lat: 35.5426, lng: 129.2608, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "바사 카페에서 같이 카공해요", kakaoQuery: "울산 무거동 바보사거리 카페" },
+      { id: "m7", name: "청운학사 후문 치킨·야식", emoji: "🍗", cat: "🍻 술/번개", filter: "야식", tag: "#후문맛집 #저녁치맥", lat: 35.5472, lng: 129.2564, locName: "25호관 청운학사 무거관", defaultTitle: "후문에서 저녁 치킨 같이 먹어요", kakaoQuery: "울산 무거동 청운학사 치킨" },
+      { id: "m8", name: "무거동 묵은지 김치찜·백반", emoji: "🥘", cat: "🍚 밥약", filter: "밥약", tag: "#집밥스타일 #웨이팅맛집", lat: 35.5439, lng: 129.2604, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "무거동 김치찜 같이 먹으러 갈 분!", kakaoQuery: "울산 무거동 김치찜" }
+    ];
+
     const AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"];
     const MBTIS = ["ENFP", "ENTP", "INFP", "INTP", "ESFJ", "ESTJ", "ISFJ", "ISTJ", "ENFJ", "ENTJ", "INFJ", "INTJ", "ESFP", "ESTP", "ISFP", "ISTP", "모름/비공개"];
 
@@ -4037,6 +4049,9 @@
         if (state.nav_tab === "지도" && !state.active_modal) {
           setTimeout(initLeafletCampusMap, 60);
         }
+        if (state.nav_tab === "홈" && !state.active_modal && state.show_home_food_map) {
+          setTimeout(initHomeMugeoMap, 60);
+        }
         if (state.nav_tab === "홈" && !state.active_modal) {
           document.body.classList.add("has-fab");
         } else {
@@ -4895,6 +4910,110 @@
       }, 60);
     }
 
+    function openCreateWithFoodSpot(spotId) {
+      const spot = MUGEO_FOOD_SPOTS.find(s => s.id === spotId);
+      if (!spot) return;
+      state.prefill_title = spot.defaultTitle;
+      state.prefill_cat = spot.cat;
+      state.prefill_loc = spot.locName;
+      state.active_modal = "create";
+      render();
+    }
+
+    function toggleHomeFoodMap() {
+      state.show_home_food_map = !state.show_home_food_map;
+      render();
+    }
+
+    function initHomeMugeoMap() {
+      const el = document.getElementById("home-mugeo-map");
+      if (!el || typeof L === "undefined") return;
+      try {
+        if (window._homeMugeoMap) { window._homeMugeoMap.remove(); window._homeMugeoMap = null; }
+        const map = L.map("home-mugeo-map", { zoomControl: true, attributionControl: false }).setView([35.5436, 129.2594], 16);
+        window._homeMugeoMap = map;
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+
+        const filterKey = state.home_food_filter || "전체";
+        const spots = filterKey === "전체" ? MUGEO_FOOD_SPOTS : MUGEO_FOOD_SPOTS.filter(s => s.filter === filterKey);
+
+        spots.forEach(s => {
+          const kakaoUrl = `https://map.kakao.com/link/search/${encodeURIComponent(s.kakaoQuery)}`;
+          const icon = L.divIcon({
+            className: "mugeo-food-pin",
+            html: `<div style="background:#FFFFFF; border:2px solid #287D62; border-radius:999px; padding:3px 8px; font-size:12px; font-weight:800; color:#191F28; white-space:nowrap; box-shadow:0 3px 8px rgba(0,0,0,0.16); transform:translate(-50%,-50%);">${s.emoji} ${escHtml(s.name.split(' ')[1] || s.name)}</div>`,
+            iconSize: [0, 0]
+          });
+          const popupHtml = `
+            <div style="min-width:170px; font-family:inherit;">
+              <div style="font-size:13.5px; font-weight:800; color:#191F28; margin-bottom:2px;">${s.emoji} ${escHtml(s.name)}</div>
+              <div style="font-size:11.5px; color:#6B7684; margin-bottom:8px;">${escHtml(s.tag)}</div>
+              <div style="display:flex; gap:6px;">
+                <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#FEE500; color:#191919; font-size:11px; font-weight:800; text-decoration:none;">카카오맵</a>
+                <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="flex:1; padding:5px 0; border-radius:7px; border:none; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700; cursor:pointer;">밥약 올리기</button>
+              </div>
+            </div>
+          `;
+          L.marker([s.lat, s.lng], { icon }).addTo(map).bindPopup(popupHtml);
+        });
+      } catch (e) { console.error("initHomeMugeoMap err:", e); }
+    }
+
+    function renderMugeoFoodMapSection() {
+      const filterKey = state.home_food_filter || "전체";
+      const spots = filterKey === "전체" ? MUGEO_FOOD_SPOTS : MUGEO_FOOD_SPOTS.filter(s => s.filter === filterKey);
+      const isOpen = Boolean(state.show_home_food_map);
+
+      return `
+        <div class="uldaemo-card" style="padding:14px 16px; margin: 4px 0 16px; border:1px solid #E5EAE7; background:#FFFFFF;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:800; color:#191F28;">📍 무거동 맛집 지도</span>
+              <span style="font-size:11px; font-weight:700; background:#EEF8F3; color:#287D62; padding:2px 8px; border-radius:999px;">울대 앞 · 바보사거리</span>
+            </div>
+            <button type="button" class="btn" style="width:auto; min-height:30px; height:30px; padding:0 10px; font-size:11.5px; font-weight:700; border-radius:8px; background:${isOpen ? '#191F28' : '#EEF8F3'}; color:${isOpen ? '#FFFFFF' : '#287D62'}; border-color:${isOpen ? '#191F28' : '#C5E6D6'};" onclick="toggleHomeFoodMap()">
+              ${isOpen ? '지도 접기 ▲' : '🗺️ 지도 펼치기'}
+            </button>
+          </div>
+
+          <!-- 무거동 상권 카테고리 필터 -->
+          <div style="display:flex; gap:6px; margin-bottom:10px; overflow-x:auto; scrollbar-width:none;">
+            ${['전체', '밥약', '카페', '야식'].map(fk => `
+              <button type="button" class="quick-chip ${filterKey === fk ? 'active' : ''}" style="padding:4px 11px; font-size:11.5px;" onclick="state.home_food_filter='${fk}'; render();">${fk === '전체' ? '전체' : (fk === '밥약' ? '🍚 식사·밥약' : (fk === '카페' ? '☕ 카공·카페' : '🍗 치맥·야식'))}</button>
+            `).join("")}
+          </div>
+
+          ${isOpen ? `
+            <div style="margin-bottom:12px;">
+              <div id="home-mugeo-map" style="height:250px; border-radius:14px; border:1px solid #E5EAE7; overflow:hidden;"></div>
+              <div style="font-size:11px; color:#8B95A1; margin-top:6px;">
+                💡 지도의 핀을 누르면 <b>카카오맵 상세 위치·리뷰</b> 확인 및 바로 <b>밥약 올리기</b>가 가능해요.
+              </div>
+            </div>
+          ` : ""}
+
+          <!-- 가로 스크롤 무거동 맛집 칩 리스트 -->
+          <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+            ${spots.map(s => {
+              const kakaoUrl = `https://map.kakao.com/link/search/${encodeURIComponent(s.kakaoQuery)}`;
+              return `
+                <div style="min-width:195px; max-width:210px; background:#F7F9F8; border:1px solid #E5EAE7; border-radius:14px; padding:11px 12px; flex-shrink:0; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="font-size:13.5px; font-weight:800; color:#191F28; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.emoji} ${escHtml(s.name)}</div>
+                    <div style="font-size:11px; color:#6B7684; margin-top:3px;">${escHtml(s.tag)}</div>
+                  </div>
+                  <div style="display:flex; gap:5px; margin-top:10px;">
+                    <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:8px; background:#FEE500; color:#191919; font-size:11px; font-weight:800; text-decoration:none;">카카오맵</a>
+                    <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="flex:1.2; padding:5px 0; border-radius:8px; border:none; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700; cursor:pointer;">⚡ 밥약 올리기</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    }
+
     function renderHomeTab() {
       return `
         <div class="tk-pc-home-header">
@@ -4908,6 +5027,8 @@
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
         </div>
+
+        ${renderMugeoFoodMapSection()}
 
         <div id="home-feed-list-wrap">
           ${renderHomeFeedListHtml()}
@@ -4997,7 +5118,7 @@
       const catPresets = ["🍚 밥약", "☕ 카공", "🎮 게임/PC방", "🏃 운동", "📚 스터디", "💬 기타"];
 
       return `
-        <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; state.prefill_title=''; render();">← 돌아가기</button>
+        <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();">← 돌아가기</button>
         <h3 style="margin-bottom:6px; font-size:20px; font-weight:800; color:#191F28;">번개 올리기</h3>
         <div class="privacy-badge" style="margin-bottom:12px;"><span>🛡️</span><span>수락 전까지 내 정보는 숨겨져요</span></div>
 
@@ -5042,7 +5163,7 @@
 
           <!-- 4. 장소 & 인원 칩 -->
           <label class="label" style="font-weight:700;">어디서 만날까요?</label>
-          <input id="c_loc" list="loc_presets" class="input" value="22호관 학생회관" placeholder="호관 또는 장소 검색" style="margin-bottom:16px;" />
+          <input id="c_loc" list="loc_presets" class="input" value="${escHtml(state.prefill_loc || '22호관 학생회관')}" placeholder="호관 또는 장소 검색" style="margin-bottom:16px;" />
           <datalist id="loc_presets">
             ${buildingList.map(b => `<option value="${b}"></option>`).join("")}
           </datalist>
@@ -5115,7 +5236,7 @@
       });
       notifyFavCategory(DB.posts[0]);
       window._justCreatedPostId = newId;
-      state.prefill_title = "";
+      state.prefill_title = ""; state.prefill_loc = "";
       saveDB(true);
       triggerLightningFlash();
       fireConfetti();
