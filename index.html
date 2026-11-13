@@ -4931,10 +4931,15 @@
       try {
         if (window._homeMugeoMap) { window._homeMugeoMap.remove(); window._homeMugeoMap = null; }
         const isExpanded = Boolean(state.home_food_map_expanded);
+        const mugeoBounds = L.latLngBounds([35.5375, 129.2465], [35.5525, 129.2675]);
         const map = L.map("home-mugeo-map", {
           zoomControl: true,
           attributionControl: false,
-          scrollWheelZoom: isExpanded
+          scrollWheelZoom: isExpanded,
+          minZoom: 15,
+          maxZoom: 19,
+          maxBounds: mugeoBounds,
+          maxBoundsViscosity: 1.0
         }).setView([35.5436, 129.2606], isExpanded ? 17 : 16);
         window._homeMugeoMap = map;
 
@@ -5251,7 +5256,8 @@
       try {
         if (window._detailMap) { window._detailMap.remove(); window._detailMap = null; }
         const c = getBuildingCoords(post.location);
-        const map = L.map("detail-map", { zoomControl: true, attributionControl: false }).setView([c[0], c[1]], 17);
+        const detailBounds = L.latLngBounds([35.5375, 129.2465], [35.5525, 129.2675]);
+        const map = L.map("detail-map", { zoomControl: true, attributionControl: false, minZoom: 15, maxZoom: 19, maxBounds: detailBounds, maxBoundsViscosity: 1.0 }).setView([c[0], c[1]], 17);
         window._detailMap = map;
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
         L.circleMarker([c[0], c[1]], { radius: 11, color: "#FFFFFF", weight: 3, fillColor: "#287D62", fillOpacity: 0.95 })
@@ -6099,7 +6105,13 @@
       const mapEl = document.getElementById("campus-map");
       if (!mapEl) return;
       if (window._leafletMap) { window._leafletMap.remove(); }
-      const map = L.map("campus-map").setView([state.my_lat, state.my_lng], 16);
+      const campusBounds = L.latLngBounds([35.5375, 129.2465], [35.5525, 129.2675]);
+      const map = L.map("campus-map", {
+        minZoom: 15,
+        maxZoom: 19,
+        maxBounds: campusBounds,
+        maxBoundsViscosity: 1.0
+      }).setView([state.my_lat, state.my_lng], 16);
       window._leafletMap = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
