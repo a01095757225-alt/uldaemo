@@ -4932,14 +4932,14 @@
         if (window._homeMugeoMap) { window._homeMugeoMap.remove(); window._homeMugeoMap = null; }
         const isExpanded = Boolean(state.home_food_map_expanded);
         const map = L.map("home-mugeo-map", {
-          zoomControl: isExpanded,
+          zoomControl: true,
           attributionControl: false,
           scrollWheelZoom: isExpanded
         }).setView([35.5436, 129.2606], isExpanded ? 17 : 16);
         window._homeMugeoMap = map;
 
-        // 밝고 깔끔한 지도 타일
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+        // 지도 탭과 동일한 상세 한글 도로명/건물명 OpenStreetMap 타일 적용
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
         // 별점 4.6점 이상 실제 무거동 맛집만 지도에 표시
         const qualifiedSpots = MUGEO_FOOD_SPOTS.filter(s => s.rating >= 4.6);
@@ -4983,7 +4983,7 @@
 
     function renderMugeoFoodMapSection() {
       const isExpanded = Boolean(state.home_food_map_expanded);
-      const mapHeight = isExpanded ? "340px" : "195px";
+      const mapHeight = isExpanded ? "380px" : "225px";
 
       return `
         <div style="position:relative; border-radius:16px; overflow:hidden; border:1px solid #E5EAE7; margin: 6px 0 18px; box-shadow:0 2px 10px rgba(0,0,0,0.04); background:#F2F4F3;">
@@ -6128,7 +6128,7 @@
         });
       }
 
-      let activePosts = DB.posts.filter(p => p.status === "모집중");
+      let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p));
       if (state.map_cat !== "전체") activePosts = activePosts.filter(p => p.category.includes(state.map_cat));
       activePosts.forEach(p => {
         const c = getBuildingCoords(p.location);
