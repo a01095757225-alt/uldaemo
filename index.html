@@ -1992,6 +1992,1082 @@
       { id: "r8", name: "쭈꾸미가 알고싶다", rating: 4.7, menu: "매콤 직화 쭈꾸미 점심특선", emoji: "🐙", bg: "#FEE2E2", cat: "🍚 밥약", lat: 35.5434, lng: 129.2609, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "쭈꾸미가 알고싶다 점심 특선 고!", kakaoQuery: "울산 무거동 쭈꾸미가 알고싶다" }
     ];
 
+    const AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"];
+    const MBTIS = ["ENFP", "ENTP", "INFP", "INTP", "ESFJ", "ESTJ", "ISFJ", "ISTJ", "ENFJ", "ENTJ", "INFJ", "INTJ", "ESFP", "ESTP", "ISFP", "ISTP", "모름/비공개"];
+
+    function getTodayStr() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function isPostTimePassed(post) {
+      if (!post || !post.meet_date) return false;
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "12:00";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 실제 모임 약속 일시가 지났는지 판별 (만남 이후 후기 유도용)
+        return now.getTime() >= postDate.getTime();
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function isChatAutoArchived(post) {
+      if (!post || !post.meet_date) return false;
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "12:00";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 모임 일시 기준 24시간(86400000ms) 유예 후 자동 정리 (분실물·정산·신고 골든타임 보장)
+        return now.getTime() > (postDate.getTime() + 24 * 60 * 60 * 1000);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function isPostExpired(post) {
+      if (!post) return true;
+      if (post.status !== "모집중") return true;
+      if (!post.meet_date) return false; // 날짜가 없는 레거시 데이터는 숨기지 않음
+      try {
+        const now = new Date();
+        const timeStr = post.meet_time || "23:59";
+        const postDate = new Date(`${post.meet_date}T${timeStr}:00`);
+        if (isNaN(postDate.getTime())) return false;
+        // 모임 시작 시각 기준 1시간(60분) 경과 시 홈 피드에서 자동 마감/숨김
+        return now.getTime() > (postDate.getTime() + 60 * 60 * 1000);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.style.display = "block";
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => { el.style.display = "none"; }, 2800);
+    }
+
+    // =========================================================
+    // ✨ 비주얼 임팩트 엔진 (폭죽 콘페티 & 번개 플래시 효과)
+    // =========================================================
+    function fireConfetti() {
+      const canvas = document.getElementById("confetti-canvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const colors = ["#287D62", "#52B788", "#FFD166", "#FF6B6B", "#4EA8DE", "#9B5DE5"];
+      const pieces = Array.from({ length: 75 }, () => ({
+        x: canvas.width * 0.5 + (Math.random() - 0.5) * 180,
+        y: canvas.height * 0.42,
+        vx: (Math.random() - 0.5) * 15,
+        vy: -Math.random() * 14 - 5,
+        size: Math.random() * 7 + 5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * Math.PI * 2,
+        vrot: (Math.random() - 0.5) * 0.25,
+        alpha: 1
+      }));
+      let frame = 0;
+      function tick() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        pieces.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.42;
+          p.rot += p.vrot;
+          if (frame > 45) p.alpha -= 0.025;
+          if (p.alpha > 0 && p.y < canvas.height + 20) {
+            alive = true;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.alpha);
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65);
+            ctx.restore();
+          }
+        });
+        if (alive && frame < 95) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function triggerLightningFlash() {
+      const el = document.getElementById("flash-overlay");
+      if (!el) return;
+      el.style.opacity = "1";
+      setTimeout(() => { el.style.opacity = "0"; }, 320);
+    }
+
+    // 번개 폭파/취소 시 펑! 하고 터지는 연기·파편 폭발 애니메이션
+    function fireBurstExplosion(x, y) {
+      const canvas = document.getElementById("confetti-canvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const originX = x || (canvas.width * 0.5);
+      const originY = y || (canvas.height * 0.45);
+      const colors = ["#EF4444", "#F59E0B", "#6B7280", "#9CA3AF", "#DC2626", "#FBBF24", "#1F2937"];
+      const particles = Array.from({ length: 65 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 16 + 4;
+        return {
+          x: originX,
+          y: originY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,
+          size: Math.random() * 9 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          isSmoke: Math.random() > 0.4,
+          alpha: 1
+        };
+      });
+      let frame = 0;
+      function tick() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.94;
+          p.vy = p.vy * 0.94 + (p.isSmoke ? -0.1 : 0.35); // 연기는 위로 피어오르고 파편은 떨어짐
+          p.size += p.isSmoke ? 0.35 : 0;
+          p.alpha -= p.isSmoke ? 0.022 : 0.028;
+          if (p.alpha > 0) {
+            alive = true;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.alpha);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        });
+        if (alive && frame < 70) requestAnimationFrame(tick);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    const LEGACY_POLL_IDS = new Set([101, 102, 103]);
+
+    const DEFAULT_POLLS = [
+      {
+        id: 501,
+        tag: "💘 연애 레전드",
+        question: "⚖️ [연애 세기의 논쟁] 내 애인이 내 절친에게 해줘도 되는 마지노선은?",
+        opt_a: "🦐 손에 양념 묻히며 새우 껍질 정성껏 까주기",
+        opt_b: "🧥 추운 날 목까지 패딩 지퍼 직접 올려주기",
+        votes_a: [],
+        votes_b: []
+      },
+      {
+        id: 502,
+        tag: "💘 연애 레전드",
+        question: "⚖️ [극악의 연애] 둘 중 한 명과 무조건 1년 사귀어야 한다면?",
+        opt_a: "📵 연락 6시간마다 한 번 되는 집돌이·집순이 애인",
+        opt_b: "🍻 연락은 1분 칼답인데 이성 친구와 단둘이 술 마시는 애인",
+        votes_a: [],
+        votes_b: []
+      },
+      {
+        id: 503,
+        tag: "🍜 음식 난제",
+        question: "⚖️ [음식 세기의 대결] 평생 단 하나의 탄수화물만 먹어야 한다면?",
+        opt_a: "🍜 라면·파스타·짜장면·냉면 등 평생 '면 요리'만 먹기",
+        opt_b: "🍚 국밥·삼겹살볶음밥·치밥·초밥 등 평생 '밥 요리'만 먹기",
+        votes_a: [],
+        votes_b: []
+      },
+      {
+        id: 504,
+        tag: "💸 인생·만약에",
+        question: "⚖️ [인생 딜레마] 당장 통장에 세후 5천만 원 입금! 대신 조건은?",
+        opt_a: "⏰ 졸업 때까지 월화수목금 9시 1교시 풀강 (지각·결석 시 전액 환수)",
+        opt_b: "💸 안 받고 지금처럼 원하는 시간표 짜서 공강 즐기기",
+        votes_a: [],
+        votes_b: []
+      },
+      {
+        id: 505,
+        tag: "🎓 대학 공감",
+        question: "⚖️ [팀플 지옥] 조별과제 팀원으로 만나면 더 스트레스받는 유형은?",
+        opt_a: "🗣️ 친절하고 매일 모이자고 하는데 결과물이 처참한 열정 팀원",
+        opt_b: "👻 단톡방 다 읽씹하고 잠수타다가 마감 직전에 A+급 자료 던지는 팀원",
+        votes_a: [],
+        votes_b: []
+      },
+      {
+        id: 506,
+        tag: "💸 인생·만약에",
+        question: "⚖️ [초능력 선택] 지금 당장 단 한 번의 기회가 주어진다면?",
+        opt_a: "⏪ 지금 기억과 지식 그대로 10년 전 과거로 돌아가기",
+        opt_b: "🎱 타임머신은 없지만 이번 주 로또 1등 당첨 번호 받기 (약 25억)",
+        votes_a: [],
+        votes_b: []
+      }
+    ];
+
+    const VIRAL_BALANCE_POOL = [
+      {
+        tag: "💘 연애 레전드",
+        question: "⚖️ [이별 밸런스] 겪어보면 멘탈이 더 바사삭 부서지는 이별은?",
+        opt_a: "💔 헤어지고 3일 만에 새 애인 생기는 환승이별",
+        opt_b: "👻 아무 이유도 모른 채 하루아침에 차단당한 잠수이별"
+      },
+      {
+        tag: "🍜 음식 난제",
+        question: "⚖️ [괴식 대결] 10만 원 받고 한 그릇 국물까지 다 비워야 한다면?",
+        opt_a: "🌿 따뜻한 민트초코 소스 듬뿍 뿌린 양념치킨",
+        opt_b: "🍍 구운 파인애플과 초콜릿 넣은 돼지국밥"
+      },
+      {
+        tag: "💸 인생·만약에",
+        question: "⚖️ [현대인 고문] 평생 스마트폰을 이 상태로만 써야 한다면?",
+        opt_a: "🔋 아무리 충전해도 최대 배터리가 15%까지만 차는 폰",
+        opt_b: "🐢 모든 앱과 영상이 무조건 5초씩 버퍼링 걸리는 폰"
+      },
+      {
+        tag: "💘 연애 레전드",
+        question: "⚖️ [절친 논쟁] 10년 지기 절친이 내 전 애인과 사귄다고 고백한다면?",
+        opt_a: "🤬 절대 용서 못 함, 둘 다 당장 손절",
+        opt_b: "🤝 이미 끝난 인연인데 어쩔 수 없지, 쿨하게 인정"
+      },
+      {
+        tag: "💸 인생·만약에",
+        question: "⚖️ [계절 극악 밸런스] 1년 내내 단 하나의 날씨에서만 살아야 한다면?",
+        opt_a: "🥵 에어컨 고장 난 38도 한여름 폭염",
+        opt_b: "🥶 보일러 고장 난 영하 18도 한겨울 한파"
+      },
+      {
+        tag: "🍜 음식 난제",
+        question: "⚖️ [음식 궁합] 평생 이 조합으로만 먹어야 한다면?",
+        opt_a: "🍕 탄산음료·피클 없이 퍽퍽한 피자만 먹기",
+        opt_b: "🍗 치킨무·양념소스·콜라 없이 눅눅한 후라이드 치킨만 먹기"
+      }
+    ];
+
+    const DEFAULT_PLAZA_TALKS = [];
+
+    function ensurePlazaDefaults(dbObj) {
+      if (!Array.isArray(dbObj.polls)) {
+        dbObj.polls = JSON.parse(JSON.stringify(DEFAULT_POLLS));
+      } else {
+        // 기존 구형 질문(101, 102, 103) 제거 및 신규 레전드 밸런스 질문 자동 보충
+        dbObj.polls = dbObj.polls.filter(p => p && !LEGACY_POLL_IDS.has(p.id));
+        const existingIds = new Set(dbObj.polls.map(p => p.id));
+        DEFAULT_POLLS.forEach(defP => {
+          if (!existingIds.has(defP.id)) {
+            dbObj.polls.push(JSON.parse(JSON.stringify(defP)));
+          }
+        });
+      }
+      if (!Array.isArray(dbObj.plaza_talks)) {
+        dbObj.plaza_talks = JSON.parse(JSON.stringify(DEFAULT_PLAZA_TALKS));
+      }
+      return ensureDefaultPosts(dbObj);
+    }
+
+    function ensureDefaultPosts(dbObj) {
+      if (!Array.isArray(dbObj.posts)) dbObj.posts = [];
+      const nonExpired = dbObj.posts.filter(p => p && p.status === "모집중" && !isPostExpired(p));
+      if (nonExpired.length === 0) {
+        const now = new Date();
+        const d1 = new Date(now.getTime() + 25 * 60 * 1000);
+        const t1H = String(d1.getHours()).padStart(2, '0');
+        const t1M = String(d1.getMinutes()).padStart(2, '0');
+        const date1 = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}-${String(d1.getDate()).padStart(2,'0')}`;
+
+        const d2 = new Date(now.getTime() + 110 * 60 * 1000);
+        const t2H = String(d2.getHours()).padStart(2, '0');
+        const t2M = String(d2.getMinutes()).padStart(2, '0');
+        const date2 = `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}-${String(d2.getDate()).padStart(2,'0')}`;
+
+        const d3 = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const date3 = `${d3.getFullYear()}-${String(d3.getMonth()+1).padStart(2,'0')}-${String(d3.getDate()).padStart(2,'0')}`;
+
+        const defPosts = [
+          {
+            id: 101,
+            author_id: "20261275",
+            title: "[공식] 중앙도서관 3층 카공 & 스터디 메이트 ☕",
+            category: "☕ 카공",
+            meet_date: date1,
+            meet_time: `${t1H}:${t1M}`,
+            location: "16호관 아산도서관",
+            max_participants: 4,
+            meeting_style: "조용히 각자 집중하는 분위기 🎧",
+            status: "모집중",
+            is_official: true,
+            created_at: Date.now() - 10 * 60 * 1000
+          },
+          {
+            id: 102,
+            author_id: "20261275",
+            title: "[공식] 학생회관 밥약 메이트 (소규모 번개) 🍚",
+            category: "🍚 밥약",
+            meet_date: date2,
+            meet_time: `${t2H}:${t2M}`,
+            location: "22호관 학생회관",
+            max_participants: 3,
+            meeting_style: "친절하고 편안한 스몰토크 환영 😊",
+            status: "모집중",
+            is_official: true,
+            created_at: Date.now() - 30 * 60 * 1000
+          },
+          {
+            id: 103,
+            author_id: "20261275",
+            title: "[공식] 저녁 아산스포츠센터 가벼운 트랙 러닝 🏃",
+            category: "🏃 운동",
+            meet_date: date3,
+            meet_time: "18:00",
+            location: "39호관 아산스포츠센터",
+            max_participants: 5,
+            meeting_style: "부담 없이 가볍게 땀 흘려요 👟",
+            status: "모집중",
+            is_official: true,
+            created_at: Date.now() - 60 * 60 * 1000
+          }
+        ];
+        const userPosts = dbObj.posts.filter(p => p && ![101, 102, 103].includes(p.id));
+        dbObj.posts = [...defPosts, ...userPosts];
+      }
+      return dbObj;
+    }
+
+    // =========================================================
+    // 2. 데이터베이스 상태 초기화 및 30일 영구 저장 (localStorage + 쿠키)
+    // =========================================================
+    // 체험(데모) 계정 ID: 앱에서 완전히 제거되며 로컬/클라우드 어디서 들어와도 자동 정리됩니다.
+    const DEMO_USER_IDS = ["20241001", "20241002", "20241003"];
+    function purgeDemoData(db) {
+      if (!db || typeof db !== "object") return db;
+      const isDemo = (id) => DEMO_USER_IDS.includes(String(id));
+      if (db.users) DEMO_USER_IDS.forEach(id => { delete db.users[id]; });
+      const demoPostIds = new Set((db.posts || []).filter(p => p && isDemo(p.author_id)).map(p => p.id));
+      db.posts = (db.posts || []).filter(p => p && !isDemo(p.author_id));
+      db.applications = (db.applications || []).filter(a => a && !isDemo(a.applicant_id) && !demoPostIds.has(a.post_id));
+      db.messages = (db.messages || []).filter(m => m && !isDemo(m.sender_id) && m.sender_id !== "AI_BOT" && !demoPostIds.has(m.post_id));
+      db.notifications = (db.notifications || []).filter(n => n && !isDemo(n.user_id));
+      db.reviews = (db.reviews || []).filter(r => r && !isDemo(r.from_id) && !isDemo(r.to_id));
+      if (Array.isArray(db.plaza_talks)) {
+        db.plaza_talks = db.plaza_talks.filter(t => t && !isDemo(t.author_id));
+        db.plaza_talks.forEach(t => { t.likes = (t.likes || []).filter(u => !isDemo(u)); });
+      }
+      if (Array.isArray(db.polls)) {
+        db.polls.forEach(pl => {
+          pl.votes_a = (pl.votes_a || []).filter(u => !isDemo(u));
+          pl.votes_b = (pl.votes_b || []).filter(u => !isDemo(u));
+        });
+      }
+      return db;
+    }
+
+    function loadDB() {
+      const today = getTodayStr();
+      const raw = localStorage.getItem("uldaemo_db_v5");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          // 아바타 텍스트 정규화 ('🐶 강아지' -> '🐶')
+          Object.values(parsed.users || {}).forEach(u => {
+            if (u.avatar && u.avatar.includes(" ")) u.avatar = u.avatar.split(" ")[0];
+          });
+          return ensurePlazaDefaults(purgeDemoData(parsed));
+        } catch (e) {}
+      }
+      const initial = ensurePlazaDefaults({
+        users: {
+          "20261275": { student_id: "20261275", email: "user@ulsan.ac.kr", nickname: "사과", avatar: "🐶", gender: "남성", department: "컴퓨터공학과", mbti: "모름/비공개", manner_temp: 36.5, report_count: 0, bio: "반갑습니다! 공강 시간에 같이 소통해요 🌱", keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊"] }
+        },
+        posts: [],
+        applications: [],
+        messages: [],
+        notifications: [],
+        reviews: []
+      });
+      localStorage.setItem("uldaemo_db_v5", JSON.stringify(initial));
+      return initial;
+    }
+
+    let _deletedPostIds = [];
+    let _syncTimer = null;
+
+    function mergeCloudDBIntoLocal(cloudDb) {
+      if (!cloudDb || typeof cloudDb !== "object") return false;
+      let changed = false;
+
+      // 1. Users 병합 (PC/폰 어느 쪽에서 가입한 학번이든 모두 보존 + 최신 수정본 우선)
+      if (cloudDb.users && typeof cloudDb.users === "object") {
+        DB.users = DB.users || {};
+        for (const [uid, uObj] of Object.entries(cloudDb.users)) {
+          if (uObj && typeof uObj === "object") {
+            const localU = DB.users[uid];
+            if (!localU) {
+              DB.users[uid] = Object.assign({}, uObj);
+            } else {
+              const localTs = localU.updated_at || 0;
+              const cloudTs = uObj.updated_at || 0;
+              if (cloudTs >= localTs) {
+                DB.users[uid] = Object.assign({}, localU, uObj);
+              } else {
+                DB.users[uid] = Object.assign({}, uObj, localU);
+              }
+            }
+          }
+        }
+        changed = true;
+      }
+
+      const mergeItem = (localIt, cloudIt) => {
+        if (!localIt) return Object.assign({}, cloudIt);
+        if (!cloudIt) return Object.assign({}, localIt);
+        const lTs = localIt.updated_at || 0;
+        const cTs = cloudIt.updated_at || 0;
+        const merged = (lTs > cTs)
+          ? Object.assign({}, cloudIt, localIt)
+          : Object.assign({}, localIt, cloudIt);
+        // 한 번 '승인됨' 또는 '매칭완료'가 된 상태는 로컬의 이전 '대기중'/'모집중' 캐시로 절대 되돌아가지 않도록 보호
+        if (localIt.status === "승인됨" || cloudIt.status === "승인됨") {
+          merged.status = "승인됨";
+        } else if (localIt.status === "매칭완료" || cloudIt.status === "매칭완료") {
+          merged.status = "매칭완료";
+        }
+        if (localIt.is_read === 1 || cloudIt.is_read === 1) {
+          merged.is_read = 1;
+        }
+        if (Array.isArray(localIt.replies) || Array.isArray(cloudIt.replies)) {
+          const rmap = new Map();
+          [].concat(localIt.replies || [], cloudIt.replies || []).forEach(r => {
+            if (!r || !r.id) return;
+            const prev = rmap.get(r.id);
+            rmap.set(r.id, prev ? Object.assign({}, prev, r, { deleted: !!(prev.deleted || r.deleted) }) : r);
+          });
+          merged.replies = Array.from(rmap.values()).sort((a, b) => (a.id || 0) - (b.id || 0));
+        }
+        return merged;
+      };
+
+      const mergeList = (localArr, cloudArr) => {
+        const deletedSet = new Set(_deletedPostIds);
+        const map = new Map();
+        (localArr || []).forEach(it => { if (it && it.id && !deletedSet.has(it.id)) map.set(it.id, it); });
+        (cloudArr || []).forEach(it => {
+          if (it && it.id && !deletedSet.has(it.id)) {
+            if (map.has(it.id)) {
+              map.set(it.id, mergeItem(map.get(it.id), it));
+            } else {
+              map.set(it.id, it);
+            }
+          }
+        });
+        return Array.from(map.values());
+      };
+
+      if (Array.isArray(cloudDb.posts)) {
+        DB.posts = mergeList(DB.posts, cloudDb.posts).sort((a, b) => (b.id || 0) - (a.id || 0));
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.applications)) {
+        DB.applications = mergeList(DB.applications, cloudDb.applications);
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.messages)) {
+        DB.messages = mergeList(DB.messages, cloudDb.messages).sort((a, b) => (a.id || 0) - (b.id || 0));
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.notifications)) {
+        DB.notifications = mergeList(DB.notifications, cloudDb.notifications).sort((a, b) => (b.id || 0) - (a.id || 0));
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.reviews)) {
+        DB.reviews = mergeList(DB.reviews, cloudDb.reviews);
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.polls) && cloudDb.polls.length) {
+        const cleanCloudPolls = cloudDb.polls.filter(p => p && !LEGACY_POLL_IDS.has(p.id));
+        DB.polls = mergeList((DB.polls || []).filter(p => p && !LEGACY_POLL_IDS.has(p.id)), cleanCloudPolls).sort((a, b) => (b.id || 0) - (a.id || 0));
+        ensurePlazaDefaults(DB);
+        changed = true;
+      }
+      if (Array.isArray(cloudDb.plaza_talks) && cloudDb.plaza_talks.length) {
+        DB.plaza_talks = mergeList(DB.plaza_talks, cloudDb.plaza_talks).sort((a, b) => (b.id || 0) - (a.id || 0));
+        changed = true;
+      }
+
+      purgeDemoData(DB);
+      if (changed) {
+        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+      }
+      return changed;
+    }
+
+    async function syncToCloud(immediate = false) {
+      const runSync = async () => {
+        try {
+          const res = await fetch("/api/index", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "sync_db",
+              db: DB,
+              deleted_post_ids: _deletedPostIds
+            })
+          });
+          const data = await res.json();
+          if (data && data.ok && data.db) {
+            mergeCloudDBIntoLocal(data.db);
+          }
+        } catch (e) {}
+      };
+      if (immediate) {
+        clearTimeout(_syncTimer);
+        await runSync();
+      } else {
+        clearTimeout(_syncTimer);
+        _syncTimer = setTimeout(runSync, 250);
+      }
+    }
+
+    function getDbStateSignature() {
+      try {
+        return JSON.stringify({
+          u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, v.coffee_tickets, v.streak_days]),
+          p: (DB.posts || []).map(p => [p.id, p.status, p.title]),
+          a: (DB.applications || []).map(a => [a.id, a.status]),
+          m: (DB.messages || []).map(m => [m.id, m.is_read, m.text, m.reactions]),
+          n: (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => [n.id, n.is_read]),
+          pl: (DB.polls || []).map(p => [p.id, (p.votes_a || []).length, (p.votes_b || []).length]),
+          t: (DB.plaza_talks || []).map(t => [t.id, (t.likes || []).length])
+        });
+      } catch (e) {
+        return "";
+      }
+    }
+
+    async function pullFromCloud(force = false) {
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "load_db", force })
+        });
+        const data = await res.json();
+        if (data && data.ok && data.db) {
+          const sigBefore = getDbStateSignature();
+          const localUserCountBefore = Object.keys(DB.users || {}).length;
+          const prevNotifIds = new Set((DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => n.id));
+          const prevApprovedIds = new Set(
+            (DB.applications || [])
+              .filter(a => String(a.applicant_id) === String(state.user_id) && a.status === "승인됨")
+              .map(a => a.id)
+          );
+          mergeCloudDBIntoLocal(data.db);
+          const sigAfter = getDbStateSignature();
+
+          // 내 참여 신청이 방금 '승인됨'으로 바뀌었다면 즉시 토스트 안내
+          if (state.user_id) {
+            const newlyApproved = (DB.applications || []).filter(
+              a => String(a.applicant_id) === String(state.user_id) && a.status === "승인됨" && !prevApprovedIds.has(a.id)
+            );
+            if (newlyApproved.length > 0) {
+              showToast("🎉 방장이 참여 신청을 수락하여 안심 채팅방이 열렸습니다!");
+            }
+            const newlyArrived = (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id) && !n.is_read && !prevNotifIds.has(n.id));
+            if (newlyArrived.length > 0 && newlyApproved.length === 0) {
+              showToast(newlyArrived[0].message);
+              if (typeof pushEnabled === "function" && pushEnabled()) {
+                showSystemNotification("⚡ 울대모 새 알림", newlyArrived[0].message, "/");
+              }
+            }
+          }
+          // 만약 이 기기에만 있던 기존 가입 계정이 클라우드에 아직 안 올라가 있었다면 즉시 클라우드로도 업로드
+          const cloudUsers = data.db.users || {};
+          const hasLocalOnlyUser = Object.keys(DB.users || {}).some(uid => !cloudUsers[uid]);
+          if (hasLocalOnlyUser || localUserCountBefore > Object.keys(cloudUsers).length) {
+            syncToCloud(true);
+          }
+
+          // 데이터가 실제로 바뀐 경우에만 화면 갱신 (지도 깜빡임 및 입력창 커서 풀림 원천 방지)
+          if (sigBefore !== sigAfter) {
+            const ae = document.activeElement;
+            const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
+            if (ae && ae.id && ae.id.startsWith("chat_in_")) {
+              // 채팅 입력 중일 때는 입력창(input) DOM을 절대 건드리지 않고 말풍선 목록만 부분 갱신
+              updateAllChatBoxesInPlace();
+            } else if (!typing) {
+              renderWithoutMapFlicker();
+            }
+          }
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    function saveDB(immediate = false) {
+      localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+      syncToCloud(immediate);
+    }
+
+    let DB = loadDB();
+
+    // 운영진(관리자) 권한: 학번 20261275 단 1개 계정 + 전용 비밀번호 인증을 통과한 경우에만 부여됩니다.
+    // (비밀번호 원문은 코드에 저장하지 않고 SHA-256 해시만 보관합니다.)
+    const ADMIN_STUDENT_IDS = ["20261275"];
+    const ADMIN_PW_HASH = "799bd88683489d6a99dee51db6c04b3ca41c9a730fe7c34f44283157bd2aaded";
+    const ADMIN_AUTH_KEY = "uldaemo_admin_auth";
+    async function hashAdminPw(pw) {
+      const buf = new TextEncoder().encode("uldaemo-admin::" + pw);
+      const digest = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+    async function hashUserPw(sid, pw) {
+      const buf = new TextEncoder().encode("uldaemo-user::" + String(sid).trim() + "::" + String(pw));
+      const digest = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+    function isAdminAuthed() {
+      try { return localStorage.getItem(ADMIN_AUTH_KEY) === ADMIN_PW_HASH; } catch (e) { return false; }
+    }
+    function isCurrentUserAdmin() {
+      if (!state || !state.user_id) return false;
+      return ADMIN_STUDENT_IDS.includes(String(state.user_id)) && isAdminAuthed();
+    }
+
+    // =========================================================
+    // 🏆 리워드 & 뱃지 & 어뷰징(조작) 방지 & 주간 출석/참여 챌린지 엔진
+    // =========================================================
+    function getUserStatsAndBadges(uid) {
+      const u = (DB && DB.users && DB.users[uid]) ? DB.users[uid] : { manner_temp: 36.5 };
+      const pairCounts = {};
+      let validMeets = 0;
+      let abusedBlockedCnt = 0;
+
+      // 1) 승인된 번개 매칭 및 상호 후기 기반 카운트 (어뷰징 방지: 동일 상대방 월 최대 2회까지만 인정)
+      const recordEncounter = (partnerId) => {
+        if (!partnerId || partnerId === uid) return; // 셀프 매칭 원천 차단
+        pairCounts[partnerId] = (pairCounts[partnerId] || 0) + 1;
+        if (pairCounts[partnerId] <= 2) {
+          validMeets++;
+        } else {
+          abusedBlockedCnt++;
+        }
+      };
+
+      (DB.applications || []).filter(a => a.status === "승인됨").forEach(a => {
+        const post = (DB.posts || []).find(p => p.id === a.post_id);
+        if (!post) return;
+        if (post.author_id === uid) recordEncounter(a.applicant_id);
+        else if (a.applicant_id === uid) recordEncounter(post.author_id);
+      });
+
+      (DB.reviews || []).forEach(r => {
+        if (r.from_id === uid) recordEncounter(r.to_id);
+      });
+
+      // 데모/초기 데이터 자연스러운 기본 실적 보정
+
+      // 2) 번개 만남 후 받은 호평(칭찬 스티커) 누적 집계
+      let talkPraiseCnt = 0;
+      let timePraiseCnt = 0;
+      let kindPraiseCnt = 0;
+
+      (DB.reviews || []).forEach(r => {
+        if (String(r.to_id) === String(uid) && !r.is_none) {
+          const kw = String(r.keyword || "");
+          if (kw.includes("대화")) talkPraiseCnt++;
+          else if (kw.includes("시간")) timePraiseCnt++;
+          else kindPraiseCnt++;
+        }
+      });
+
+      const totalPraiseCnt = talkPraiseCnt + timePraiseCnt + kindPraiseCnt;
+      const mannerMannerCnt = timePraiseCnt + kindPraiseCnt;
+      const userTemp = parseFloat(u.manner_temp || 36.5);
+      const reportCnt = Number(u.report_count || 0);
+      const isCleanRecord = (reportCnt === 0);
+
+      const today = getTodayStr();
+      const streakDays = u.streak_days || 1;
+      const checkedInToday = (u.last_checkin === today);
+      const weeklyMeets = Math.min(validMeets, u.weekly_meets || validMeets);
+      const firstMeetupDone = Boolean(u.first_reward_claimed || validMeets >= 1);
+      const coffeeTickets = (u.coffee_tickets !== undefined)
+        ? u.coffee_tickets
+        : ((firstMeetupDone ? 1 : 0) + (streakDays >= 3 ? 1 : 0) + (weeklyMeets >= 2 ? 1 : 0));
+
+      // 월간 리워드 활동 점수 = (유효 만남 × 15점) + (누적 호평 × 5점) + (연속 출석 × 3점) + 보너스 점수
+      const bonusScore = Number(u.bonus_score || 0);
+      const rewardScore = (validMeets * 15) + (totalPraiseCnt * 5) + (streakDays * 3) + bonusScore;
+
+      // 3) 공식 안심 인증 뱃지 4종 ("완전히 인증된 사람" 보증 타이틀 · 노쇼/신고 0회 필수)
+      const badgeCatalog = [
+        {
+          id: "warm_peer",
+          label: "따뜻한 온기 학우",
+          cls: "achieve-temp",
+          condText: "매너온도 40.0°C 이상 · 노쇼 0회",
+          desc: "매너온도 40.0°C 이상을 달성하고 비매너 신고가 0회인 따뜻한 학우",
+          earned: isCleanRecord && userTemp >= 40.0,
+          progressText: `${userTemp.toFixed(1)}°C / 40.0°C`,
+          progressPct: Math.min(100, Math.max(8, Math.round(((userTemp - 36.5) / (40.0 - 36.5)) * 100)))
+        },
+        {
+          id: "verified_mate",
+          label: "검증된 안심 메이트",
+          cls: "achieve-verified",
+          condText: "번개 후 좋은 평가 누적 15회 이상",
+          desc: "번개 모임 이후 학우들로부터 좋은 평가를 15회 이상 받은 공식 보증 학우",
+          earned: isCleanRecord && totalPraiseCnt >= 15,
+          progressText: `${totalPraiseCnt} / 15회`,
+          progressPct: Math.min(100, Math.round((totalPraiseCnt / 15) * 100))
+        },
+        {
+          id: "fun_talker",
+          label: "대화가 즐거운 사람",
+          cls: "achieve-talk",
+          condText: "'즐거운 대화' 호평 15회 이상",
+          desc: "만남 후 '즐거운 대화' 칭찬 평가를 15회 이상 받은 유쾌한 소통 메이트",
+          earned: isCleanRecord && talkPraiseCnt >= 15,
+          progressText: `${talkPraiseCnt} / 15회`,
+          progressPct: Math.min(100, Math.round((talkPraiseCnt / 15) * 100))
+        },
+        {
+          id: "time_keeper",
+          label: "약속 칼지킴이",
+          cls: "achieve-time",
+          condText: "'시간 약속 · 친절 매너' 호평 15회 이상",
+          desc: "만남 후 시간 약속 준수 및 친절 매너 호평을 15회 이상 받은 신뢰 학우",
+          earned: isCleanRecord && mannerMannerCnt >= 15,
+          progressText: `${mannerMannerCnt} / 15회`,
+          progressPct: Math.min(100, Math.round((mannerMannerCnt / 15) * 100))
+        }
+      ];
+
+      const badges = badgeCatalog.filter(b => b.earned);
+
+      return {
+        validMeets,
+        abusedBlockedCnt,
+        weeklyMeets,
+        streakDays,
+        checkedInToday,
+        firstMeetupDone,
+        coffeeTickets,
+        rewardScore,
+        totalPraiseCnt,
+        talkPraiseCnt,
+        timePraiseCnt,
+        kindPraiseCnt,
+        mannerMannerCnt,
+        isCleanRecord,
+        badgeCatalog,
+        badges
+      };
+    }
+
+    function renderVerifiedBadgePills(uid, maxShow = 2) {
+      const st = getUserStatsAndBadges(uid);
+      if (!st.badges || st.badges.length === 0) return "";
+      return st.badges.slice(0, maxShow).map(b => `
+        <span class="achieve-badge ${b.cls}" title="${escHtml(b.desc)}">
+          ${getSvgIcon('shield', 11, b.cls === 'achieve-verified' ? '#FFFFFF' : '#287D62', 2.4)}
+          <span>${escHtml(b.label)}</span>
+        </span>
+      `).join("");
+    }
+
+    function getMonthlyLeaderboard() {
+      const usersObj = (DB && DB.users) ? DB.users : {};
+      const list = Object.keys(usersObj).map(uid => {
+        const u = usersObj[uid];
+        const st = getUserStatsAndBadges(uid);
+        return {
+          uid,
+          nickname: u.nickname || uid,
+          avatar: (u.avatar || "🐶").split(" ")[0],
+          department: u.department || "울산대",
+          manner_temp: u.manner_temp || 36.5,
+          validMeets: st.validMeets,
+          streakDays: st.streakDays,
+          rewardScore: st.rewardScore,
+          badges: st.badges
+        };
+      });
+      list.sort((a, b) => (b.rewardScore - a.rewardScore) || (b.manner_temp - a.manner_temp));
+      return list;
+    }
+
+    function checkAndGrantFirstMeetupReward(uid) {
+      const u = DB.users && DB.users[uid];
+      if (!u || u.first_reward_claimed) return false;
+      u.first_reward_claimed = true;
+      u.coffee_tickets = (u.coffee_tickets || 0) + 1;
+      u.bonus_score = (u.bonus_score || 0) + 15;
+      u.updated_at = Date.now();
+      notifyUser(uid, "[첫 번개 달성 리워드] 첫 번개 매칭 성공으로 아메리카노 추첨권 1장과 챌린지 활동 점수 +15점이 지급되었습니다. 만남 후 서로 매너 칭찬을 남겨 매너온도와 공식 인증 뱃지를 달성해보세요!");
+      return true;
+    }
+
+    function handleDailyCheckin() {
+      if (!state.user_id || !DB.users[state.user_id]) return;
+      const u = DB.users[state.user_id];
+      const today = getTodayStr();
+      if (u.last_checkin === today) {
+        return showToast("오늘 출석체크를 이미 완료했어요. 내일 또 참여해 주세요.");
+      }
+      u.last_checkin = today;
+      u.streak_days = (u.streak_days || 1) + 1;
+      u.bonus_score = (u.bonus_score || 0) + 3;
+      if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
+        u.coffee_tickets = (u.coffee_tickets || 0) + 1;
+        showToast(`연속 ${u.streak_days}일 출석 달성! 아메리카노 추첨권 +1장 & 활동 랭킹 +3점 획득!`);
+      } else {
+        showToast(`출석체크 완료! (연속 ${u.streak_days}일째 · 활동 랭킹 +3점 획득)`);
+      }
+      u.updated_at = Date.now();
+      fireConfetti();
+      saveDB(true);
+      render();
+    }
+
+    function selectReviewKeyword(postId, kw) {
+      state['review_kw_' + postId] = kw;
+      render();
+    }
+
+    function submitDetailedMannerReview(postId, partnerId) {
+      const kw = state['review_kw_' + postId] || '시간 약속을 잘 지켜요';
+      const detailEl = document.getElementById('review_detail_' + postId);
+      const detail = detailEl ? detailEl.value.trim().slice(0, 150) : '';
+      const isNone = (kw === '후기없음');
+
+      if (!isNone && detail && typeof checkContactLeak === 'function' && checkContactLeak(detail)) {
+        return showToast("후기 내용에 연락처나 외부 SNS 아이디를 적을 수 없어요.");
+      }
+
+      submitMannerPraise(postId, partnerId, kw, detail, isNone);
+    }
+
+    function submitMannerPraise(postId, partnerId, keyword, detail = "", isNone = false) {
+      if (!state.user_id || !partnerId) return;
+      if (partnerId === state.user_id) {
+        return showToast("[어뷰징 방지] 본인에게는 매너 평가를 남길 수 없어요.");
+      }
+      DB.reviews = DB.reviews || [];
+      const alreadyThisPost = DB.reviews.some(r => Number(r.post_id) === Number(postId) && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(partnerId));
+      if (alreadyThisPost) {
+        return showToast("이 번개 모임에서 이미 후기를 완료했어요.");
+      }
+
+      if (isNone) {
+        // 후기 없음 선택: 상대방 알림/온도 변동 없이 조용히 완료 기록
+        DB.reviews.push({
+          id: Date.now(),
+          post_id: postId,
+          from_id: state.user_id,
+          to_id: partnerId,
+          keyword: "후기없음",
+          detail: "",
+          is_none: true,
+          created_at: getTodayStr()
+        });
+        state['chat_action_open_' + postId] = false;
+        saveDB(true);
+        showToast("후기 없이 모임을 깔끔하게 마무리했어요.");
+        render();
+        return;
+      }
+
+      // 어뷰징 방지: 동일 학우 간 반복 평가는 월 최대 2회까지만 인정
+      const samePairCount = DB.reviews.filter(r => !r.is_none && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(partnerId)).length;
+      if (samePairCount >= 2) {
+        return showToast("[어뷰징 방지] 동일한 학우와의 반복 평가는 월 최대 2회까지만 매너온도 및 인증 뱃지 실적에 반영돼요.");
+      }
+
+      DB.reviews.push({
+        id: Date.now(),
+        post_id: postId,
+        from_id: state.user_id,
+        to_id: partnerId,
+        keyword: keyword || "친절해요",
+        detail: detail || "",
+        is_none: false,
+        created_at: getTodayStr()
+      });
+
+      const partner = DB.users[partnerId];
+      const me = DB.users[state.user_id];
+      if (partner) {
+        partner.manner_temp = Math.min(60, Math.round(((partner.manner_temp || 36.5) + 0.5) * 10) / 10);
+        partner.keywords = partner.keywords || [];
+        if (keyword && !partner.keywords.includes(keyword)) partner.keywords.push(keyword);
+        partner.updated_at = Date.now();
+        const detailMsg = detail ? ` ("${detail}")` : "";
+        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 후기를 남겨 매너온도 +0.5°C 상승했어요!${detailMsg}`, postId);
+      }
+      if (me) {
+        me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.2) * 10) / 10);
+        me.updated_at = Date.now();
+      }
+
+      checkAndGrantFirstMeetupReward(state.user_id);
+      checkAndGrantFirstMeetupReward(partnerId);
+
+      state['chat_action_open_' + postId] = false;
+      fireConfetti();
+      saveDB(true);
+      showToast("매너 후기를 보냈어요! (상대방 +0.5°C, 내 온도 +0.2°C)");
+      render();
+    }
+
+    const state = {
+      user_id: (function () {
+        const saved = localStorage.getItem("uldaemo_uid") || "";
+        if (DEMO_USER_IDS.includes(saved)) return "";
+        if (ADMIN_STUDENT_IDS.includes(saved) && !isAdminAuthed()) return "";
+        return saved;
+      })(),
+      login_tab: "login",
+      nav_tab: "홈",
+      active_modal: null,
+      notif_tab: "mine",
+      selected_post_id: null,
+      home_cat: "전체",
+      map_cat: "전체",
+      search_q: "",
+      sort_opt: "마감 임박순",
+      gps_consent: false,
+      confirm_dialog: null,
+      my_building: "26호관 행정본관",
+      my_lat: 35.543723,
+      my_lng: 129.257063,
+      verified_email: null,
+      pending_email: "",
+      generated_otp: "",
+      auth_code_sent: false,
+      smtp_sent_live: false,
+      smtp_sender: localStorage.getItem("uldaemo_smtp_sender") || "",
+      smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || "",
+      expanded_post_ids: { 1: true },
+      pc_accordions: { notifs: false, map: false, cafeteria: false }
+    };
+
+    function persistLogin(uid) {
+      state.user_id = String(uid).trim();
+      localStorage.setItem("uldaemo_uid", state.user_id);
+      document.cookie = `user_id=${state.user_id}; path=/; max-age=2592000`;
+      render();
+    }
+
+
+    // =========================================================
+    // 토스/당근 감성 앱 스타일 안심 확인 시트/모달 시스템
+    // =========================================================
+    function openConfirmDialog(opts) {
+      state.confirm_dialog = opts || null;
+      render();
+    }
+    const openConfirmSheet = openConfirmDialog;
+
+    function closeConfirmDialog() {
+      state.confirm_dialog = null;
+      render();
+    }
+
+    function handleConfirmDialogAction() {
+      if (state.confirm_dialog && typeof state.confirm_dialog.onConfirm === "function") {
+        const fn = state.confirm_dialog.onConfirm;
+        state.confirm_dialog = null;
+        fn();
+      } else {
+        state.confirm_dialog = null;
+        render();
+      }
+    }
+
+    function renderConfirmDialogHtml() {
+      if (!state.confirm_dialog) return "";
+      const d = state.confirm_dialog;
+      return `
+        <div class="modal-backdrop" style="z-index:99999; display:flex; align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px); animation:fadeIn 0.18s ease-out;" onclick="if(event.target===this) closeConfirmDialog();">
+          <div style="background:#FFFFFF; width:100%; max-width:440px; border-radius:24px 24px 0 0; padding:24px 20px 28px; box-shadow:0 -4px 24px rgba(0,0,0,0.18); animation:slideUp 0.22s cubic-bezier(0.16,1,0.3,1); max-height:85vh; overflow-y:auto;">
+            <div style="font-size:18px; font-weight:800; color:#191F28; margin-bottom:8px; line-height:1.35;">${escHtml(d.title || "확인")}</div>
+            <div style="font-size:14.5px; color:#4E5968; line-height:1.55; margin-bottom:22px; word-break:keep-all;">${escHtml(d.desc || "")}</div>
+            <div style="display:flex; gap:10px;">
+              <button type="button" class="btn" style="flex:1; height:46px; border-radius:12px; font-size:14.5px; font-weight:700; background:#F2F4F3; color:#4E5968; border:none; cursor:pointer;" onclick="closeConfirmDialog()">${escHtml(d.cancelText || "돌아가기")}</button>
+              <button type="button" class="btn ${d.isDanger ? 'btn-danger' : 'btn-primary'}" style="flex:1; height:46px; border-radius:12px; font-size:14.5px; font-weight:700; cursor:pointer; ${d.isDanger ? 'background:#E53E3E; color:#FFFFFF;' : ''}" onclick="handleConfirmDialogAction()">${escHtml(d.confirmText || "확인")}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function executeLogoutNow() {
+      state.user_id = "";
+      state.verified_email = null;
+      state.auth_code_sent = false;
+      localStorage.removeItem("uldaemo_uid");
+      localStorage.removeItem(ADMIN_AUTH_KEY);
+      document.cookie = "user_id=; path=/; max-age=0";
+      render();
+    }
+
+    function clearLogin() {
+      const curUser = state.user_id ? DB.users[state.user_id] : null;
+      if (curUser && !isAdminSid(state.user_id) && !curUser.pw_hash) {
+        openConfirmSheet({
+          title: "비밀번호 설정 안내",
+          desc: "아직 로그인 비밀번호가 설정되지 않았어요. 안전한 계정 보호를 위해 지금 비밀번호를 설정할까요?",
+          confirmText: "비밀번호 설정하기",
+          cancelText: "그대로 로그아웃",
+          onConfirm: () => {
+            switchTab('내정보');
+            setTimeout(() => {
+              const el = document.getElementById("edit_user_pw");
+              if (el) { el.focus(); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+            }, 120);
+          }
+        });
+        return;
+      }
+      openConfirmSheet({
+        title: "로그아웃할까요?",
+        desc: "30일간 유지되던 자동 로그인이 해제돼요.",
+        confirmText: "로그아웃",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => executeLogoutNow()
+      });
+    }
+
+    function calcDistanceMeters(lat1, lng1, lat2, lng2) {
+      const R = 6371000.0;
+      const p1 = lat1 * Math.PI / 180;
+      const p2 = lat2 * Math.PI / 180;
+      const dp = (lat2 - lat1) * Math.PI / 180;
+      const dl = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
     function getBuildingCoords(locName) {
       if (ULSAN_CAMPUS_COORDS[locName]) return ULSAN_CAMPUS_COORDS[locName];
       for (const [k, v] of Object.entries(ULSAN_CAMPUS_COORDS)) {
