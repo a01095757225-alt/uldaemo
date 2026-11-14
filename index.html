@@ -1915,6 +1915,139 @@
       margin-top: 16px;
     }
 
+    /* =====================================================
+       매너온도 티어 시스템 (포인트 영역 전용 CSS 변수 & 요소별 data-tier)
+       ===================================================== */
+    body,
+    body[data-tier="2"],
+    [data-tier="2"] {
+      --tier-accent: #287D62;
+      --tier-soft: #EEF8F3;
+      --tier-text: #1E6B52;
+      --tier-gold: transparent;
+    }
+    body[data-tier="1"],
+    [data-tier="1"] {
+      --tier-accent: #9AA5B1;
+      --tier-soft: #F2F4F6;
+      --tier-text: #4E5968;
+      --tier-gold: transparent;
+    }
+    body[data-tier="3"],
+    [data-tier="3"] {
+      --tier-accent: #287D62;
+      --tier-soft: #E3F3EB;
+      --tier-text: #1E6B52;
+      --tier-gold: transparent;
+    }
+    body[data-tier="4"],
+    [data-tier="4"] {
+      --tier-accent: #1E6B52;
+      --tier-soft: #DCEFE5;
+      --tier-text: #16523E;
+      --tier-gold: transparent;
+    }
+    body[data-tier="5"],
+    [data-tier="5"] {
+      --tier-accent: #1E6B52;
+      --tier-soft: #E3F3EB;
+      --tier-text: #16523E;
+      --tier-gold: #C9A227;
+    }
+
+    .home-tier-card {
+      background: var(--tier-soft);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin: 4px 0 14px;
+      border: 1px solid rgba(25, 31, 40, 0.06);
+      transition: background 0.25s ease, border-color 0.25s ease;
+    }
+    body[data-tier="5"] .home-tier-card {
+      border: 1.5px solid #C9A227;
+      box-shadow: 0 4px 14px rgba(201, 162, 39, 0.12);
+    }
+    .tier-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 800;
+      background: var(--tier-soft);
+      color: var(--tier-text);
+      border: 1px solid rgba(25, 31, 40, 0.08);
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+    .tier-badge-pill[data-tier="5"],
+    body[data-tier="5"] .tier-badge-pill.is-self {
+      background: linear-gradient(135deg, #FFFDF5 0%, #F9F1D0 100%);
+      color: #6B4E00;
+      border: 1px solid #C9A227;
+    }
+    .tk-feed-temp[data-tier],
+    .tier-temp-chip[data-tier] {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      background: var(--tier-soft);
+      color: var(--tier-text);
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    .tk-feed-temp[data-tier="5"],
+    .tier-temp-chip[data-tier="5"] {
+      border: 1px solid #C9A227;
+    }
+    .tier-avatar-frame {
+      border: 2.5px solid var(--tier-accent);
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    body[data-tier="5"] .tier-avatar-frame.is-self,
+    .tier-avatar-frame[data-tier="5"] {
+      border: 2.5px solid #C9A227 !important;
+      box-shadow: 0 0 0 2px #E3F3EB, 0 4px 12px rgba(201, 162, 39, 0.28);
+    }
+    .dock-btn.active[data-nav-key="마이"] {
+      color: var(--tier-text);
+    }
+    .dock-btn.active[data-nav-key="마이"] svg {
+      stroke: var(--tier-accent);
+    }
+    .tier-levelup-toast {
+      position: fixed;
+      left: 50%;
+      top: 18px;
+      transform: translateX(-50%);
+      z-index: 100000;
+      width: calc(100% - 28px);
+      max-width: 420px;
+      background: var(--tier-soft);
+      color: var(--tier-text);
+      border: 1.5px solid var(--tier-accent);
+      border-radius: 16px;
+      padding: 13px 16px;
+      box-shadow: 0 10px 28px rgba(25, 31, 40, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13.5px;
+      font-weight: 800;
+      line-height: 1.4;
+      animation: fadeIn 0.22s ease-out;
+    }
+    .tier-levelup-toast[data-tier="5"] {
+      border-color: #C9A227;
+      box-shadow: 0 10px 28px rgba(201, 162, 39, 0.25);
+    }
+
   </style>
 </head>
 <body>
@@ -2773,6 +2906,7 @@
       const badges = badgeCatalog.filter(b => b.earned);
 
       return {
+        userTemp,
         validMeets,
         abusedBlockedCnt,
         weeklyMeets,
@@ -3185,16 +3319,211 @@
       return `<img src="/icon-192.png" alt="울대모" width="${size}" height="${size}" style="width:${size}px; height:${size}px; border-radius:${Math.round(size * 0.22)}px; object-fit:cover; display:block;" />`;
     }
 
-    function renderTempGauge(temp, showLabel = true) {
-      const t = parseFloat(temp || 36.5);
-      const pct = Math.max(5, Math.min(100, Math.round((t / 60.0) * 100)));
+    // =========================================================
+    // 🌡️ 매너온도 티어 시스템 (단일 정의: getTierByTemp)
+    // =========================================================
+    function getTierByTemp(temp) {
+      const parsed = (temp !== null && temp !== undefined && temp !== "" && typeof temp !== "boolean") ? Number(temp) : NaN;
+      const isValid = Number.isFinite(parsed) && parsed > 0;
+      const t = isValid ? parsed : 36.0;
+
+      if (!isValid || t < 36.5) {
+        return {
+          tier: 1,
+          name: "새내기",
+          accent: "#9AA5B1",
+          soft: "#F2F4F6",
+          text: "#4E5968",
+          goldPoint: null,
+          dailyLimit: 1,
+          roleLabel: "",
+          titleBadge: "새내기",
+          benefitSummary: "기본 기능 · 번개 개설 하루 1회",
+          nextTemp: 36.5,
+          remainTemp: isValid ? Math.max(0.1, +(36.5 - t).toFixed(1)) : 0.5,
+          nextCopy: "아직 36.5°가 안 됐어요. 번개 한 번만 다녀와도 쑥 올라요",
+          levelUpCopy: "울대모 새내기 학우로 시작해요 🌱",
+          displayTemp: isValid ? t.toFixed(1) : "36.0",
+          gaugePct: isValid ? Math.max(8, Math.min(100, Math.round(((t - 30) / 25) * 100))) : 20
+        };
+      }
+      if (t < 40.0) {
+        const rem = Math.max(0.1, +(40.0 - t).toFixed(1));
+        return {
+          tier: 2,
+          name: "따뜻한 학우",
+          accent: "#287D62",
+          soft: "#EEF8F3",
+          text: "#1E6B52",
+          goldPoint: null,
+          dailyLimit: 2,
+          roleLabel: "",
+          titleBadge: "따뜻한 학우",
+          benefitSummary: "번개 개설 하루 2회",
+          nextTemp: 40.0,
+          remainTemp: rem,
+          nextCopy: `${rem.toFixed(1)}°만 더 올리면 신청 목록에서 '믿음직 학우'로 보여요`,
+          levelUpCopy: "온도 36.5° 돌파! 이제 번개를 하루 2번 열 수 있어요 🌱",
+          displayTemp: t.toFixed(1),
+          gaugePct: Math.max(20, Math.min(100, Math.round(((t - 30) / 25) * 100)))
+        };
+      }
+      if (t < 45.0) {
+        const rem = Math.max(0.1, +(45.0 - t).toFixed(1));
+        return {
+          tier: 3,
+          name: "믿음직 학우",
+          accent: "#287D62",
+          soft: "#E3F3EB",
+          text: "#1E6B52",
+          goldPoint: null,
+          dailyLimit: 2,
+          roleLabel: "신뢰 학우",
+          titleBadge: "믿음직 학우",
+          benefitSummary: "'신뢰 학우' 라벨 · 퀵 문구·리액션 이모지 추가 해금",
+          nextTemp: 45.0,
+          remainTemp: rem,
+          nextCopy: `${rem.toFixed(1)}°만 더 올리면 번개를 하루 5번 열 수 있어요`,
+          levelUpCopy: "온도 40° 돌파! 이제 신청 목록에서 '믿음직 학우'로 보여요 🔥",
+          displayTemp: t.toFixed(1),
+          gaugePct: Math.max(40, Math.min(100, Math.round(((t - 30) / 25) * 100)))
+        };
+      }
+      if (t < 50.0) {
+        const rem = Math.max(0.1, +(50.0 - t).toFixed(1));
+        return {
+          tier: 4,
+          name: "캠퍼스 인싸",
+          accent: "#1E6B52",
+          soft: "#DCEFE5",
+          text: "#16523E",
+          goldPoint: null,
+          dailyLimit: 5,
+          roleLabel: "신뢰 학우",
+          titleBadge: "캠퍼스 인싸",
+          benefitSummary: "번개 개설 하루 5회 · 광장 노출 우대",
+          nextTemp: 50.0,
+          remainTemp: rem,
+          nextCopy: `${rem.toFixed(1)}°만 더 올리면 '울대 레전드' 전용 프레임과 칭호를 받아요`,
+          levelUpCopy: "온도 45° 돌파! 이제 번개를 하루 5번 열고 광장 노출 우대를 받아요 ⚡",
+          displayTemp: t.toFixed(1),
+          gaugePct: Math.max(65, Math.min(100, Math.round(((t - 30) / 25) * 100)))
+        };
+      }
+      return {
+        tier: 5,
+        name: "울대 레전드",
+        accent: "#1E6B52",
+        soft: "#E3F3EB",
+        text: "#16523E",
+        goldPoint: "#C9A227",
+        dailyLimit: 5,
+        roleLabel: "신뢰 학우",
+        titleBadge: "울대 레전드",
+        benefitSummary: "프로필 프레임 · 전용 칭호 · 번개 하루 5회",
+        nextTemp: null,
+        remainTemp: 0,
+        nextCopy: "최고 단계 달성! 울대 레전드 전용 프레임과 칭호가 적용 중이에요 👑",
+        levelUpCopy: "온도 50° 돌파! 최고 등급 '울대 레전드' 전용 프레임과 칭호가 해금됐어요 👑",
+        displayTemp: t.toFixed(1),
+        gaugePct: 100
+      };
+    }
+
+    function resolveUserTempForTier(uid) {
+      const u = (DB && DB.users && DB.users[uid]) ? DB.users[uid] : null;
+      if (!u || u.manner_temp === undefined || u.manner_temp === null || u.manner_temp === "") return undefined;
+      const st = getUserStatsAndBadges(uid);
+      return st.userTemp;
+    }
+
+    function getTodayMyPostCount(uid) {
+      const today = getTodayStr();
+      return (DB.posts || []).filter(p => {
+        if (!p || String(p.author_id) !== String(uid) || p.status === "취소됨") return false;
+        const ts = Number(p.id);
+        if (Number.isFinite(ts) && ts > 1700000000000) {
+          const d = new Date(ts);
+          const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          return ds === today;
+        }
+        return p.meet_date === today;
+      }).length;
+    }
+
+    let _tierToastTimer = null;
+    function showTierLevelUpBanner(tierInfo) {
+      if (!tierInfo) return;
+      let el = document.getElementById("tier-levelup-banner");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "tier-levelup-banner";
+        document.body.appendChild(el);
+      }
+      el.className = "tier-levelup-toast";
+      el.setAttribute("data-tier", String(tierInfo.tier));
+      el.innerHTML = `
+        <span>${escHtml(tierInfo.levelUpCopy)}</span>
+        <button type="button" onclick="this.parentElement.remove()" style="border:none; background:none; color:inherit; font-size:15px; font-weight:800; cursor:pointer; padding:0 4px;">✕</button>
+      `;
+      clearTimeout(_tierToastTimer);
+      _tierToastTimer = setTimeout(() => {
+        if (el && el.parentElement) el.remove();
+      }, 4800);
+    }
+
+    function checkAndShowTierLevelUp(uid, tempVal) {
+      if (!uid) return;
+      const tierInfo = getTierByTemp(tempVal);
+      const storageKey = "uldaemo_last_tier_" + String(uid);
+      const prevRaw = localStorage.getItem(storageKey);
+      if (prevRaw === null) {
+        localStorage.setItem(storageKey, String(tierInfo.tier));
+        return;
+      }
+      const prevTier = parseInt(prevRaw, 10);
+      if (Number.isFinite(prevTier) && tierInfo.tier > prevTier) {
+        localStorage.setItem(storageKey, String(tierInfo.tier));
+        showTierLevelUpBanner(tierInfo);
+      } else if (Number.isFinite(prevTier) && tierInfo.tier !== prevTier) {
+        localStorage.setItem(storageKey, String(tierInfo.tier));
+      }
+    }
+
+    function renderHomeTierCard() {
+      const tempVal = resolveUserTempForTier(state.user_id);
+      const tInfo = getTierByTemp(tempVal);
+      const todayUsed = getTodayMyPostCount(state.user_id);
+      const remainPosts = Math.max(0, tInfo.dailyLimit - todayUsed);
       return `
-        <div class="temp-wrap">
-          <div class="temp-header">
-            <span style="color:#6B7684; font-weight:600;">${showLabel ? "매너온도" : "기본 36.5°C"}</span>
-            <span style="color:#287D62; font-weight:800;">${t.toFixed(1)}°C</span>
+        <div class="home-tier-card" data-tier="${tInfo.tier}">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="tier-badge-pill is-self" data-tier="${tInfo.tier}" style="background:#FFFFFF;">${tInfo.tier === 5 ? '👑 ' : ''}${escHtml(tInfo.name)}</span>
+              ${tInfo.roleLabel ? `<span style="font-size:11.5px; font-weight:700; color:var(--tier-text);">· ${escHtml(tInfo.roleLabel)}</span>` : ''}
+            </div>
+            <div style="display:flex; align-items:baseline; gap:6px;">
+              <span style="font-size:11.5px; color:var(--tier-text); opacity:0.85; font-weight:600;">오늘 번개 ${remainPosts}/${tInfo.dailyLimit}회</span>
+              <span style="font-size:18px; font-weight:800; color:${tInfo.tier === 1 ? 'var(--tier-text)' : 'var(--tier-accent)'}; letter-spacing:-0.02em;">${tInfo.displayTemp}°C</span>
+            </div>
           </div>
-          <div class="temp-track" style="height:6px; background:#E5EAE7; border-radius:999px; overflow:hidden;"><div class="temp-fill" style="width:${pct}%; height:100%; background:linear-gradient(90deg, #B8DECB 0%, #287D62 100%); border-radius:999px;"></div></div>
+          <div style="height:6px; background:rgba(25,31,40,0.08); border-radius:999px; overflow:hidden; margin:8px 0 7px;">
+            <div style="width:${tInfo.gaugePct}%; height:100%; background:${tInfo.tier === 5 ? 'linear-gradient(90deg, #1E6B52 0%, #C9A227 100%)' : 'var(--tier-accent)'}; border-radius:999px; transition:width 0.4s ease;"></div>
+          </div>
+          <div style="font-size:12px; font-weight:600; color:var(--tier-text); line-height:1.35;">${escHtml(tInfo.nextCopy)}</div>
+        </div>
+      `;
+    }
+
+    function renderTempGauge(temp, showLabel = true) {
+      const tInfo = getTierByTemp(temp);
+      return `
+        <div class="temp-wrap" data-tier="${tInfo.tier}">
+          <div class="temp-header">
+            <span style="color:#6B7684; font-weight:600;">${showLabel ? `매너온도 · ${escHtml(tInfo.name)}` : "기본 36.5°C"}</span>
+            <span style="color:var(--tier-text); font-weight:800;">${tInfo.displayTemp}°C</span>
+          </div>
+          <div class="temp-track" style="height:6px; background:#E5EAE7; border-radius:999px; overflow:hidden;"><div class="temp-fill" style="width:${tInfo.gaugePct}%; height:100%; background:${tInfo.tier === 5 ? 'linear-gradient(90deg, #1E6B52 0%, #C9A227 100%)' : 'var(--tier-accent)'}; border-radius:999px;"></div></div>
         </div>
       `;
     }
@@ -3953,7 +4282,10 @@
           { key: "마이", iconSvg: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>', label: "내 정보", mLabel: "내 정보" }
         ];
         const isActiveNav = (k) => state.nav_tab === k && !state.active_modal;
-        const userTemp = parseFloat(currentUser.manner_temp || 36.5);
+        const myTempForTier = resolveUserTempForTier(state.user_id);
+        const myTierInfo = getTierByTemp(myTempForTier);
+        document.body.setAttribute("data-tier", String(myTierInfo.tier));
+        checkAndShowTierLevelUp(state.user_id, myTempForTier);
 
         const sidebarHtml = `
           <aside class="pc-sidebar">
@@ -3983,10 +4315,10 @@
 
             <div class="side-user" onclick="switchTab('마이')" style="cursor:pointer;">
               <div style="display:flex; align-items:center; gap:12px;">
-                <span style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${currentUser.avatar.split(" ")[0]}</span>
+                <span class="tier-avatar-frame is-self" style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${currentUser.avatar.split(" ")[0]}</span>
                 <div style="min-width:0; flex:1;">
                   <div style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(currentUser.nickname)}</div>
-                  <div style="font-size:12px; color:#287D62; font-weight:600;">${userTemp.toFixed(1)}°C</div>
+                  <div style="font-size:12px; color:var(--tier-text); font-weight:700;">${myTierInfo.displayTemp}°C · ${escHtml(myTierInfo.name)}</div>
                 </div>
               </div>
             </div>
@@ -4026,7 +4358,7 @@
                 ${navItems.map(n => {
                   const on = isActiveNav(n.key);
                   return `
-                    <button class="dock-btn ${on ? 'active' : ''}" onclick="switchTab('${n.key}')">
+                    <button class="dock-btn ${on ? 'active' : ''}" data-nav-key="${n.key}" onclick="switchTab('${n.key}')">
                       <span class="dock-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${on ? '#191F28' : '#B0B8C1'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.iconSvg}</svg>
                       </span>
@@ -4813,7 +5145,8 @@
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5 };
       const acceptedCnt = DB.applications.filter(a => a.post_id === post.id && a.status === "승인됨").length + 1;
       const isOfficial = Boolean(post.is_official);
-      const authorTemp = parseFloat(author.manner_temp || 36.5);
+      const authorRawTemp = (DB.users[post.author_id] && DB.users[post.author_id].manner_temp !== undefined) ? resolveUserTempForTier(post.author_id) : author.manner_temp;
+      const authorTier = getTierByTemp(authorRawTemp);
       const emoji = getCatEmoji(post.category, post.title);
 
       const coords = getBuildingCoords(post.location);
@@ -4833,7 +5166,7 @@
             <div class="tk-feed-meta">${escHtml(post.location)} · ${escHtml(post.meet_time || '오늘')}${distText}</div>
             <div class="tk-feed-stats">
               <span class="tk-feed-cnt">${acceptedCnt}/${post.max_participants}명</span>
-              <span class="tk-feed-temp">${authorTemp.toFixed(1)}°C</span>
+              <span class="tk-feed-temp" data-tier="${authorTier.tier}">${authorTier.tier === 5 ? '👑 ' : ''}${authorTier.displayTemp}°C${authorTier.roleLabel ? ` · ${authorTier.roleLabel}` : ''}</span>
             </div>
           </div>
         </div>
@@ -5029,6 +5362,8 @@
           </div>
         </div>
 
+        ${renderHomeTierCard()}
+
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
         </div>
@@ -5124,7 +5459,15 @@
       return `
         <button class="btn" style="margin-bottom:10px;" onclick="state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();">← 돌아가기</button>
         <h3 style="margin-bottom:6px; font-size:20px; font-weight:800; color:#191F28;">번개 올리기</h3>
-        <div class="privacy-badge" style="margin-bottom:12px;"><span>🛡️</span><span>수락 전까지 내 정보는 숨겨져요</span></div>
+        ${(() => {
+          const myTier = getTierByTemp(resolveUserTempForTier(state.user_id));
+          const used = getTodayMyPostCount(state.user_id);
+          const rem = Math.max(0, myTier.dailyLimit - used);
+          return `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+            <div class="privacy-badge" style="margin:0;"><span>🛡️</span><span>수락 전까지 내 정보는 숨겨져요</span></div>
+            <span class="tier-badge-pill is-self" data-tier="${myTier.tier}">${escHtml(myTier.name)} · 오늘 개설 가능 ${rem}/${myTier.dailyLimit}회</span>
+          </div>`;
+        })()}
 
         <div class="uldaemo-card" style="padding-bottom:10px;">
           <!-- 1. 제목 입력 & 추천 칩 -->
@@ -5223,6 +5566,12 @@
       if (title.length < 2) return showToast("모집 제목은 최소 2글자 이상 입력해주세요.");
       if (meet_date < getTodayStr()) return showToast("과거 날짜로는 번개 모임을 등록할 수 없어요.");
       if (!category || !location || !style) return showToast("카테고리, 장소, 성향 태그를 모두 입력해주세요.");
+
+      const myTier = getTierByTemp(resolveUserTempForTier(state.user_id));
+      const todayCount = getTodayMyPostCount(state.user_id);
+      if (!isCurrentUserAdmin() && todayCount >= myTier.dailyLimit) {
+        return showToast(`${myTier.name} 단계는 하루 ${myTier.dailyLimit}번까지 번개를 열 수 있어요. (${myTier.nextCopy})`);
+      }
 
       const newId = Date.now();
       DB.posts.unshift({
@@ -5343,28 +5692,31 @@
 
           <div style="border-top:1px solid #E5EAE7; padding-top:12px;">
             <div style="font-size:12px; font-weight:700; color:#6B7684; margin-bottom:8px;">방장 블라인드 프로필 (매너온도 & 공식 인증 뱃지)</div>
-            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-              <div style="font-size:28px; background:#EEF8F3; border:1.5px solid #287D62; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                ${author.avatar.split(" ")[0]}
-              </div>
-              <div style="flex:1;">
-                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                  <span style="font-size:15px; font-weight:800; color:#191F28;">${author.nickname}</span>
-                  ${authorBadgesHtml || `<span style="font-size:11px; color:#6B7684; background:#F7F9F8; border:1px solid #E5EAE7; padding:2px 8px; border-radius:999px;">재학생 인증 완료</span>`}
-                </div>
-                ${(() => {
-                  const myApp = apps.find(a => a.applicant_id === state.user_id);
-                  const isAccepted = isAuthor || (myApp && myApp.status === "승인됨");
-                  const deptDisplay = isAccepted ? author.department : `${getBroadCollege(author.department)}`;
-                  const mbtiDisplay = isAccepted ? author.mbti : `MBTI 비공개`;
-                  return `
-                    <div style="font-size:12px; color:#6B7684; margin-top:3px;">${deptDisplay} · ${mbtiDisplay} · 누적 호평 ${authorSt.totalPraiseCnt}회</div>
+            ${(() => {
+              const hostRawTemp = (DB.users[post.author_id] && DB.users[post.author_id].manner_temp !== undefined) ? authorSt.userTemp : author.manner_temp;
+              const hostTier = getTierByTemp(hostRawTemp);
+              const myApp = apps.find(a => a.applicant_id === state.user_id);
+              const isAccepted = isAuthor || (myApp && myApp.status === "승인됨");
+              const deptDisplay = isAccepted ? author.department : `${getBroadCollege(author.department)}`;
+              const mbtiDisplay = isAccepted ? author.mbti : `MBTI 비공개`;
+              return `
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                  <div class="tier-avatar-frame" data-tier="${hostTier.tier}" style="font-size:28px; background:var(--tier-soft); width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    ${author.avatar.split(" ")[0]}
+                  </div>
+                  <div style="flex:1;">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <span style="font-size:15px; font-weight:800; color:#191F28;">${escHtml(author.nickname)}</span>
+                      <span class="tier-badge-pill" data-tier="${hostTier.tier}">${hostTier.tier === 5 ? '👑 ' : ''}${escHtml(hostTier.name)}${hostTier.roleLabel ? ` · ${escHtml(hostTier.roleLabel)}` : ''}</span>
+                      ${authorBadgesHtml}
+                    </div>
+                    <div style="font-size:12px; color:#6B7684; margin-top:3px;">${escHtml(deptDisplay)} · ${escHtml(mbtiDisplay)} · 누적 호평 ${authorSt.totalPraiseCnt}회</div>
                     ${!isAccepted ? `<div style="font-size:11px; color:#287D62; font-weight:600; margin-top:3px;">🔒 상세 학과·MBTI는 방장 참여 수락 시 안전하게 공개됩니다.</div>` : ""}
-                  `;
-                })()}
-              </div>
-            </div>
-            ${renderTempGauge(author.manner_temp, true)}
+                  </div>
+                </div>
+                ${renderTempGauge(hostRawTemp, true)}
+              `;
+            })()}
           </div>
         </div>
 
@@ -5372,17 +5724,21 @@
           <div class="uldaemo-card">
             <h4 style="margin-bottom:8px;">방장 전용: 신청자 수락 및 모임 관리</h4>
             ${apps.length === 0 ? `<div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">아직 신청한 학우가 없어요.</div>` : apps.map(a => {
-              const apUser = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, department: "울산대", mbti: "INFP", manner_temp: 36.5 };
+              const apUser = DB.users[a.applicant_id] || { avatar: "🐱", nickname: "익명 학우", department: "울산대", mbti: "비공개", manner_temp: 36.5 };
+              const apRawTemp = (DB.users[a.applicant_id] && DB.users[a.applicant_id].manner_temp !== undefined) ? resolveUserTempForTier(a.applicant_id) : apUser.manner_temp;
+              const apTier = getTierByTemp(apRawTemp);
               const apBadges = renderVerifiedBadgePills(a.applicant_id, 2);
+              const isApApproved = (a.status === "승인됨");
+              const apDeptText = isApApproved ? `${apUser.department} · ${apUser.mbti}` : `${getBroadCollege(apUser.department)} · 수락 전 블라인드`;
               return `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F2F4F3; flex-wrap:wrap; gap:8px;">
                   <div>
                     <div style="font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                      <b>${apUser.avatar.split(" ")[0]} ${apUser.nickname}</b>
-                      <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 7px; border-radius:999px;">${(apUser.manner_temp || 36.5).toFixed(1)}°C</span>
+                      <b>${apUser.avatar.split(" ")[0]} ${escHtml(apUser.nickname)}</b>
+                      <span class="tier-temp-chip" data-tier="${apTier.tier}">${apTier.tier === 5 ? '👑 ' : ''}${apTier.displayTemp}°C · ${escHtml(apTier.roleLabel || apTier.name)}</span>
                       ${apBadges}
                     </div>
-                    <div style="font-size:12px; color:#6B7684; margin-top:2px;">${apUser.department} · ${apUser.mbti} — <b style="color:#287D62;">${a.status}</b></div>
+                    <div style="font-size:12px; color:#6B7684; margin-top:2px;">${escHtml(apDeptText)} — <b style="color:#287D62;">${escHtml(a.status)}</b></div>
                   </div>
                   ${a.status === "대기중" ? `<button class="btn btn-primary" style="width:auto; min-height:34px; padding:4px 12px;" onclick="acceptApplicant(${a.id})">수락</button>` : ""}
                 </div>
@@ -5982,15 +6338,22 @@
             </div>
 
             <div>
-              ${talks.map(t => {
+              ${[...talks].sort((a, b) => {
+                const ta = getTierByTemp(resolveUserTempForTier(a.author_id)).tier >= 4 ? 1 : 0;
+                const tb = getTierByTemp(resolveUserTempForTier(b.author_id)).tier >= 4 ? 1 : 0;
+                return (tb - ta) || ((b.id || 0) - (a.id || 0));
+              }).map(t => {
                 const u = DB.users[t.author_id] || { nickname: "학우", avatar: "🐰" };
+                const tTier = getTierByTemp(resolveUserTempForTier(t.author_id));
                 const likes = t.likes || [];
                 const liked = likes.includes(state.user_id);
                 return `
                   <div style="border-bottom:1px solid #F7F9F8;">
                   <div style="padding:12px 0; display:flex; align-items:center; gap:12px;">
-                    <span style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">${u.avatar.split(" ")[0]}</span>
-                    <span style="font-size:15px; color:#191F28; flex:1; min-width:0; line-height:1.4;">${escHtml(t.text)}</span>
+                    <span class="tier-avatar-frame" data-tier="${tTier.tier}" style="width:36px; height:36px; border-radius:50%; background:var(--tier-soft); display:inline-flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">${u.avatar.split(" ")[0]}</span>
+                    <span style="font-size:15px; color:#191F28; flex:1; min-width:0; line-height:1.4;">
+                      ${tTier.tier >= 4 ? `<span class="tier-badge-pill" data-tier="${tTier.tier}" style="margin-right:6px; font-size:10.5px; padding:1px 7px;">${tTier.tier === 5 ? '👑 울대 레전드' : '⚡ 인싸 학우'}</span>` : ''}${escHtml(t.text)}
+                    </span>
                     <button type="button" style="border:none; background:${liked ? '#EEF8F3' : '#F2F4F3'}; color:${liked ? '#287D62' : '#6B7684'}; font-size:12px; font-weight:600; padding:4px 9px; border-radius:999px; cursor:pointer; flex-shrink:0;" onclick="toggleTalkLike(${t.id})">❤️ ${likes.length}</button>
                     ${renderReplyButton('t', t)}
                     <span style="font-size:12px; color:#B0B8C1; flex-shrink:0;">${escHtml(t.created_at || "방금 전")}</span>
@@ -6164,6 +6527,15 @@
       "어디쯤이신가요? 👀",
       "반가웠어요! 조심히 들어가세요 🙌"
     ];
+    const TIER3_EXTRA_QUICK_PHRASES = [
+      "오늘 텐션 최고예요 🔥",
+      "다음에 또 같이 모여요 ⚡",
+      "맛있게 잘 먹었어요 🍽️"
+    ];
+    function getQuickChatPhrasesForCurrentUser() {
+      const tInfo = getTierByTemp(resolveUserTempForTier(state.user_id));
+      return tInfo.tier >= 3 ? [...QUICK_CHAT_PHRASES, ...TIER3_EXTRA_QUICK_PHRASES] : QUICK_CHAT_PHRASES;
+    }
 
     function getMyActiveChatRooms() {
       const myId = String(state.user_id || "");
@@ -6350,13 +6722,18 @@
             <span style="font-size:12px; font-weight:700; color:#287D62;">${pendingHost.length}건</span>
           </div>
           ${pendingHost.map(a => {
-            const u = DB.users[a.applicant_id] || { avatar: "🐱", nickname: a.applicant_id, manner_temp: 36.5 };
+            const u = DB.users[a.applicant_id] || { avatar: "🐱", nickname: "익명 학우", manner_temp: 36.5 };
+            const apRawTemp = (DB.users[a.applicant_id] && DB.users[a.applicant_id].manner_temp !== undefined) ? resolveUserTempForTier(a.applicant_id) : u.manner_temp;
+            const apTier = getTierByTemp(apRawTemp);
             const p = DB.posts.find(post => Number(post.id) === Number(a.post_id));
             return `
               <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-top:1px solid #EEF0EF;">
                 <div style="min-width:0; flex:1;">
-                  <div style="font-size:14px; font-weight:700; color:#191F28;">${u.avatar.split(" ")[0]} ${escHtml(u.nickname)} <span style="font-size:12px; color:#287D62;">${(u.manner_temp || 36.5).toFixed(1)}°C</span></div>
-                  <div style="font-size:12px; color:#8B95A1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p ? escHtml(p.title) : ""}</div>
+                  <div style="font-size:14px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span>${u.avatar.split(" ")[0]} ${escHtml(u.nickname)}</span>
+                    <span class="tier-temp-chip" data-tier="${apTier.tier}">${apTier.tier === 5 ? '👑 ' : ''}${apTier.displayTemp}°C · ${escHtml(apTier.roleLabel || apTier.name)}</span>
+                  </div>
+                  <div style="font-size:12px; color:#8B95A1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px;">${p ? escHtml(p.title) : ""}</div>
                 </div>
                 <button class="btn btn-primary" style="width:auto; min-height:34px; padding:0 12px; font-size:12px; border-radius:8px;" onclick="acceptApplicant(${a.id})">수락</button>
               </div>
@@ -6560,7 +6937,7 @@
               </div>
             ` : ""}
             <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 6px;">
-              ${QUICK_CHAT_PHRASES.map(phrase => `
+              ${getQuickChatPhrasesForCurrentUser().map(phrase => `
                 <button type="button" class="cat-btn" style="height:34px; font-size:13px; padding:0 13px; flex-shrink:0; white-space:nowrap;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
               `).join("")}
             </div>
@@ -6606,7 +6983,8 @@
     function renderMsgReactionsHtml(m, postId, isMe) {
       const myId = String(state.user_id || "");
       const reactions = m.reactions || {};
-      const emojis = ["❤️", "👍", "🙌"];
+      const myTier = getTierByTemp(resolveUserTempForTier(myId));
+      const emojis = myTier.tier >= 3 ? ["❤️", "👍", "🙌", "🔥", "🎉"] : ["❤️", "👍", "🙌"];
       const activeEntries = Object.entries(reactions).filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
       const isPickerOpen = Number(state.open_react_msg_id) === Number(m.id);
 
@@ -7098,8 +7476,8 @@
 
     function renderProfileTab(user) {
       const myStats = getUserStatsAndBadges(state.user_id);
-      const userTemp = parseFloat(user.manner_temp || 36.5);
-      const gaugePct = Math.max(8, Math.min(100, Math.round(((userTemp - 30) / 20) * 100)));
+      const rawTemp = (user && user.manner_temp !== undefined && user.manner_temp !== null && user.manner_temp !== "") ? myStats.userTemp : undefined;
+      const myTier = getTierByTemp(rawTemp);
       const sec = state.profile_sec || null;
       const myAllPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id) && p.status !== "취소됨");
       const myPosts = myAllPosts.filter(p => !isPostExpired(p));
@@ -7111,26 +7489,32 @@
           <h1 class="tk-page-title" style="margin-bottom:22px;">내 정보</h1>
 
           <div style="display:flex; align-items:center; gap:14px;">
-            <span style="width:60px; height:60px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0;">
+            <span class="tier-avatar-frame is-self" data-tier="${myTier.tier}" style="width:60px; height:60px; border-radius:50%; background:var(--tier-soft); display:inline-flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0;">
               ${user.avatar.split(" ")[0]}
             </span>
             <div>
-              <div style="font-size:19px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px;">
+              <div style="font-size:19px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <span>${escHtml(user.nickname)}</span>
+                <span class="tier-badge-pill is-self" data-tier="${myTier.tier}">${myTier.tier === 5 ? '👑 ' : ''}${escHtml(myTier.name)}${myTier.roleLabel ? ` · ${escHtml(myTier.roleLabel)}` : ''}</span>
                 ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:#EEF8F3; color:#287D62; font-weight:700; padding:2px 7px; border-radius:6px;">운영진</span>` : ""}
               </div>
-              <div style="font-size:13.5px; color:#8B95A1; margin-top:2px;">${escHtml(user.department)} · 인증 뱃지 ${myStats.badges.length}개</div>
+              <div style="font-size:13.5px; color:#8B95A1; margin-top:3px;">${escHtml(user.department)} · 인증 뱃지 ${myStats.badges.length}개</div>
+              <div style="font-size:12px; color:var(--tier-text); font-weight:600; margin-top:3px;">혜택: ${escHtml(myTier.benefitSummary)}</div>
             </div>
           </div>
 
-          <div style="margin-top:26px; font-size:13px; font-weight:600; color:#8B95A1;">매너온도</div>
-          <div style="display:flex; align-items:flex-end; gap:2px; margin-top:2px;">
-            <span style="font-size:48px; font-weight:800; color:#287D62; line-height:1; letter-spacing:-0.03em;">${userTemp.toFixed(1)}</span>
-            <span style="font-size:21px; font-weight:700; color:#287D62; margin-bottom:4px;">°C</span>
+          <div style="margin-top:26px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <span style="font-size:13px; font-weight:600; color:#8B95A1;">매너온도</span>
+            ${myTier.tier === 5 ? `<span style="font-size:12px; font-weight:800; color:#6B4E00; background:#FFFDF5; border:1px solid #C9A227; padding:2px 8px; border-radius:999px;">👑 전용 칭호: 울대 레전드</span>` : ""}
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:2px; margin-top:4px;">
+            <span style="font-size:48px; font-weight:800; color:${myTier.tier === 1 ? 'var(--tier-text)' : 'var(--tier-accent)'}; line-height:1; letter-spacing:-0.03em;">${myTier.displayTemp}</span>
+            <span style="font-size:21px; font-weight:700; color:${myTier.tier === 1 ? 'var(--tier-text)' : 'var(--tier-accent)'}; margin-bottom:4px;">°C</span>
           </div>
           <div style="height:8px; border-radius:999px; background:#F2F4F3; margin-top:12px; overflow:hidden;">
-            <div style="width:${gaugePct}%; height:100%; background:#287D62; border-radius:999px; transition:width 0.6s cubic-bezier(.2,.8,.2,1);"></div>
+            <div style="width:${myTier.gaugePct}%; height:100%; background:${myTier.tier === 5 ? 'linear-gradient(90deg, #1E6B52 0%, #C9A227 100%)' : 'var(--tier-accent)'}; border-radius:999px; transition:width 0.6s cubic-bezier(.2,.8,.2,1);"></div>
           </div>
+          <div style="margin-top:8px; font-size:12.5px; font-weight:600; color:var(--tier-text); line-height:1.4;">${escHtml(myTier.nextCopy)}</div>
 
           <div class="tk-gap8" style="margin:26px -20px 10px;"></div>
 
