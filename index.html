@@ -3779,6 +3779,10 @@
       render();
     }
 
+    function isAdminSid(sid) {
+      return ADMIN_STUDENT_IDS.includes(String(sid || "").trim());
+    }
+
     function clearLogin() {
       const curUser = state.user_id ? DB.users[state.user_id] : null;
       if (curUser && !isAdminSid(state.user_id) && !curUser.pw_hash) {
@@ -3788,7 +3792,7 @@
           confirmText: "비밀번호 설정하기",
           cancelText: "그대로 로그아웃",
           onConfirm: () => {
-            switchTab('내정보');
+            switchTab('마이');
             setTimeout(() => {
               const el = document.getElementById("edit_user_pw");
               if (el) { el.focus(); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
@@ -9153,6 +9157,19 @@
     render();
     pullFromCloud(true);
     scheduleNextCloudPull(4000);
+
+    try {
+      if (window.location.search && window.location.search.includes("preview_match=1")) {
+        setTimeout(() => {
+          triggerLightningFlash();
+          fireConfetti({ mode: "match" });
+          showMeetupMatchCelebration(
+            { author_id: "20261275", title: "학생회관 밥약 메이트 (소규모 번개) 🍚" },
+            { avatar: "🐱", nickname: "울대메이트" }
+          );
+        }, 250);
+      }
+    } catch (e) {}
 
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
