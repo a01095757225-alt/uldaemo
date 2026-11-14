@@ -1928,7 +1928,7 @@
     }
     body[data-tier="1"],
     [data-tier="1"] {
-      --tier-accent: #9AA5B1;
+      --tier-accent: #6B7684;
       --tier-soft: #F2F4F6;
       --tier-text: #4E5968;
       --tier-gold: transparent;
@@ -1936,14 +1936,14 @@
     body[data-tier="3"],
     [data-tier="3"] {
       --tier-accent: #287D62;
-      --tier-soft: #E3F3EB;
+      --tier-soft: #DDF0E7;
       --tier-text: #1E6B52;
       --tier-gold: transparent;
     }
     body[data-tier="4"],
     [data-tier="4"] {
       --tier-accent: #1E6B52;
-      --tier-soft: #DCEFE5;
+      --tier-soft: #CFE9DD;
       --tier-text: #16523E;
       --tier-gold: transparent;
     }
@@ -2014,11 +2014,9 @@
       border: 2.5px solid #C9A227 !important;
       box-shadow: 0 0 0 2px #E3F3EB, 0 4px 12px rgba(201, 162, 39, 0.28);
     }
-    .dock-btn.active[data-nav-key="마이"] {
-      color: var(--tier-text);
-    }
-    .dock-btn.active[data-nav-key="마이"] svg {
-      stroke: var(--tier-accent);
+    .dock-btn.active[data-nav-key="마이"] svg,
+    .side-nav-btn.active[data-nav-key="마이"] svg {
+      stroke: var(--tier-accent) !important;
     }
     .tier-levelup-toast {
       position: fixed;
@@ -3326,22 +3324,26 @@
       const parsed = (temp !== null && temp !== undefined && temp !== "" && typeof temp !== "boolean") ? Number(temp) : NaN;
       const isValid = Number.isFinite(parsed) && parsed > 0;
       const t = isValid ? parsed : 36.0;
+      const fmtRem = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1);
 
       if (!isValid || t < 36.5) {
+        const rem = isValid ? Math.max(0.1, +(36.5 - t).toFixed(1)) : 0.5;
         return {
           tier: 1,
           name: "새내기",
-          accent: "#9AA5B1",
+          accent: "#6B7684",
           soft: "#F2F4F6",
           text: "#4E5968",
           goldPoint: null,
           dailyLimit: 1,
           roleLabel: "",
           titleBadge: "새내기",
-          benefitSummary: "기본 기능 · 번개 개설 하루 1회",
+          benefitSummary: "번개 개설 하루 1회",
           nextTemp: 36.5,
-          remainTemp: isValid ? Math.max(0.1, +(36.5 - t).toFixed(1)) : 0.5,
-          nextCopy: "아직 36.5°가 안 됐어요. 번개 한 번만 다녀와도 쑥 올라요",
+          nextTierName: "따뜻한 학우",
+          remainTemp: rem,
+          cheerCopy: "번개 한 번이면 36.5° 달성",
+          nextCopy: `${fmtRem(rem)}°만 더 올리면 번개를 하루 2번 열 수 있어요`,
           levelUpCopy: "울대모 새내기 학우로 시작해요 🌱",
           displayTemp: isValid ? t.toFixed(1) : "36.0",
           gaugePct: isValid ? Math.max(8, Math.min(100, Math.round(((t - 30) / 25) * 100))) : 20
@@ -3361,9 +3363,11 @@
           titleBadge: "따뜻한 학우",
           benefitSummary: "번개 개설 하루 2회",
           nextTemp: 40.0,
+          nextTierName: "믿음직 학우",
           remainTemp: rem,
-          nextCopy: `${rem.toFixed(1)}°만 더 올리면 신청 목록에서 '믿음직 학우'로 보여요`,
-          levelUpCopy: "온도 36.5° 돌파! 이제 번개를 하루 2번 열 수 있어요 🌱",
+          cheerCopy: `${fmtRem(rem)}°만 더 올리면 믿음직 학우예요`,
+          nextCopy: `${fmtRem(rem)}°만 더 올리면 신청 목록에서 '신뢰 학우'로 보여요`,
+          levelUpCopy: "온도 36.5° 돌파! 이제 '따뜻한 학우'로 번개를 하루 2번 열 수 있어요 🌱",
           displayTemp: t.toFixed(1),
           gaugePct: Math.max(20, Math.min(100, Math.round(((t - 30) / 25) * 100)))
         };
@@ -3374,7 +3378,7 @@
           tier: 3,
           name: "믿음직 학우",
           accent: "#287D62",
-          soft: "#E3F3EB",
+          soft: "#DDF0E7",
           text: "#1E6B52",
           goldPoint: null,
           dailyLimit: 2,
@@ -3382,8 +3386,10 @@
           titleBadge: "믿음직 학우",
           benefitSummary: "'신뢰 학우' 라벨 · 퀵 문구·리액션 이모지 추가 해금",
           nextTemp: 45.0,
+          nextTierName: "캠퍼스 인싸",
           remainTemp: rem,
-          nextCopy: `${rem.toFixed(1)}°만 더 올리면 번개를 하루 5번 열 수 있어요`,
+          cheerCopy: `${fmtRem(rem)}°만 더 올리면 캠퍼스 인싸예요`,
+          nextCopy: `${fmtRem(rem)}°만 더 올리면 번개를 하루 5번 열 수 있어요`,
           levelUpCopy: "온도 40° 돌파! 이제 신청 목록에서 '믿음직 학우'로 보여요 🔥",
           displayTemp: t.toFixed(1),
           gaugePct: Math.max(40, Math.min(100, Math.round(((t - 30) / 25) * 100)))
@@ -3395,7 +3401,7 @@
           tier: 4,
           name: "캠퍼스 인싸",
           accent: "#1E6B52",
-          soft: "#DCEFE5",
+          soft: "#CFE9DD",
           text: "#16523E",
           goldPoint: null,
           dailyLimit: 5,
@@ -3403,9 +3409,11 @@
           titleBadge: "캠퍼스 인싸",
           benefitSummary: "번개 개설 하루 5회 · 광장 노출 우대",
           nextTemp: 50.0,
+          nextTierName: "울대 레전드",
           remainTemp: rem,
-          nextCopy: `${rem.toFixed(1)}°만 더 올리면 '울대 레전드' 전용 프레임과 칭호를 받아요`,
-          levelUpCopy: "온도 45° 돌파! 이제 번개를 하루 5번 열고 광장 노출 우대를 받아요 ⚡",
+          cheerCopy: `${fmtRem(rem)}°만 더 올리면 울대 레전드예요`,
+          nextCopy: `${fmtRem(rem)}°만 더 올리면 '울대 레전드' 전용 프레임과 칭호를 받아요`,
+          levelUpCopy: "온도 45° 돌파! 이제 '캠퍼스 인싸'로 번개를 하루 5번 열 수 있어요 🔥",
           displayTemp: t.toFixed(1),
           gaugePct: Math.max(65, Math.min(100, Math.round(((t - 30) / 25) * 100)))
         };
@@ -3420,9 +3428,11 @@
         dailyLimit: 5,
         roleLabel: "신뢰 학우",
         titleBadge: "울대 레전드",
-        benefitSummary: "프로필 프레임 · 전용 칭호 · 번개 하루 5회",
+        benefitSummary: "프로필 프레임 · 전용 칭호",
         nextTemp: null,
+        nextTierName: null,
         remainTemp: 0,
+        cheerCopy: "",
         nextCopy: "최고 단계 달성! 울대 레전드 전용 프레임과 칭호가 적용 중이에요 👑",
         levelUpCopy: "온도 50° 돌파! 최고 등급 '울대 레전드' 전용 프레임과 칭호가 해금됐어요 👑",
         displayTemp: t.toFixed(1),
@@ -3464,7 +3474,7 @@
       el.setAttribute("data-tier", String(tierInfo.tier));
       el.innerHTML = `
         <span>${escHtml(tierInfo.levelUpCopy)}</span>
-        <button type="button" onclick="this.parentElement.remove()" style="border:none; background:none; color:inherit; font-size:15px; font-weight:800; cursor:pointer; padding:0 4px;">✕</button>
+        <button type="button" onclick="dismissHomeTierNotice('levelup'); this.parentElement.remove();" style="border:none; background:none; color:inherit; font-size:15px; font-weight:800; cursor:pointer; padding:0 4px;">✕</button>
       `;
       clearTimeout(_tierToastTimer);
       _tierToastTimer = setTimeout(() => {
@@ -3484,35 +3494,83 @@
       const prevTier = parseInt(prevRaw, 10);
       if (Number.isFinite(prevTier) && tierInfo.tier > prevTier) {
         localStorage.setItem(storageKey, String(tierInfo.tier));
+        state.home_levelup_tier = tierInfo.tier;
         showTierLevelUpBanner(tierInfo);
       } else if (Number.isFinite(prevTier) && tierInfo.tier !== prevTier) {
         localStorage.setItem(storageKey, String(tierInfo.tier));
+        state.home_levelup_tier = null;
       }
     }
 
+    function dismissHomeTierNotice(mode, tierNum) {
+      const uid = String(state.user_id || "");
+      const today = getTodayStr();
+      if (mode === "levelup") {
+        state.home_levelup_tier = null;
+        const b = document.getElementById("tier-levelup-banner");
+        if (b) b.remove();
+      } else if (mode === "cheer") {
+        localStorage.setItem(`uldaemo_cheer_hide_${uid}_${tierNum}_${today}`, "1");
+      } else if (mode === "tier1") {
+        state.hide_tier1_home_card = true;
+      }
+      render();
+    }
+
+    function scrollToHomeFeedList() {
+      const el = document.getElementById("home-feed-list-wrap");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // 홈 탭 조건부 배너: 상시 온도 카드/숫자 노출 금지!
+    // 오직 1) 레벨업 직후(1회), 2) 새내기(tier 1) 행동 유도 카드, 3) 다음 단계 2° 이내 응원 한 줄(일 1회)만 노출
     function renderHomeTierCard() {
-      const tempVal = resolveUserTempForTier(state.user_id);
+      const uid = String(state.user_id || "");
+      if (!uid) return "";
+      const tempVal = resolveUserTempForTier(uid);
       const tInfo = getTierByTemp(tempVal);
-      const todayUsed = getTodayMyPostCount(state.user_id);
-      const remainPosts = Math.max(0, tInfo.dailyLimit - todayUsed);
-      return `
-        <div class="home-tier-card" data-tier="${tInfo.tier}">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span class="tier-badge-pill is-self" data-tier="${tInfo.tier}" style="background:#FFFFFF;">${tInfo.tier === 5 ? '👑 ' : ''}${escHtml(tInfo.name)}</span>
-              ${tInfo.roleLabel ? `<span style="font-size:11.5px; font-weight:700; color:var(--tier-text);">· ${escHtml(tInfo.roleLabel)}</span>` : ''}
+      const today = getTodayStr();
+
+      // 1) 레벨업 직후 (티어 경계를 넘었을 때 1회만 노출)
+      if (state.home_levelup_tier && Number(state.home_levelup_tier) === tInfo.tier) {
+        return `
+          <div class="home-tier-card" data-tier="${tInfo.tier}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <span style="font-size:13.5px; font-weight:800; color:var(--tier-text); line-height:1.4;">${escHtml(tInfo.levelUpCopy)}</span>
+            <button type="button" onclick="dismissHomeTierNotice('levelup', ${tInfo.tier})" aria-label="닫기" style="border:none; background:none; color:var(--tier-text); font-size:16px; font-weight:800; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
+          </div>
+        `;
+      }
+
+      // 2) 새내기 구간 (tier 1): 온도 숫자 대신 행동 유도 카드 ("번개 한 번이면 36.5° 달성" + [오늘의 번개 보러 가기] 버튼)
+      if (tInfo.tier === 1) {
+        if (state.hide_tier1_home_card) return "";
+        return `
+          <div class="home-tier-card" data-tier="1" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              <span class="tier-badge-pill" data-tier="1" style="background:#FFFFFF;">새내기</span>
+              <span style="font-size:13.5px; font-weight:800; color:var(--tier-text);">번개 한 번이면 36.5° 달성</span>
             </div>
-            <div style="display:flex; align-items:baseline; gap:6px;">
-              <span style="font-size:11.5px; color:var(--tier-text); opacity:0.85; font-weight:600;">오늘 번개 ${remainPosts}/${tInfo.dailyLimit}회</span>
-              <span style="font-size:18px; font-weight:800; color:${tInfo.tier === 1 ? 'var(--tier-text)' : 'var(--tier-accent)'}; letter-spacing:-0.02em;">${tInfo.displayTemp}°C</span>
+            <div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+              <button type="button" onclick="scrollToHomeFeedList()" style="border:none; background:var(--tier-accent); color:#FFFFFF; font-size:12px; font-weight:700; padding:6px 12px; border-radius:999px; cursor:pointer;">오늘의 번개 보러 가기</button>
+              <button type="button" onclick="dismissHomeTierNotice('tier1', 1)" aria-label="닫기" style="border:none; background:none; color:var(--tier-text); font-size:15px; font-weight:700; cursor:pointer; padding:2px 4px;">✕</button>
             </div>
           </div>
-          <div style="height:6px; background:rgba(25,31,40,0.08); border-radius:999px; overflow:hidden; margin:8px 0 7px;">
-            <div style="width:${tInfo.gaugePct}%; height:100%; background:${tInfo.tier === 5 ? 'linear-gradient(90deg, #1E6B52 0%, #C9A227 100%)' : 'var(--tier-accent)'}; border-radius:999px; transition:width 0.4s ease;"></div>
+        `;
+      }
+
+      // 3) 다음 단계까지 2° 이내일 때 응원 한 줄 (같은 티어에서 하루 1회까지만, 닫으면 당일 재노출 금지)
+      if (tInfo.nextTemp !== null && tInfo.remainTemp > 0 && tInfo.remainTemp <= 2.0) {
+        const hideKey = `uldaemo_cheer_hide_${uid}_${tInfo.tier}_${today}`;
+        if (localStorage.getItem(hideKey) === "1") return "";
+        return `
+          <div class="home-tier-card" data-tier="${tInfo.tier}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px;">
+            <span style="font-size:13px; font-weight:700; color:var(--tier-text);">${escHtml(tInfo.cheerCopy)}</span>
+            <button type="button" onclick="dismissHomeTierNotice('cheer', ${tInfo.tier})" aria-label="닫기" style="border:none; background:none; color:var(--tier-text); font-size:15px; font-weight:700; cursor:pointer; padding:0 4px; flex-shrink:0;">✕</button>
           </div>
-          <div style="font-size:12px; font-weight:600; color:var(--tier-text); line-height:1.35;">${escHtml(tInfo.nextCopy)}</div>
-        </div>
-      `;
+        `;
+      }
+
+      return "";
     }
 
     function renderTempGauge(temp, showLabel = true) {
@@ -4298,7 +4356,7 @@
               ${navItems.map(n => {
                 const on = isActiveNav(n.key);
                 return `
-                  <button class="side-nav-btn ${on ? 'active' : ''}" onclick="switchTab('${n.key}')">
+                  <button class="side-nav-btn ${on ? 'active' : ''}" data-nav-key="${n.key}" onclick="switchTab('${n.key}')">
                     <span class="side-nav-icon">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${on ? '#191F28' : '#8B95A1'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.iconSvg}</svg>
                     </span>
@@ -4318,7 +4376,7 @@
                 <span class="tier-avatar-frame is-self" style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${currentUser.avatar.split(" ")[0]}</span>
                 <div style="min-width:0; flex:1;">
                   <div style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(currentUser.nickname)}</div>
-                  <div style="font-size:12px; color:var(--tier-text); font-weight:700;">${myTierInfo.displayTemp}°C · ${escHtml(myTierInfo.name)}</div>
+                  <div style="font-size:12px; color:var(--tier-text); font-weight:700;">${myTierInfo.tier === 5 ? '👑 ' : ''}${escHtml(myTierInfo.name)}${myTierInfo.roleLabel ? ` · ${escHtml(myTierInfo.roleLabel)}` : ''}</div>
                 </div>
               </div>
             </div>
@@ -6671,8 +6729,10 @@
       }
       return activeChats.map(room => {
         const { post, partnerId, otherIds, totalMembers, unreadInRoom, lastMsg } = room;
-        const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
-        const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+        const partner = DB.users[partnerId] || { avatar: "🐶", nickname: "학우", department: "울산대", manner_temp: 36.5 };
+        const partnerRawTemp = (DB.users[partnerId] && DB.users[partnerId].manner_temp !== undefined) ? resolveUserTempForTier(partnerId) : partner.manner_temp;
+        const partnerTier = getTierByTemp(partnerRawTemp);
+        const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : "학우").join(", ");
         const previewText = lastMsg
           ? (lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : lastMsg.text)
           : `${otherNames || partner.nickname}님과 첫 인사를 나눠보세요`;
@@ -6688,8 +6748,9 @@
               ${totalMembers > 2 ? `<span style="position:absolute; bottom:-2px; right:-2px; background:#191F28; color:#FFFFFF; font-size:11px; font-weight:700; min-width:20px; height:20px; padding:0 4px; border-radius:999px; border:2px solid #FFFFFF; display:inline-flex; align-items:center; justify-content:center;">${totalMembers}</span>` : ""}
             </div>
             <div style="min-width:0; flex:1;">
-              <div style="display:flex; align-items:baseline; gap:6px; min-width:0;">
+              <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
                 <span style="font-weight:700; font-size:15px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
+                <span class="tier-temp-chip" data-tier="${partnerTier.tier}" style="font-size:11px; padding:1px 7px;">${partnerTier.displayTemp}°C${partnerTier.roleLabel ? ` · ${escHtml(partnerTier.roleLabel)}` : ''}</span>
                 <span style="font-size:12px; color:#8B95A1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(post.location)} · ${escHtml(previewTime)}</span>
               </div>
               <div style="font-size:14px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '600' : '400'}; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
@@ -6796,11 +6857,20 @@
             <button type="button" class="tk-room-back press-flat" onclick="backToChatList()" title="목록으로">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
             </button>
-            <span class="tk-room-avatar">${partner.avatar.split(" ")[0]}</span>
-            <div style="min-width:0; flex:1;">
-              <div style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</div>
-              <div class="tk-room-sub">${escHtml(post.title)} · ${escHtml(post.location)}</div>
-            </div>
+            ${(() => {
+              const pRawTemp = (DB.users[partnerId] && DB.users[partnerId].manner_temp !== undefined) ? resolveUserTempForTier(partnerId) : partner.manner_temp;
+              const pTier = getTierByTemp(pRawTemp);
+              return `
+                <span class="tk-room-avatar tier-avatar-frame" data-tier="${pTier.tier}">${partner.avatar.split(" ")[0]}</span>
+                <div style="min-width:0; flex:1;">
+                  <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
+                    <span style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
+                    <span class="tier-temp-chip" data-tier="${pTier.tier}" style="font-size:11px; padding:1px 7px;">${pTier.displayTemp}°C${pTier.roleLabel ? ` · ${escHtml(pTier.roleLabel)}` : ''}</span>
+                  </div>
+                  <div class="tk-room-sub">${escHtml(post.title)} · ${escHtml(post.location)}</div>
+                </div>
+              `;
+            })()}
             <button type="button" class="tk-room-top-btn" style="color:#287D62; border-color:#C5E6D6; background:#EEF8F3; font-weight:700;" onclick="triggerAiIcebreaker(${post.id})" title="AI 대화 주제 추천">대화 주제 추천</button>
             <button type="button" class="tk-room-top-btn" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">평가·신고</button>
             <button type="button" class="tk-room-top-btn only-pc" onclick="backToChatList()">닫기</button>
