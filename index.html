@@ -1070,13 +1070,37 @@
       position: absolute;
       left: 50%;
       top: 50%;
-      transform-origin: 0 0;
-      font-size: 12.5px;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    .roulette-label-inner {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      transform: translate(-50%, -50%);
+      transition: transform 2.8s cubic-bezier(0.15, 0.85, 0.25, 1);
+      font-size: 11px;
       font-weight: 800;
       color: #191F28;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid #E5EAE7;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
       white-space: nowrap;
-      pointer-events: none;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
+    }
+    .tk-boost-badge {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #1E6B52;
+      background: #DDF0E7;
+      border: 1px solid #287D62;
+      padding: 2px 7px;
+      border-radius: 6px;
+      flex-shrink: 0;
     }
     .roulette-center-btn {
       position: absolute;
@@ -5516,6 +5540,7 @@
           <div class="tk-feed-body">
             <div class="tk-feed-title-row">
               ${isOfficial ? `<span class="tk-official-badge">공식</span>` : ''}
+              ${post.is_boosted ? `<span class="tk-boost-badge">⚡ 부스트</span>` : ''}
               ${getPostTimeChip(post)}
               <span class="tk-feed-title">${escHtml(post.title)}</span>
             </div>
@@ -5579,7 +5604,8 @@
 
       // 인원이 꽉 찬 마감 번개는 피드 맨 아래로 내리기
       list.sort((a, b) => (isPostFull(a) ? 1 : 0) - (isPostFull(b) ? 1 : 0));
-      // 공식 번개는 모집 중일 때 상단 우선권 부여
+      // 부스트 번개 및 공식 번개는 모집 중일 때 상단 우선권 부여
+      list.sort((a, b) => ((b.is_boosted && !isPostFull(b)) ? 1 : 0) - ((a.is_boosted && !isPostFull(a)) ? 1 : 0));
       list.sort((a, b) => (b.is_official && !isPostFull(b) ? 1 : 0) - (a.is_official && !isPostFull(a) ? 1 : 0));
       return list;
     }
@@ -5827,11 +5853,16 @@
         <h3 style="margin-bottom:6px; font-size:20px; font-weight:800; color:#191F28;">번개 올리기</h3>
         ${(() => {
           const myTier = getTierByTemp(resolveUserTempForTier(state.user_id));
+          const uObj = DB.users[state.user_id] || {};
+          const extraCnt = Number(uObj.extra_post_coupons || 0);
+          const boostCnt = Number(uObj.boost_coupons || 0);
           const used = getTodayMyPostCount(state.user_id);
-          const rem = Math.max(0, myTier.dailyLimit - used);
+          const totalLimit = myTier.dailyLimit + extraCnt;
+          const rem = Math.max(0, totalLimit - used);
           return `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
             <div class="privacy-badge" style="margin:0;"><span>🛡️</span><span>수락 전까지 내 정보는 숨겨져요</span></div>
-            <span class="tier-badge-pill is-self" data-tier="${myTier.tier}">${escHtml(myTier.name)} · 오늘 개설 가능 ${rem}/${myTier.dailyLimit}회</span>
+            <span class="tier-badge-pill is-self" data-tier="${myTier.tier}">${escHtml(myTier.name)} · 오늘 개설 가능 ${rem}/${totalLimit}회${extraCnt > 0 ? ` (추가권 +${extraCnt})` : ''}</span>
+            ${boostCnt > 0 ? `<span class="tier-badge-pill" data-tier="3">⚡ 상단 부스트권 ${boostCnt}개 보유</span>` : ''}
           </div>`;
         })()}
 
@@ -5934,9 +5965,20 @@
       if (!category || !location || !style) return showToast("카테고리, 장소, 성향 태그를 모두 입력해주세요.");
 
       const myTier = getTierByTemp(resolveUserTempForTier(state.user_id));
+      const meUser = DB.users[state.user_id];
+      const extraCoupons = meUser ? Number(meUser.extra_post_coupons || 0) : 0;
       const todayCount = getTodayMyPostCount(state.user_id);
-      if (!isCurrentUserAdmin() && todayCount >= myTier.dailyLimit) {
-        return showToast(`${myTier.name} 단계는 하루 ${myTier.dailyLimit}번까지 번개를 열 수 있어요. (${myTier.nextCopy})`);
+      if (!isCurrentUserAdmin() && todayCount >= (myTier.dailyLimit + extraCoupons)) {
+        return showToast(`${myTier.name} 단계는 하루 ${myTier.dailyLimit}번까지 번개를 열 수 있어요. (광장 룰렛에서 추가 개설권을 얻을 수 있어요)`);
+      }
+      if (!isCurrentUserAdmin() && todayCount >= myTier.dailyLimit && meUser && extraCoupons > 0) {
+        meUser.extra_post_coupons = Math.max(0, extraCoupons - 1);
+      }
+      let useBoost = false;
+      if (state.prefill_boost && meUser && Number(meUser.boost_coupons || 0) > 0) {
+        meUser.boost_coupons = Math.max(0, Number(meUser.boost_coupons || 0) - 1);
+        useBoost = true;
+        state.prefill_boost = false;
       }
 
       const newId = Date.now();
@@ -5951,6 +5993,7 @@
         max_participants: max_p,
         meeting_style: style,
         is_official: is_official,
+        is_boosted: useBoost,
         status: "모집중"
       });
       notifyFavCategory(DB.posts[0]);
@@ -6376,35 +6419,157 @@
       render();
     }
 
+    // 실용 인앱 혜택으로 개편된 리워드 룰렛 6종
     const REWARD_WHEEL_ITEMS = [
-      { label: "응모권+2", full: "아메리카노 응모권 +2장 당첨!", type: "ticket", val: 2 },
-      { label: "리워드+20점", full: "이달의 활동 리워드 점수 +20점!", type: "score", val: 20 },
-      { label: "리워드+10점", full: "이달의 활동 리워드 점수 +10점!", type: "score", val: 10 },
-      { label: "티켓+1", full: "보너스 티켓 +1장 (한 번 더!)", type: "ticket", val: 1 },
-      { label: "리워드+15점", full: "이달의 활동 리워드 점수 +15점!", type: "score", val: 15 },
-      { label: "리워드+5점", full: "오늘의 행운 리워드 점수 +5점!", type: "score", val: 5 }
+      { label: "상단부스트+1", short: "번개부스트", full: "⚡ 내 번개 상단 부스트권 +1개 당첨! (홈 피드 상단 강조)", desc: "내가 만든 번개를 홈 피드 최상단에 강조 노출해요", type: "boost", val: 1 },
+      { label: "추가개설+1", short: "추가개설권", full: "➕ 일일 번개 추가 개설권 +1회 당첨!", desc: "오늘 하루 티어 개설 한도를 +1회 늘려줘요", type: "extra_post", val: 1 },
+      { label: "매너+0.1°C", short: "온도+0.1°", full: "🌡️ 성실 활동 보너스 매너온도 +0.1°C 상승!", desc: "다음 티어 승급을 앞당겨주는 활동 보너스예요", type: "temp", val: 0.1 },
+      { label: "응모권+2장", short: "응모권+2", full: "☕ 이달의 커피 기프티콘 응모권 +2장 당첨!", desc: "월간 커피 쿠폰 추첨 및 룰렛에 사용해요", type: "ticket", val: 2 },
+      { label: "부스트+점수", short: "부스트+10점", full: "⚡ 번개 부스트권 +1개 & 챌린지 +10점 당첨!", desc: "번개 상단 노출권과 월간 랭킹 점수를 함께 받았어요", type: "boost_score", val: 1, score: 10 },
+      { label: "티켓+1(한번더)", short: "한번더+1", full: "🎟️ 보너스 티켓 +1장 (무료로 한 번 더 돌리기!)", desc: "티켓 소모 없이 한 번 더 돌릴 수 있어요", type: "ticket", val: 1 }
     ];
 
-    const MENU_WHEEL_ITEMS_SOLO = [
-      { label: "🍚 학생회관 학식", full: "🍚 22호관 학생회관 가성비 학식", loc: "22호관 학생회관" },
-      { label: "🍖 바사 국밥", full: "🍖 바보사거리 뜨끈한 돼지국밥", loc: "22호관 학생회관" },
-      { label: "🍔 수제버거", full: "🍔 육즙 가득 수제버거 & 감튀", loc: "22호관 학생회관" },
-      { label: "🍜 라멘·돈까스", full: "🍜 바보사거리 일본식 라멘 & 돈까스", loc: "22호관 학생회관" },
-      { label: "🍲 마라탕", full: "🍲 1인 마라탕 & 꿔바로우", loc: "22호관 학생회관" },
-      { label: "🥪 샌드위치·샐러드", full: "🥪 신선한 샌드위치 & 샐러드팩", loc: "22호관 학생회관" }
+    // 울산대 실제 학식 + 무거동·바보사거리 맛집 30여 종 유동적 메뉴 풀
+    const CAMPUS_DYNAMIC_MENU_POOL = [
+      // 혼밥 · 가성비 · 학식
+      { label: "학생회관 학식", short: "학생회관학식", full: "22호관 학생회관 가성비 학식", loc: "22호관 학생회관", tags: ["solo", "all"] },
+      { label: "청운학사 학식", short: "청운학사학식", full: "청운학사 무거관 기숙사 식당 오늘의 메뉴", loc: "청운학사(기숙사)", tags: ["solo", "all"] },
+      { label: "바사 돼지국밥", short: "돼지국밥", full: "바보사거리 뜨끈한 돼지국밥 & 수육백반", loc: "22호관 학생회관", tags: ["solo", "soup", "all"] },
+      { label: "가무댕댕 카레", short: "일본카레", full: "무거동 가무댕댕 진한 일본식 수제 카레", loc: "22호관 학생회관", tags: ["solo", "group", "all"] },
+      { label: "1인 마라탕", short: "마라탕", full: "내 취향대로 담는 얼큰 마라탕 & 꿔바로우", loc: "22호관 학생회관", tags: ["solo", "group", "soup", "all"] },
+      { label: "수제버거 세트", short: "수제버거", full: "육즙 가득 바보사거리 수제버거 & 감자튀김", loc: "22호관 학생회관", tags: ["solo", "all"] },
+      { label: "포케·샐러드볼", short: "포케·샐러드", full: "가볍고 든든한 연어·우삼겹 포케 & 샐러드", loc: "36호관 서점 및 북카페", tags: ["solo", "all"] },
+      { label: "서브웨이 샌드위치", short: "샌드위치", full: "공강 30분 컷! 신선한 샌드위치 & 쿠키", loc: "22호관 학생회관", tags: ["solo", "all"] },
+      { label: "돈코츠 라멘", short: "일본라멘", full: "진한 육수의 일본식 돈코츠 라멘 & 차슈추가", loc: "22호관 학생회관", tags: ["solo", "soup", "all"] },
+      { label: "가츠동·규동", short: "일식덮밥", full: "바삭한 등심 돈까스 덮밥(가츠동) & 규동", loc: "22호관 학생회관", tags: ["solo", "all"] },
+      { label: "숯불갈비 덮밥", short: "갈비덮밥", full: "단짠단짠 불향 가득 숯불갈비 덮밥", loc: "22호관 학생회관", tags: ["solo", "all"] },
+      { label: "양지 쌀국수", short: "베트남쌀국수", full: "속이 확 풀리는 뜨끈한 베트남 양지 쌀국수", loc: "22호관 학생회관", tags: ["solo", "soup", "all"] },
+
+      // 2~3명 · 인기 맛집
+      { label: "돌돌파스타", short: "돌돌파스타", full: "무거동 인기 맛집 돌돌파스타 & 화덕피자", loc: "22호관 학생회관", tags: ["group", "all"] },
+      { label: "하루 무거점 초밥", short: "모둠초밥", full: "하루 무거점 신선한 연어·모둠초밥 & 우동", loc: "22호관 학생회관", tags: ["solo", "group", "all"] },
+      { label: "안동찜닭·당면", short: "안동찜닭", full: "매콤달콤 안동찜닭에 납작당면·치즈토핑", loc: "22호관 학생회관", tags: ["group", "all"] },
+      { label: "즉석떡볶이·튀김", short: "즉석떡볶이", full: "보글보글 즉석떡볶이 & 김말이·순대 세트", loc: "22호관 학생회관", tags: ["group", "all"] },
+      { label: "바사 삼겹살·목살", short: "삼겹살구이", full: "바보사거리 노릇노릇 삼겹살 & 된장찌개", loc: "22호관 학생회관", tags: ["group", "all"] },
+      { label: "바삭 치킨·치밥", short: "치킨·치밥", full: "갓 튀긴 바삭한 치킨 & 양념 치밥", loc: "22호관 학생회관", tags: ["group", "all"] },
+      { label: "춘천 닭갈비", short: "철판닭갈비", full: "치즈 듬뿍 철판 닭갈비 & 깍두기 볶음밥", loc: "22호관 학생회관", tags: ["group", "all"] },
+      { label: "샤브샤브·칼국수", short: "샤브샤브", full: "소고기 샤브샤브 & 칼국수·죽 코스", loc: "22호관 학생회관", tags: ["group", "soup", "all"] },
+      { label: "직화 쭈꾸미볶음", short: "쭈꾸미볶음", full: "매콤 불향 직화 쭈꾸미 비빔밥 & 계란찜", loc: "22호관 학생회관", tags: ["group", "all"] },
+
+      // 국물 · 해장 특화
+      { label: "해물 순두부찌개", short: "순두부찌개", full: "뚝배기에 보글보글 끓인 얼큰 해물 순두부찌개", loc: "22호관 학생회관", tags: ["solo", "soup", "all"] },
+      { label: "의정부 부대찌개", short: "부대찌개", full: "햄·소시지 가득 의정부식 부대찌개 & 라면사리", loc: "22호관 학생회관", tags: ["group", "soup", "all"] },
+      { label: "바지락 칼국수", short: "바지락칼국수", full: "시원한 국물의 손칼국수 & 왕만두", loc: "22호관 학생회관", tags: ["solo", "group", "soup", "all"] },
+      { label: "얼큰 뼈해장국", short: "뼈해장국", full: "살코기 듬뿍 얼큰 뼈해장국 & 감자탕", loc: "22호관 학생회관", tags: ["solo", "group", "soup", "all"] },
+
+      // 카페 · 디저트 · 공강 간식
+      { label: "싱귤러커피 디저트", short: "싱귤러커피", full: "무거동 싱귤러커피 시그니처 라떼 & 크로플", loc: "36호관 서점 및 북카페", tags: ["cafe", "all"] },
+      { label: "라파르테 케이크", short: "라파르테", full: "라파르테 수제 조각케이크 & 아메리카노", loc: "36호관 서점 및 북카페", tags: ["cafe", "all"] },
+      { label: "북카페 아메리카노", short: "북카페커피", full: "36호관 북카페 시원한 아이스 아메리카노 & 베이글", loc: "36호관 서점 및 북카페", tags: ["cafe", "all"] },
+      { label: "요거트 아이스크림", short: "요거트볼", full: "생과일·벌집꿀 토핑 듬뿍 요거트 아이스크림", loc: "36호관 서점 및 북카페", tags: ["cafe", "all"] },
+      { label: "벨기에 와플·커피", short: "와플·커피", full: "생크림 사과잼 와플 & 공강 수다 타임", loc: "36호관 서점 및 북카페", tags: ["cafe", "all"] },
+      { label: "코노 & 스무디", short: "코노·스무디", full: "바보사거리 코인노래방 3곡 & 시원한 스무디", loc: "22호관 학생회관", tags: ["cafe", "all"] }
     ];
 
-    const MENU_WHEEL_ITEMS_GROUP = [
-      { label: "🍕 피자·파스타", full: "🍕 바보사거리 화덕피자 & 파스타", loc: "22호관 학생회관" },
-      { label: "🍗 치킨·치밥", full: "🍗 바삭한 치킨 & 치밥 세트", loc: "22호관 학생회관" },
-      { label: "🥘 찜닭·닭볶음탕", full: "🥘 매콤달콤 안동찜닭 & 당면사리", loc: "22호관 학생회관" },
-      { label: "🥓 삼겹살·고깃집", full: "🥓 불판 위 노릇노릇 삼겹살 번개", loc: "22호관 학생회관" },
-      { label: "🍲 즉석 떡볶이", full: "🍲 보글보글 즉석 떡볶이 & 튀김", loc: "22호관 학생회관" },
-      { label: "🍱 퓨전 덮밥", full: "🍱 다함께 즐기는 퓨전 일식 덮밥", loc: "22호관 학생회관" }
-    ];
+    function getTodayCafeteriaRouletteItem() {
+      try {
+        const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
+        const days = (data && data.days) || [];
+        const todayIdx = getCafeteriaTodayIdx();
+        const dayData = days[todayIdx] || days[0];
+        if (!dayData) return null;
+        const hour = new Date().getHours();
+        const mealKey = hour < 10 ? "breakfast" : (hour < 14 ? "lunch" : "dinner");
+        const mealList = dayData[mealKey] || dayData.lunch || [];
+        const mainDishes = mealList.filter(it => !it.startsWith("[") && it !== "쌀밥" && !it.includes("김치") && !it.includes("단무지"));
+        if (!mainDishes.length) return null;
+        const dishPreview = mainDishes.slice(0, 2).map(s => s.replace(/\([^)]*\)/g, "").trim()).join("·");
+        return {
+          label: `오늘학식(${dishPreview.slice(0, 6)})`,
+          short: "오늘의학식",
+          full: `청운학사 오늘의 학식 (${dishPreview})`,
+          loc: "청운학사(기숙사)",
+          tags: ["solo", "all"]
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function buildMenuBoardForTheme(theme, forceShuffle = false) {
+      const curTheme = theme || state.menu_people_filter || "all";
+      if (curTheme === "custom") {
+        if (!Array.isArray(state.custom_roulette_menus) || state.custom_roulette_menus.length < 2) {
+          state.custom_roulette_menus = [
+            { label: "학생회관 학식", short: "학생회관학식", full: "22호관 학생회관 학식", loc: "22호관 학생회관" },
+            { label: "바사 돼지국밥", short: "돼지국밥", full: "바보사거리 돼지국밥", loc: "22호관 학생회관" },
+            { label: "1인 마라탕", short: "마라탕", full: "얼큰 1인 마라탕", loc: "22호관 학생회관" },
+            { label: "돌돌파스타", short: "돌돌파스타", full: "무거동 돌돌파스타", loc: "22호관 학생회관" },
+            { label: "가무댕댕 카레", short: "일본카레", full: "무거동 가무댕댕 카레", loc: "22호관 학생회관" },
+            { label: "서브웨이", short: "서브웨이", full: "서브웨이 샌드위치", loc: "22호관 학생회관" }
+          ];
+        }
+        return state.custom_roulette_menus.slice(0, 6);
+      }
+
+      if (!forceShuffle && Array.isArray(state.active_menu_board) && state.active_menu_board.length === 6 && state.active_menu_board_theme === curTheme) {
+        return state.active_menu_board;
+      }
+
+      const pool = CAMPUS_DYNAMIC_MENU_POOL.filter(m => m.tags.includes(curTheme));
+      const todayCafe = getTodayCafeteriaRouletteItem();
+      const candidates = [...pool];
+      if (todayCafe && (curTheme === "all" || curTheme === "solo")) {
+        candidates.unshift(todayCafe);
+      }
+
+      // Fisher-Yates shuffle
+      const shuffled = [...candidates];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = shuffled[i];
+        shuffled[i] = shuffled[j];
+        shuffled[j] = tmp;
+      }
+
+      // If today's live cafeteria menu exists and we're in 'solo' or 'all', include it in one of the 6 slots
+      let picked = shuffled.slice(0, 6);
+      if (todayCafe && (curTheme === "solo" || curTheme === "all") && !picked.some(x => x.short === "오늘의학식")) {
+        picked[0] = todayCafe;
+      }
+      state.active_menu_board = picked;
+      state.active_menu_board_theme = curTheme;
+      return picked;
+    }
 
     function getActiveMenuItems() {
-      return (state.menu_people_filter === "group") ? MENU_WHEEL_ITEMS_GROUP : MENU_WHEEL_ITEMS_SOLO;
+      return buildMenuBoardForTheme(state.menu_people_filter || "all", false);
+    }
+
+    function changeMenuTheme(themeKey) {
+      state.menu_people_filter = themeKey;
+      state.last_roulette_win_idx = null;
+      buildMenuBoardForTheme(themeKey, true);
+      render();
+    }
+
+    function shuffleMenuRoulette() {
+      state.last_roulette_win_idx = null;
+      buildMenuBoardForTheme(state.menu_people_filter || "all", true);
+      showToast("🎲 새로운 공강 메뉴 6가지로 메뉴판을 바꿨어요!");
+      render();
+    }
+
+    function updateCustomMenuSlot(idx, val) {
+      if (!Array.isArray(state.custom_roulette_menus)) buildMenuBoardForTheme("custom", false);
+      const clean = String(val || "").trim().slice(0, 14) || `메뉴 ${idx + 1}`;
+      state.custom_roulette_menus[idx] = {
+        label: clean,
+        short: clean.slice(0, 6),
+        full: `${clean} (직접 입력 메뉴)`,
+        loc: "22호관 학생회관"
+      };
+      render();
     }
 
     let _isSpinningRoulette = false;
@@ -6420,7 +6585,7 @@
       if (mode === "reward") {
         const curTickets = (u.coffee_tickets !== undefined) ? u.coffee_tickets : st.coffeeTickets;
         if (curTickets <= 0) {
-          return showToast("보유한 돌림판 티켓이 없습니다! 출석 도장을 찍거나 번개에 참여해 티켓을 모아보세요.");
+          return showToast("보유한 돌림판 티켓이 없어요! 위 출석체크를 누르거나 번개에 참여해 티켓을 받아보세요.");
         }
         u.coffee_tickets = Math.max(0, curTickets - 1);
       }
@@ -6437,24 +6602,47 @@
       if (wheelEl) {
         _isSpinningRoulette = true;
         wheelEl.style.transform = `rotate(${_currentWheelDeg}deg)`;
+        // 원판 안의 모든 글자를 반대 각도로 동시 역회전시켜 언제나 수평(0도) 정방향 유지!
+        wheelEl.querySelectorAll(".roulette-label-inner").forEach(innerEl => {
+          const baseAngle = parseFloat(innerEl.getAttribute("data-base-angle") || "0");
+          innerEl.style.transform = `translate(-50%, -50%) rotate(${-(baseAngle + _currentWheelDeg)}deg)`;
+        });
       }
 
       setTimeout(() => {
         _isSpinningRoulette = false;
+        state.last_roulette_win_idx = winIdx;
         const won = items[winIdx];
         if (mode === "reward") {
-          if (won.type === "score") {
-            u.bonus_score = (u.bonus_score || 0) + won.val;
+          if (won.type === "boost") {
+            u.boost_coupons = (u.boost_coupons || 0) + won.val;
+            u.bonus_score = (u.bonus_score || 0) + 5;
+          } else if (won.type === "extra_post") {
+            u.extra_post_coupons = (u.extra_post_coupons || 0) + won.val;
+            u.bonus_score = (u.bonus_score || 0) + 5;
+          } else if (won.type === "temp") {
+            const weekKey = "uldaemo_roulette_temp_" + state.user_id;
+            const gainedSoFar = parseFloat(localStorage.getItem(weekKey) || "0");
+            if (gainedSoFar < 0.3) {
+              u.manner_temp = Math.min(60, Math.round(((u.manner_temp || 36.5) + 0.1) * 10) / 10);
+              localStorage.setItem(weekKey, String(+(gainedSoFar + 0.1).toFixed(1)));
+            }
+            u.bonus_score = (u.bonus_score || 0) + 10;
+          } else if (won.type === "boost_score") {
+            u.boost_coupons = (u.boost_coupons || 0) + won.val;
+            u.bonus_score = (u.bonus_score || 0) + (won.score || 10);
           } else if (won.type === "ticket") {
             u.coffee_tickets = (u.coffee_tickets || 0) + won.val;
           }
           u.updated_at = Date.now();
-          state.last_roulette_result = `[리워드 당첨] ${won.full}`;
-          showToast(`돌림판 당첨! ${won.full}`);
+          state.last_roulette_result = won.full;
+          state.last_roulette_desc = won.desc || "";
+          showToast(`🎉 ${won.full}`);
         } else {
-          state.last_roulette_result = `[오늘의 추천 메뉴] ${won.full}`;
+          state.last_roulette_result = won.full;
+          state.last_roulette_desc = `추천 장소: ${won.loc || '22호관 학생회관'}`;
           state.last_roulette_menu = won;
-          showToast(`오늘의 공강 메뉴 추천: ${won.full}!`);
+          showToast(`🍴 오늘의 추천 메뉴: ${won.full}`);
         }
         saveDB(true);
         render();
@@ -6464,17 +6652,56 @@
     function openMeetupFromRouletteMenu() {
       const m = state.last_roulette_menu;
       if (!m) return;
-      state.prefill_title = `같이 ${m.label.replace(/^[^\s]+\s/, "")} 드실 분! (돌림판 추천 🎯)`;
-      state.prefill_cat = "🍚 밥약";
+      const cleanName = String(m.label || "").replace(/^[^\w가-힣]+/, "").trim();
+      state.prefill_title = `같이 ${cleanName} 드실 분! (룰렛 추천)`;
+      state.prefill_cat = (m.tags && m.tags.includes("cafe")) ? "☕ 카공" : "🍚 밥약";
+      state.prefill_loc = m.loc || "22호관 학생회관";
       state.active_modal = "create";
       render();
     }
 
+    function useBoostCouponNow() {
+      const u = DB.users[state.user_id];
+      if (!u || Number(u.boost_coupons || 0) <= 0) {
+        return showToast("보유한 번개 상단 부스트권이 없어요. 리워드 룰렛을 돌려 획득해보세요!");
+      }
+      const myOpenPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id) && p.status === "모집중" && !isPostExpired(p));
+      if (myOpenPosts.length > 0) {
+        const targetPost = myOpenPosts[0];
+        if (targetPost.is_boosted) {
+          state.prefill_boost = true;
+          state.active_modal = "create";
+          render();
+          return showToast("새 번개를 올릴 때 자동으로 ⚡ 상단 부스트가 적용됩니다!");
+        }
+        u.boost_coupons = Math.max(0, Number(u.boost_coupons || 0) - 1);
+        targetPost.is_boosted = true;
+        targetPost.updated_at = Date.now();
+        saveDB(true);
+        showToast(`⚡ [${targetPost.title}] 번개에 상단 부스트가 적용되어 홈 피드 상단에 강조됩니다!`);
+        render();
+      } else {
+        state.prefill_boost = true;
+        state.active_modal = "create";
+        render();
+        showToast("번개를 올리면 자동으로 ⚡ 상단 부스트가 적용됩니다!");
+      }
+    }
+
     function renderStampAndRouletteCard() {
       const st = getUserStatsAndBadges(state.user_id);
+      const u = DB.users[state.user_id] || {};
+      const boostCnt = Number(u.boost_coupons || 0);
+      const extraPostCnt = Number(u.extra_post_coupons || 0);
       const stampedCnt = Math.min(7, st.streakDays);
-      const mode = state.roulette_mode || "reward";
+      const mode = state.roulette_mode || "menu";
+      const curTheme = state.menu_people_filter || "all";
       const items = mode === "reward" ? REWARD_WHEEL_ITEMS : getActiveMenuItems();
+      const circledNums = ["①", "②", "③", "④", "⑤", "⑥"];
+
+      const fullList = getMonthlyLeaderboard();
+      const myIdx = fullList.findIndex(x => x.uid === state.user_id);
+      const myRank = myIdx >= 0 ? (myIdx + 1) : fullList.length + 1;
 
       return `
         <div class="uldaemo-card" style="margin-bottom:20px; border:1px solid #E5EAE7; box-shadow:0 2px 10px rgba(0,0,0,0.03);">
@@ -6486,7 +6713,7 @@
               <span style="font-size:16px; font-weight:800; color:#191F28;">7일 연속 출석 스탬프</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:#287D62;">
-              연속 <b style="color:#191F28;">${st.streakDays}일째</b> 달성 중 🔥
+              연속 <b style="color:#191F28;">${st.streakDays}일째</b> 출석 중
             </span>
           </div>
 
@@ -6507,20 +6734,44 @@
             }).join("")}
           </div>
           <button class="btn ${st.checkedInToday ? '' : 'btn-primary'}" style="min-height:42px; font-size:13.5px; margin-bottom:18px;" onclick="handleDailyCheckin()">
-            ${st.checkedInToday ? "오늘 출석체크 완료 (내일 또 만나요!)" : "오늘 출석체크하고 리워드 티켓 받기 (+3점)"}
+            ${st.checkedInToday ? "오늘 출석체크 완료 (내일 또 만나요)" : "오늘 출석체크하고 룰렛 티켓 받기 (+3점)"}
           </button>
 
           <div style="border-top:1px solid #F2F4F3; padding-top:16px;">
+            <!-- 모드 전환 탭: 공강 메뉴 추천 vs 리워드 룰렛 -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-              <div style="display:flex; gap:6px;">
-                <button class="btn" style="width:auto; min-height:36px; padding:0 14px; font-size:12.5px; font-weight:700; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; render();">
-                  🎁 리워드 룰렛 (티켓 ${st.coffeeTickets}장)
+              <div style="display:flex; gap:6px; width:100%;">
+                <button class="btn" style="flex:1; min-height:38px; padding:0 12px; font-size:13px; font-weight:800; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; state.last_roulette_win_idx=null; render();">
+                  🍴 오늘의 공강 메뉴 룰렛
                 </button>
-                <button class="btn" style="width:auto; min-height:36px; padding:0 14px; font-size:12.5px; font-weight:700; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; render();">
-                  🍱 오늘의 공강 메뉴 추천
+                <button class="btn" style="flex:1; min-height:38px; padding:0 12px; font-size:13px; font-weight:800; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; state.last_roulette_win_idx=null; render();">
+                  🎁 혜택 리워드 룰렛 (티켓 ${st.coffeeTickets}장)
                 </button>
               </div>
             </div>
+
+            ${mode === 'menu' ? `
+              <!-- 공강 메뉴 테마 필터 & 셔플 바 -->
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+                <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                  ${[
+                    { k: 'all', label: '전체 추천' },
+                    { k: 'solo', label: '혼밥·학식' },
+                    { k: 'group', label: '2~3명 맛집' },
+                    { k: 'soup', label: '국물·해장' },
+                    { k: 'cafe', label: '카페·간식' },
+                    { k: 'custom', label: '직접 입력' }
+                  ].map(t => `
+                    <button type="button" class="quick-chip ${curTheme === t.k ? 'active' : ''}" style="padding:5px 11px; font-size:12px;" onclick="changeMenuTheme('${t.k}')">${t.label}</button>
+                  `).join("")}
+                </div>
+                ${curTheme !== 'custom' ? `
+                  <button type="button" class="btn" style="width:auto; min-height:32px; padding:0 11px; font-size:12px; font-weight:700; color:#287D62; background:#EEF8F3; border-color:#C5E6D6; border-radius:999px;" onclick="shuffleMenuRoulette()">
+                    🎲 다른 메뉴 6개 뽑기
+                  </button>
+                ` : ''}
+              </div>
+            ` : ''}
 
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items:center; gap:16px; background:#F7F9F8; border:1px solid #E5EAE7; border-radius:18px; padding:16px;">
               <div class="roulette-stage">
@@ -6528,8 +6779,16 @@
                 <div id="uldaemo-roulette-wheel" class="roulette-wheel" style="transform:rotate(${_currentWheelDeg}deg);">
                   ${items.map((it, idx) => {
                     const angle = idx * 60 + 30 - 90;
-                    const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
-                    return `<div class="roulette-label" style="transform: rotate(${angle}deg) translate(58px, 0) rotate(${-angle}deg) translate(-50%, -50%); text-align:center; font-size:11px; background:rgba(255,255,255,0.88); padding:2px 6px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">${escHtml(cleanLabel)}</div>`;
+                    const shortTxt = String(it.short || it.label || "").replace(/^[^\w가-힣+]+/, "").trim().slice(0, 6);
+                    const counterDeg = -(angle + _currentWheelDeg);
+                    return `
+                      <div class="roulette-label" style="transform: rotate(${angle}deg) translate(60px, 0);">
+                        <div class="roulette-label-inner" data-base-angle="${angle}" style="transform: translate(-50%, -50%) rotate(${counterDeg}deg);">
+                          <span style="color:#287D62;">${circledNums[idx]}</span>
+                          <span>${escHtml(shortTxt)}</span>
+                        </div>
+                      </div>
+                    `;
                   }).join("")}
                 </div>
                 <button class="roulette-center-btn" onclick="spinRouletteWheel()">
@@ -6540,40 +6799,96 @@
               <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
                   <div style="font-size:14px; font-weight:800; color:#191F28;">
-                    ${mode === 'reward' ? '🎉 캠퍼스 리워드 룰렛' : '🍴 오늘의 공강 메뉴 룰렛'}
+                    ${mode === 'reward' ? '🎁 룰렛 당첨 혜택 안내 (꽝 없음)' : (curTheme === 'custom' ? '✏️ 직접 후보 6개를 적어 돌려보세요' : '🍴 현재 원판에 올라온 메뉴 6선')}
                   </div>
-                  ${mode === 'menu' ? `
-                    <div style="display:flex; gap:4px;">
-                      <button type="button" class="quick-chip ${state.menu_people_filter !== 'group' ? 'active' : ''}" style="padding:3px 10px; font-size:11.5px;" onclick="state.menu_people_filter='solo'; render();">혼밥</button>
-                      <button type="button" class="quick-chip ${state.menu_people_filter === 'group' ? 'active' : ''}" style="padding:3px 10px; font-size:11.5px;" onclick="state.menu_people_filter='group'; render();">2~3명</button>
-                    </div>
-                  ` : ''}
                 </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:12px;">
-                  ${items.map((it, i) => {
-                    const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
-                    return `
-                      <div style="font-size:12px; font-weight:600; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:8px; padding:6px 9px; color:#191F28;">
-                        ${i + 1}. ${cleanLabel}
+
+                ${mode === 'menu' && curTheme === 'custom' ? `
+                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:12px;">
+                    ${items.map((it, i) => `
+                      <div style="display:flex; align-items:center; gap:4px; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:8px; padding:4px 8px;">
+                        <span style="font-size:12px; font-weight:800; color:#287D62;">${circledNums[i]}</span>
+                        <input type="text" value="${escHtml(it.label)}" maxlength="12" style="border:none; outline:none; width:100%; font-size:12px; font-weight:600; color:#191F28; background:transparent;" onchange="updateCustomMenuSlot(${i}, this.value)" />
                       </div>
-                    `;
-                  }).join("")}
-                </div>
+                    `).join("")}
+                  </div>
+                ` : `
+                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:12px;">
+                    ${items.map((it, i) => {
+                      const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
+                      const isWon = (state.last_roulette_win_idx === i);
+                      return `
+                        <div style="font-size:12px; font-weight:${isWon ? '800' : '600'}; background:${isWon ? '#EEF8F3' : '#FFFFFF'}; border:${isWon ? '1.5px solid #287D62' : '1px solid #E5EAE7'}; border-radius:8px; padding:7px 9px; color:${isWon ? '#1E6B52' : '#191F28'}; display:flex; align-items:center; justify-content:space-between; gap:4px;">
+                          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b style="color:#287D62; margin-right:3px;">${circledNums[i]}</b>${escHtml(cleanLabel)}</span>
+                          ${isWon ? `<span style="font-size:10px; background:#287D62; color:#FFFFFF; padding:1px 5px; border-radius:999px; flex-shrink:0;">당첨</span>` : ''}
+                        </div>
+                      `;
+                    }).join("")}
+                  </div>
+                `}
+
                 ${state.last_roulette_result ? `
-                  <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:12.5px; font-weight:700; color:#287D62;">
-                    ${escHtml(String(state.last_roulette_result).replace(/^[^\w가-힣\[]+/, "").trim())}
+                  <div style="background:#EEF8F3; border:1.5px solid #287D62; border-radius:12px; padding:12px 14px; margin-bottom:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#287D62; margin-bottom:2px;">🎯 이번 룰렛 당첨 결과</div>
+                    <div style="font-size:13.5px; font-weight:800; color:#191F28; line-height:1.4;">
+                      ${escHtml(state.last_roulette_result)}
+                    </div>
+                    ${state.last_roulette_desc ? `<div style="font-size:12px; color:#4E5968; margin-top:3px;">${escHtml(state.last_roulette_desc)}</div>` : ''}
                     ${mode === 'menu' && state.last_roulette_menu ? `
                       <div style="margin-top:8px;">
                         <button class="btn btn-primary" style="min-height:34px; padding:4px 12px; font-size:12px;" onclick="openMeetupFromRouletteMenu()">
-                          이 메뉴로 밥약 번개 만들기 →
+                          ⚡ 이 메뉴로 밥약 번개 열기 →
                         </button>
                       </div>
                     ` : ""}
                   </div>
                 ` : ""}
-                <button class="btn btn-primary" style="min-height:44px; font-size:14px;" onclick="spinRouletteWheel()">
-                  ${mode === 'reward' ? `룰렛 돌리기 (보유 티켓 ${st.coffeeTickets}장)` : `메뉴 추천 돌리기`}
+
+                <button class="btn btn-primary" style="min-height:44px; font-size:14px; font-weight:800;" onclick="spinRouletteWheel()">
+                  ${mode === 'reward' ? `🎁 리워드 룰렛 돌리기 (티켓 ${st.coffeeTickets}장)` : `🎯 공강 메뉴 룰렛 돌리기 (무료)`}
                 </button>
+              </div>
+            </div>
+
+            <!-- 내 리워드 지갑 & 사용처 한눈에 보기 (리워드의 역할 명확화) -->
+            <div style="margin-top:14px; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:16px; padding:14px 16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+                <span style="font-size:13.5px; font-weight:800; color:#191F28;">💼 내 리워드 지갑 & 사용처</span>
+                <span style="font-size:11.5px; color:#6B7684;">출석·룰렛으로 모은 아이템을 바로 쓸 수 있어요</span>
+              </div>
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px;">
+                <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="font-size:12px; font-weight:700; color:#6B7684;">⚡ 번개 상단 부스트권</div>
+                    <div style="font-size:17px; font-weight:800; color:#287D62; margin:2px 0;">${boostCnt}개</div>
+                    <div style="font-size:11px; color:#6B7684; line-height:1.35;">내 번개를 홈 피드 최상단에 강조 노출해요</div>
+                  </div>
+                  <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px; background:${boostCnt > 0 ? '#287D62' : '#FFFFFF'}; color:${boostCnt > 0 ? '#FFFFFF' : '#6B7684'}; border-color:${boostCnt > 0 ? '#287D62' : '#E5EAE7'};" onclick="useBoostCouponNow()">
+                    ${boostCnt > 0 ? '⚡ 내 번개에 바로 쓰기' : '룰렛에서 획득 가능'}
+                  </button>
+                </div>
+
+                <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="font-size:12px; font-weight:700; color:#6B7684;">➕ 오늘 추가 개설권</div>
+                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;">${extraPostCnt}개</div>
+                    <div style="font-size:11px; color:#6B7684; line-height:1.35;">일일 번개 개설 한도를 +1회 늘려줘요</div>
+                  </div>
+                  <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="state.active_modal='create'; render();">
+                    번개 열 때 자동 적용 ›
+                  </button>
+                </div>
+
+                <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="font-size:12px; font-weight:700; color:#6B7684;">☕ 커피 응모 · 이달의 랭킹</div>
+                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;">${myRank}위 <span style="font-size:12px; color:#287D62;">(${st.rewardScore}점)</span></div>
+                    <div style="font-size:11px; color:#6B7684; line-height:1.35;">이달의 활동 TOP 3 학우에게 커피 쿠폰 증정</div>
+                  </div>
+                  <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="state.profile_sec='challenge'; switchTab('마이');">
+                    이달의 랭킹 보러 가기 ›
+                  </button>
+                </div>
               </div>
             </div>
           </div>
