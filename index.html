@@ -1281,11 +1281,17 @@
       to { opacity: 1; transform: none; }
     }
 
-    .press-flat, .press-row, .tk-feed-item, .tk-menu-row, .tk-balance-opt, .cat-btn, .dock-btn, .side-nav-btn, .fab-create, .chat-room-item {
-      transition: transform 0.1s ease, background 0.15s ease, box-shadow 0.18s ease;
+    .btn, .press-flat, .press-row, .tk-feed-item, .tk-menu-row, .tk-balance-opt, .cat-btn, .quick-chip, .dock-btn, .side-nav-btn, .fab-create, .chat-room-item, .notice-item {
+      transition: transform 0.12s ease-out, background-color 0.12s ease-out, filter 0.12s ease-out, box-shadow 0.18s ease;
     }
-    .press-flat:active, .press-row:active, .tk-feed-item:active, .tk-menu-row:active, .tk-balance-opt:active, .cat-btn:active, .dock-btn:active, .side-nav-btn:active, .fab-create:active, .chat-room-item:active {
-      transform: scale(0.975);
+    .btn:not(:disabled):active, .press-flat:active, .press-row:active, .tk-feed-item:active, .tk-menu-row:active, .tk-balance-opt:active, .cat-btn:active, .quick-chip:active, .dock-btn:active, .side-nav-btn:active, .fab-create:active, .chat-room-item:active, .notice-item:active {
+      transform: scale(0.98);
+      filter: brightness(0.96);
+    }
+    /* 지도(Leaflet) 영역, 채팅 입력창, 스크롤 영역은 터치 스케일 제외 */
+    #campus-map, #campus-map *, #home-mugeo-map, #home-mugeo-map *, #detail-map, #detail-map *, #side-map, #side-map *, .leaflet-container, .leaflet-container *, .tk-chat-input, input, textarea, select, .cat-scroll-wrap, .tk-chat-messages {
+      transform: none !important;
+      filter: none !important;
     }
     .press-row:hover { background: #F7F9F8 !important; }
 
@@ -1987,20 +1993,30 @@
       color: #6B4E00;
       border: 1px solid #C9A227;
     }
+    /* 공통 온도 칩 (.temp-chip) - 크기·여백·폰트·둥근 정도·숫자 폭 통일 */
+    .temp-chip,
     .tk-feed-temp[data-tier],
     .tier-temp-chip[data-tier] {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 4px;
-      padding: 2px 8px;
+      min-width: 52px;
+      height: 22px;
+      padding: 0 8px;
       border-radius: 999px;
       font-size: 11.5px;
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
       background: var(--tier-soft);
       color: var(--tier-text);
-      line-height: 1.35;
+      line-height: 1;
       white-space: nowrap;
+      box-sizing: border-box;
+      vertical-align: middle;
     }
+    .temp-chip[data-tier="5"],
     .tk-feed-temp[data-tier="5"],
     .tier-temp-chip[data-tier="5"] {
       border: 1px solid #C9A227;
@@ -2018,6 +2034,43 @@
     .side-nav-btn.active[data-nav-key="마이"] svg {
       stroke: var(--tier-accent) !important;
     }
+    @keyframes tierPopIn {
+      0% { transform: scale(0.9); opacity: 0; }
+      65% { transform: scale(1.03); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes tierToastPopIn {
+      0% { transform: translateX(-50%) scale(0.9); opacity: 0; }
+      65% { transform: translateX(-50%) scale(1.03); opacity: 1; }
+      100% { transform: translateX(-50%) scale(1); opacity: 1; }
+    }
+    .home-tier-card.is-levelup {
+      animation: tierPopIn 0.4s cubic-bezier(.2, .8, .2, 1) forwards;
+      transform-origin: center center;
+    }
+    .levelup-temp-num {
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      color: var(--tier-accent);
+    }
+    .levelup-gauge-track {
+      width: 100%;
+      height: 7px;
+      background: rgba(25, 31, 40, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .levelup-gauge-fill {
+      height: 100%;
+      background: var(--tier-accent);
+      border-radius: 999px;
+      transition: width 0.9s cubic-bezier(.2, .8, .2, 1);
+    }
+    .home-tier-card[data-tier="5"] .levelup-gauge-fill,
+    .tier-levelup-toast[data-tier="5"] .levelup-gauge-fill {
+      background: linear-gradient(90deg, #1E6B52 0%, #C9A227 100%);
+    }
     .tier-levelup-toast {
       position: fixed;
       left: 50%;
@@ -2033,17 +2086,104 @@
       padding: 13px 16px;
       box-shadow: 0 10px 28px rgba(25, 31, 40, 0.16);
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+      flex-direction: column;
+      gap: 6px;
       font-size: 13.5px;
       font-weight: 800;
       line-height: 1.4;
-      animation: fadeIn 0.22s ease-out;
+      animation: tierToastPopIn 0.4s cubic-bezier(.2, .8, .2, 1) forwards;
     }
     .tier-levelup-toast[data-tier="5"] {
       border-color: #C9A227;
       box-shadow: 0 10px 28px rgba(201, 162, 39, 0.25);
+    }
+
+    /* 로딩 스켈레톤 UI (shimmer 1.2s linear infinite, #F2F4F6 <-> #E5E8EB) */
+    @keyframes skeletonShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .skeleton-block {
+      background: linear-gradient(90deg, #F2F4F6 25%, #E5E8EB 50%, #F2F4F6 75%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.2s linear infinite;
+      border-radius: 8px;
+    }
+    .skeleton-card {
+      padding: 16px 0;
+      border-bottom: 1px solid #F2F4F3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* 빈 상태 카피 공통 스타일 (.empty-state-box) */
+    .empty-state-box {
+      padding: 44px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .empty-state-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #F2F4F3;
+      color: #287D62;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .empty-state-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #191F28;
+      line-height: 1.35;
+    }
+    .empty-state-desc {
+      font-size: 13.5px;
+      color: #6B7684;
+      margin-top: 4px;
+      line-height: 1.45;
+    }
+    .empty-state-btn {
+      margin-top: 14px;
+      height: 38px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: none;
+      background: #287D62;
+      color: #FFFFFF;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* prefers-reduced-motion: 애니메이션 및 shimmer 비활성화 */
+    @media (prefers-reduced-motion: reduce) {
+      .home-tier-card.is-levelup,
+      .tier-levelup-toast,
+      .screen-fade {
+        animation: none !important;
+      }
+      .levelup-gauge-fill,
+      .temp-fill {
+        transition: none !important;
+      }
+      .skeleton-block {
+        animation: none !important;
+        background: #F2F4F6 !important;
+      }
+      .btn:not(:disabled):active, .press-flat:active, .press-row:active, .tk-feed-item:active, .tk-menu-row:active, .tk-balance-opt:active, .cat-btn:active, .quick-chip:active, .dock-btn:active, .side-nav-btn:active, .fab-create:active, .chat-room-item:active, .notice-item:active {
+        transform: none !important;
+      }
     }
 
   </style>
@@ -3461,8 +3601,110 @@
       }).length;
     }
 
+    function renderEmptyStateBox(iconName, title, desc, btnLabel = "", btnOnclick = "") {
+      return `
+        <div class="empty-state-box">
+          <div class="empty-state-icon">${getSvgIcon(iconName || 'sparkle', 22, '#287D62', 2)}</div>
+          <div class="empty-state-title">${escHtml(title)}</div>
+          <div class="empty-state-desc">${escHtml(desc)}</div>
+          ${btnLabel ? `<button type="button" class="empty-state-btn" onclick="${btnOnclick}">${escHtml(btnLabel)}</button>` : ''}
+        </div>
+      `;
+    }
+
+    function renderSkeletonList(type = "feed", count = 3) {
+      const n = Math.max(1, Number(count) || 3);
+      if (type === "compact") {
+        return Array.from({ length: n }).map(() => `
+          <div style="padding:10px 0; display:flex; flex-direction:column; gap:6px;">
+            <div class="skeleton-block" style="width:68%; height:14px;"></div>
+            <div class="skeleton-block" style="width:45%; height:12px;"></div>
+          </div>
+        `).join("");
+      }
+      return Array.from({ length: n }).map(() => `
+        <div class="skeleton-card">
+          <div class="skeleton-block" style="width:48px; height:48px; border-radius:14px; flex-shrink:0;"></div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:7px;">
+            <div class="skeleton-block" style="width:62%; height:15px;"></div>
+            <div class="skeleton-block" style="width:42%; height:12px;"></div>
+            <div class="skeleton-block" style="width:30%; height:12px;"></div>
+          </div>
+          <div class="skeleton-block" style="width:54px; height:30px; border-radius:999px; flex-shrink:0;"></div>
+        </div>
+      `).join("");
+    }
+
+    function isReducedMotionPreferred() {
+      try {
+        return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    let _levelUpRafId = null;
+    function scheduleTierLevelUpAnimation() {
+      if (!state.home_levelup_tier || !state.home_levelup_anim_pending) return;
+      state.home_levelup_anim_pending = false;
+      const fromTemp = Number.isFinite(Number(state.home_levelup_prev_temp)) ? Number(state.home_levelup_prev_temp) : 36.5;
+      const toTemp = Number.isFinite(Number(state.home_levelup_target_temp)) ? Number(state.home_levelup_target_temp) : 40.0;
+      const fromPct = getTierByTemp(fromTemp).gaugePct;
+      const toPct = getTierByTemp(toTemp).gaugePct;
+
+      setTimeout(() => {
+        const numEls = document.querySelectorAll(".levelup-temp-num");
+        const barEls = document.querySelectorAll(".levelup-gauge-fill");
+        if (!numEls.length && !barEls.length) return;
+
+        if (isReducedMotionPreferred()) {
+          numEls.forEach(el => { el.textContent = `${toTemp.toFixed(1)}°C`; });
+          barEls.forEach(el => {
+            el.style.transition = "none";
+            el.style.width = `${toPct}%`;
+          });
+          return;
+        }
+
+        numEls.forEach(el => { el.textContent = `${fromTemp.toFixed(1)}°C`; });
+        barEls.forEach(el => {
+          el.style.transition = "none";
+          el.style.width = `${fromPct}%`;
+        });
+
+        requestAnimationFrame(() => {
+          barEls.forEach(el => {
+            el.style.transition = "width 0.9s cubic-bezier(.2, .8, .2, 1)";
+            el.style.width = `${toPct}%`;
+          });
+          const duration = 900;
+          const startTs = performance.now();
+          if (_levelUpRafId) cancelAnimationFrame(_levelUpRafId);
+
+          function step(now) {
+            const elapsed = Math.max(0, now - startTs);
+            const p = Math.min(1, elapsed / duration);
+            const eased = 1 - Math.pow(1 - p, 3);
+            const cur = fromTemp + (toTemp - fromTemp) * eased;
+            numEls.forEach(el => { el.textContent = `${cur.toFixed(1)}°C`; });
+            if (p < 1) {
+              _levelUpRafId = requestAnimationFrame(step);
+            } else {
+              numEls.forEach(el => { el.textContent = `${toTemp.toFixed(1)}°C`; });
+              try {
+                if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+                  navigator.vibrate(30);
+                }
+              } catch (e) {}
+            }
+          }
+          _levelUpRafId = requestAnimationFrame(step);
+        });
+      }, 20);
+    }
+
     let _tierToastTimer = null;
-    function showTierLevelUpBanner(tierInfo) {
+    function showTierLevelUpBanner(tierInfo, fromTemp, toTemp) {
       if (!tierInfo) return;
       let el = document.getElementById("tier-levelup-banner");
       if (!el) {
@@ -3470,35 +3712,65 @@
         el.id = "tier-levelup-banner";
         document.body.appendChild(el);
       }
+      const startTemp = Number.isFinite(Number(fromTemp)) ? Number(fromTemp) : Number(tierInfo.displayTemp);
+      const endTemp = Number.isFinite(Number(toTemp)) ? Number(toTemp) : Number(tierInfo.displayTemp);
+      const initTemp = isReducedMotionPreferred() ? endTemp : startTemp;
+      const initPct = isReducedMotionPreferred() ? tierInfo.gaugePct : getTierByTemp(startTemp).gaugePct;
       el.className = "tier-levelup-toast";
       el.setAttribute("data-tier", String(tierInfo.tier));
       el.innerHTML = `
-        <span>${escHtml(tierInfo.levelUpCopy)}</span>
-        <button type="button" onclick="dismissHomeTierNotice('levelup'); this.parentElement.remove();" style="border:none; background:none; color:inherit; font-size:15px; font-weight:800; cursor:pointer; padding:0 4px;">✕</button>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;">
+            <span class="levelup-temp-num">${initTemp.toFixed(1)}°C</span>
+            <span>${escHtml(tierInfo.levelUpCopy)}</span>
+          </div>
+          <button type="button" onclick="dismissHomeTierNotice('levelup'); if(this.closest('#tier-levelup-banner')) this.closest('#tier-levelup-banner').remove();" style="border:none; background:none; color:inherit; font-size:15px; font-weight:800; cursor:pointer; padding:0 4px; flex-shrink:0;">✕</button>
+        </div>
+        <div class="levelup-gauge-track">
+          <div class="levelup-gauge-fill" style="width:${initPct}%;"></div>
+        </div>
       `;
       clearTimeout(_tierToastTimer);
       _tierToastTimer = setTimeout(() => {
         if (el && el.parentElement) el.remove();
-      }, 4800);
+      }, 5200);
     }
 
     function checkAndShowTierLevelUp(uid, tempVal) {
       if (!uid) return;
       const tierInfo = getTierByTemp(tempVal);
       const storageKey = "uldaemo_last_tier_" + String(uid);
+      const tempStorageKey = "uldaemo_last_temp_" + String(uid);
       const prevRaw = localStorage.getItem(storageKey);
+      const prevTempRaw = localStorage.getItem(tempStorageKey);
+      const curNumTemp = Number(tierInfo.displayTemp);
+
       if (prevRaw === null) {
         localStorage.setItem(storageKey, String(tierInfo.tier));
+        localStorage.setItem(tempStorageKey, String(curNumTemp));
         return;
       }
       const prevTier = parseInt(prevRaw, 10);
       if (Number.isFinite(prevTier) && tierInfo.tier > prevTier) {
+        const defaultPrevMap = { 2: 36.0, 3: 39.2, 4: 44.2, 5: 49.2 };
+        const parsedPrevTemp = prevTempRaw !== null ? parseFloat(prevTempRaw) : NaN;
+        const fromTemp = (Number.isFinite(parsedPrevTemp) && parsedPrevTemp < curNumTemp)
+          ? parsedPrevTemp
+          : (defaultPrevMap[tierInfo.tier] || Math.max(36.0, +(curNumTemp - 1.0).toFixed(1)));
+
         localStorage.setItem(storageKey, String(tierInfo.tier));
+        localStorage.setItem(tempStorageKey, String(curNumTemp));
         state.home_levelup_tier = tierInfo.tier;
-        showTierLevelUpBanner(tierInfo);
+        state.home_levelup_prev_temp = fromTemp;
+        state.home_levelup_target_temp = curNumTemp;
+        state.home_levelup_anim_pending = true;
+        showTierLevelUpBanner(tierInfo, fromTemp, curNumTemp);
       } else if (Number.isFinite(prevTier) && tierInfo.tier !== prevTier) {
         localStorage.setItem(storageKey, String(tierInfo.tier));
+        localStorage.setItem(tempStorageKey, String(curNumTemp));
         state.home_levelup_tier = null;
+      } else {
+        localStorage.setItem(tempStorageKey, String(curNumTemp));
       }
     }
 
@@ -3507,6 +3779,7 @@
       const today = getTodayStr();
       if (mode === "levelup") {
         state.home_levelup_tier = null;
+        state.home_levelup_anim_pending = false;
         const b = document.getElementById("tier-levelup-banner");
         if (b) b.remove();
       } else if (mode === "cheer") {
@@ -3531,12 +3804,25 @@
       const tInfo = getTierByTemp(tempVal);
       const today = getTodayStr();
 
-      // 1) 레벨업 직후 (티어 경계를 넘었을 때 1회만 노출)
+      // 1) 레벨업 직후 (티어 경계를 넘었을 때 1회만 노출 + 숫자 카운트업 & 게이지 연출)
       if (state.home_levelup_tier && Number(state.home_levelup_tier) === tInfo.tier) {
+        const fromT = Number.isFinite(Number(state.home_levelup_prev_temp)) ? Number(state.home_levelup_prev_temp) : Number(tInfo.displayTemp);
+        const toT = Number.isFinite(Number(state.home_levelup_target_temp)) ? Number(state.home_levelup_target_temp) : Number(tInfo.displayTemp);
+        const initT = isReducedMotionPreferred() ? toT : fromT;
+        const initPct = isReducedMotionPreferred() ? tInfo.gaugePct : getTierByTemp(fromT).gaugePct;
         return `
-          <div class="home-tier-card" data-tier="${tInfo.tier}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <span style="font-size:13.5px; font-weight:800; color:var(--tier-text); line-height:1.4;">${escHtml(tInfo.levelUpCopy)}</span>
-            <button type="button" onclick="dismissHomeTierNotice('levelup', ${tInfo.tier})" aria-label="닫기" style="border:none; background:none; color:var(--tier-text); font-size:16px; font-weight:800; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
+          <div class="home-tier-card is-levelup" data-tier="${tInfo.tier}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;">
+                <span class="tier-badge-pill" data-tier="${tInfo.tier}" style="background:#FFFFFF;">${tInfo.tier === 5 ? '👑 ' : ''}${escHtml(tInfo.name)}</span>
+                <span class="levelup-temp-num" style="font-size:15px;">${initT.toFixed(1)}°C</span>
+              </div>
+              <button type="button" onclick="dismissHomeTierNotice('levelup', ${tInfo.tier})" aria-label="닫기" style="border:none; background:none; color:var(--tier-text); font-size:16px; font-weight:800; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
+            </div>
+            <div style="font-size:13.5px; font-weight:800; color:var(--tier-text); line-height:1.4; margin-top:6px;">${escHtml(tInfo.levelUpCopy)}</div>
+            <div class="levelup-gauge-track">
+              <div class="levelup-gauge-fill" style="width:${initPct}%;"></div>
+            </div>
           </div>
         `;
       }
@@ -3811,14 +4097,12 @@
       if (t === "ulsan") loadNotices(true);
     }
     function renderUlsanNoticeList() {
+      if (NOTICES.loading) {
+        return `<div class="uldaemo-card" style="padding:12px 16px;">${renderSkeletonList('feed', 3)}</div>`;
+      }
       const items = NOTICES.items;
       if (!items.length) {
-        return `<div class="uldaemo-card" style="text-align:center; padding:30px;">
-          <div style="font-size:32px; margin-bottom:6px;">🏫</div>
-          <div style="font-weight:800;">${NOTICES.loading ? "공지를 불러오는 중이에요…" : "공지를 불러오지 못했어요"}</div>
-          <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">잠시 후 다시 시도하거나 공식 홈페이지에서 확인해 주세요.</div>
-          <a class="btn" style="margin-top:10px; text-decoration:none;" href="https://www.ulsan.ac.kr/kor/CMS/Board/Board.do?mCode=MN113" target="_blank" rel="noopener">울산대 공지사항 바로가기 ↗</a>
-        </div>`;
+        return `<div class="uldaemo-card">${renderEmptyStateBox('bell', '새 소식이 없어요', '번개 소식이 오면 여기서 알려드려요')}</div>`;
       }
       return `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <span style="font-size:11.5px; color:#8B95A1;">울산대 공식 홈페이지의 만남·행사·동아리·봉사 공지예요.</span>
@@ -4030,7 +4314,7 @@
 
               <!-- 식단 메뉴 리스트 -->
               <div style="background:#F9FAFB; border-radius:8px; padding:9px 11px; font-size:11.5px; line-height:1.55; max-height:140px; overflow-y:auto; border:1px solid #F2F4F6;">
-                ${mealList.length === 0 ? `
+                ${CAFETERIA.loading ? renderSkeletonList('compact', 2) : (mealList.length === 0 ? `
                   <div style="color:#8B95A1; text-align:center; padding:10px 0;">운영 정보가 없거나 미운영 시간입니다.</div>
                 ` : mealList.map(item => {
                   const isCorner = item.startsWith("[");
@@ -4038,7 +4322,7 @@
                     return `<div style="font-weight:800; color:#287D62; margin-top:4px; margin-bottom:2px; font-size:11px;">${escHtml(item)}</div>`;
                   }
                   return `<div style="color:#333D4B; display:flex; align-items:baseline; gap:5px;"><span style="color:#287D62; font-size:9px;">•</span><span>${escHtml(item)}</span></div>`;
-                }).join("")}
+                }).join(""))}
               </div>
 
               <!-- 번개 열기 바로가기 버튼 -->
@@ -4175,7 +4459,7 @@
         ${isNotifsExp ? `
           <div class="accordion-body" style="padding:10px 14px 14px;">
             ${myNotifs.length === 0
-              ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새로운 알림이 없어요.${newNoticeCnt > 0 ? `<br><span style="color:#287D62; font-weight:700; cursor:pointer;" onclick="openUlsanNoticesModal(event)">울산대 공지 ${newNoticeCnt}건 확인하기 →</span>` : ""}</div>`
+              ? `<div style="font-size:12px; color:#6B7684; padding:6px 0;">새 소식이 없어요 · 번개 소식이 오면 여기서 알려드려요</div>`
               : myNotifs.map(n => `
                 <div class="right-notif ${n.is_read ? '' : 'unread'}" style="cursor:pointer;" onclick="openNotifItem(${n.id})">
                   <div style="font-size:12px; font-weight:600; line-height:1.4;">${n.message}</div>
@@ -4248,7 +4532,7 @@
             ${activeChats.length > 0 ? `<button type="button" style="font-size:12px; font-weight:600; color:#8B95A1; background:none; border:none; cursor:pointer;" onclick="switchTab('채팅')">전체 ›</button>` : ''}
           </div>
           ${activeChats.length === 0 ? `
-            <div style="font-size:13px; color:#B0B8C1; padding:8px 0;">참여 중인 대화가 없어요</div>
+            <div style="font-size:13px; color:#6B7684; padding:8px 0;">아직 대화가 없어요 · 번개에 참여하면 안심 채팅이 열려요</div>
           ` : activeChats.slice(0, 3).map(r => {
             const partner = DB.users[r.partnerId] || { avatar: "🐶", nickname: r.partnerId };
             const otherNames = r.otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
@@ -4344,6 +4628,7 @@
         const myTierInfo = getTierByTemp(myTempForTier);
         document.body.setAttribute("data-tier", String(myTierInfo.tier));
         checkAndShowTierLevelUp(state.user_id, myTempForTier);
+        scheduleTierLevelUpAnimation();
 
         const sidebarHtml = `
           <aside class="pc-sidebar">
@@ -5077,11 +5362,8 @@
           <button class="btn" style="flex:1; min-height:38px; font-size:12.5px; white-space:nowrap; color:#6B7684;" ${myNotifs.length === 0 ? "disabled" : ""} onclick="clearAllNotifs()">모두 지우기</button>
         </div>
         ${myNotifs.length === 0 ? `
-          <div class="uldaemo-card" style="text-align:center; padding:30px;">
-            <div style="font-size:32px; margin-bottom:6px;">🌱</div>
-            <div style="font-weight:800;">내 알림이 아직 없어요</div>
-            <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">모임에 참여 신청이 오거나 수락되면 이곳에 실시간으로 표시됩니다!</div>
-            ${newNotice > 0 ? `<button class="btn btn-primary" style="margin-top:10px;" onclick="switchNotifTab('ulsan')">🏫 새 울산대 공지 ${newNotice}건 확인하기 ›</button>` : `<div style="font-size:12px; color:#8B95A1; margin-top:8px;">학교 공지는 위의 [🏫 울산대 공지] 탭에서 볼 수 있어요.</div>`}
+          <div class="uldaemo-card">
+            ${renderEmptyStateBox('bell', '새 소식이 없어요', '번개 소식이 오면 여기서 알려드려요', newNotice > 0 ? `울산대 공지 ${newNotice}건 보기` : '', newNotice > 0 ? "switchNotifTab('ulsan')" : '')}
           </div>
         ` : myNotifs.map(n => `
           <div class="uldaemo-card" style="background:${n.is_read ? '#FFFFFF' : '#EEF8F3'}; border-color:${n.is_read ? '#E5E8EB' : '#287D62'}; padding:13px 15px; margin-bottom:8px; cursor:pointer;" onclick="openNotifItem(${n.id})">
@@ -5240,7 +5522,7 @@
             <div class="tk-feed-meta">${escHtml(post.location)} · ${escHtml(post.meet_time || '오늘')}${distText}</div>
             <div class="tk-feed-stats">
               <span class="tk-feed-cnt">${acceptedCnt}/${post.max_participants}명</span>
-              <span class="tk-feed-temp" data-tier="${authorTier.tier}">${authorTier.tier === 5 ? '👑 ' : ''}${authorTier.displayTemp}°C${authorTier.roleLabel ? ` · ${authorTier.roleLabel}` : ''}</span>
+              <span class="temp-chip" data-tier="${authorTier.tier}">${authorTier.tier === 5 ? '👑 ' : ''}${authorTier.displayTemp}°C${authorTier.roleLabel ? ` · ${authorTier.roleLabel}` : ''}</span>
             </div>
           </div>
           ${actionBtnHtml}
@@ -5303,14 +5585,18 @@
     }
 
     function renderHomeFeedListHtml() {
+      if (state.feed_loading) {
+        return `<div class="tk-feed-grid">${renderSkeletonList('feed', 3)}</div>`;
+      }
       const list = getFilteredHomePosts();
       if (list.length === 0) {
-        return `
-          <div style="text-align:center; padding:56px 20px; color:#8B95A1;">
-            <div style="font-weight:700; font-size:15px; color:#191F28;">조건에 맞는 번개가 없어요</div>
-            <div style="font-size:13px; color:#8B95A1; margin-top:4px;">새로운 번개를 직접 열어보세요</div>
-          </div>
-        `;
+        return renderEmptyStateBox(
+          'sparkle',
+          '아직 열린 번개가 없어요',
+          '첫 번개를 열어볼까요?',
+          '번개 열기',
+          "state.active_modal='create'; render();"
+        );
       }
       return `<div class="tk-feed-grid">${list.map(renderMeetupCard).join("")}</div>`;
     }
@@ -5803,7 +6089,7 @@
         ${isAuthor ? `
           <div class="uldaemo-card">
             <h4 style="margin-bottom:8px;">방장 전용: 신청자 수락 및 모임 관리</h4>
-            ${apps.length === 0 ? `<div style="font-size:12.5px; color:#6B7684; margin-bottom:10px;">아직 신청한 학우가 없어요.</div>` : apps.map(a => {
+            ${state.applicants_loading ? renderSkeletonList('compact', 2) : (apps.length === 0 ? renderEmptyStateBox('user', '아직 신청한 학우가 없어요', '학우가 참여를 신청하면 이곳에 표시돼요') : apps.map(a => {
               const apUser = DB.users[a.applicant_id] || { avatar: "🐱", nickname: "익명 학우", department: "울산대", mbti: "비공개", manner_temp: 36.5 };
               const apRawTemp = (DB.users[a.applicant_id] && DB.users[a.applicant_id].manner_temp !== undefined) ? resolveUserTempForTier(a.applicant_id) : apUser.manner_temp;
               const apTier = getTierByTemp(apRawTemp);
@@ -5815,7 +6101,7 @@
                   <div>
                     <div style="font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                       <b>${apUser.avatar.split(" ")[0]} ${escHtml(apUser.nickname)}</b>
-                      <span class="tier-temp-chip" data-tier="${apTier.tier}">${apTier.tier === 5 ? '👑 ' : ''}${apTier.displayTemp}°C · ${escHtml(apTier.roleLabel || apTier.name)}</span>
+                      <span class="temp-chip" data-tier="${apTier.tier}">${apTier.tier === 5 ? '👑 ' : ''}${apTier.displayTemp}°C${apTier.roleLabel ? ` · ${escHtml(apTier.roleLabel)}` : ''}</span>
                       ${apBadges}
                     </div>
                     <div style="font-size:12px; color:#6B7684; margin-top:2px;">${escHtml(apDeptText)} — <b style="color:#287D62;">${escHtml(a.status)}</b></div>
@@ -5823,7 +6109,7 @@
                   ${a.status === "대기중" ? `<button class="btn btn-primary" style="width:auto; min-height:34px; padding:4px 12px;" onclick="acceptApplicant(${a.id})">수락</button>` : ""}
                 </div>
               `;
-            }).join("")}
+            }).join(""))}
             <div class="row-2" style="margin-top:10px;">
               <button class="btn" onclick="closePostEarly(${post.id})">모집 마감하기</button>
               <button class="btn btn-danger" onclick="confirmDeletePost(${post.id})">모임 취소하기</button>
@@ -6752,15 +7038,7 @@
 
     function renderChatRoomListItemsHtml(activeChats, selectedPostId) {
       if (activeChats.length === 0) {
-        return `
-          <div style="text-align:center; padding:48px 16px;">
-            <div style="width:48px; height:48px; border-radius:14px; background:#F2F4F3; color:#B0B8C1; display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">
-              ${getSvgIcon('chat', 24, '#B0B8C1')}
-            </div>
-            <div style="font-weight:700; font-size:15px; color:#191F28;">아직 대화가 없어요</div>
-            <div style="font-size:13px; color:#8B95A1; margin-top:4px;">번개에 참여하면 여기에 대화방이 생겨요</div>
-          </div>
-        `;
+        return renderEmptyStateBox('chat', '아직 대화가 없어요', '번개에 참여하면 안심 채팅이 열려요');
       }
       return activeChats.map(room => {
         const { post, partnerId, otherIds, totalMembers, unreadInRoom, lastMsg } = room;
@@ -6785,7 +7063,7 @@
             <div style="min-width:0; flex:1;">
               <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
                 <span style="font-weight:700; font-size:15px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
-                <span class="tier-temp-chip" data-tier="${partnerTier.tier}" style="font-size:11px; padding:1px 7px;">${partnerTier.displayTemp}°C${partnerTier.roleLabel ? ` · ${escHtml(partnerTier.roleLabel)}` : ''}</span>
+                <span class="temp-chip" data-tier="${partnerTier.tier}">${partnerTier.displayTemp}°C${partnerTier.roleLabel ? ` · ${escHtml(partnerTier.roleLabel)}` : ''}</span>
                 <span style="font-size:12px; color:#8B95A1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(post.location)} · ${escHtml(previewTime)}</span>
               </div>
               <div style="font-size:14px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '600' : '400'}; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
@@ -6827,7 +7105,7 @@
                 <div style="min-width:0; flex:1;">
                   <div style="font-size:14px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     <span>${u.avatar.split(" ")[0]} ${escHtml(u.nickname)}</span>
-                    <span class="tier-temp-chip" data-tier="${apTier.tier}">${apTier.tier === 5 ? '👑 ' : ''}${apTier.displayTemp}°C · ${escHtml(apTier.roleLabel || apTier.name)}</span>
+                    <span class="temp-chip" data-tier="${apTier.tier}">${apTier.tier === 5 ? '👑 ' : ''}${apTier.displayTemp}°C${apTier.roleLabel ? ` · ${escHtml(apTier.roleLabel)}` : ''}</span>
                   </div>
                   <div style="font-size:12px; color:#8B95A1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px;">${p ? escHtml(p.title) : ""}</div>
                 </div>
@@ -6900,7 +7178,7 @@
                 <div style="min-width:0; flex:1;">
                   <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
                     <span style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
-                    <span class="tier-temp-chip" data-tier="${pTier.tier}" style="font-size:11px; padding:1px 7px;">${pTier.displayTemp}°C${pTier.roleLabel ? ` · ${escHtml(pTier.roleLabel)}` : ''}</span>
+                    <span class="temp-chip" data-tier="${pTier.tier}">${pTier.displayTemp}°C${pTier.roleLabel ? ` · ${escHtml(pTier.roleLabel)}` : ''}</span>
                   </div>
                   <div class="tk-room-sub">${escHtml(post.title)} · ${escHtml(post.location)}</div>
                 </div>
@@ -7587,6 +7865,10 @@
       const myAllPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id) && p.status !== "취소됨");
       const myPosts = myAllPosts.filter(p => !isPostExpired(p));
       const myPastPosts = myAllPosts.filter(p => isPostExpired(p));
+      const myAppliedList = (DB.applications || []).filter(a => String(a.applicant_id) === String(state.user_id) && a.status !== "취소됨" && a.status !== "나감").map(a => {
+        const p = (DB.posts || []).find(post => Number(post.id) === Number(a.post_id));
+        return p && p.status !== "취소됨" ? { app: a, post: p } : null;
+      }).filter(Boolean);
       const myReviews = (DB.reviews || []).filter(r => String(r.to_id) === String(state.user_id) && !r.is_none);
 
       return `
@@ -7662,11 +7944,31 @@
             ${sec === 'reviews' ? `
               <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
                 ${myReviews.length === 0
-                  ? `<div style="font-size:13.5px; color:#8B95A1;">아직 받은 후기가 없어요</div>`
+                  ? renderEmptyStateBox('check', '아직 받은 후기가 없어요', '번개 모임 후 학우들과 따뜻한 후기를 나눠보세요')
                   : myReviews.map(r => `
                     <div style="padding:10px 0; border-bottom:1px solid #EEF0EF;">
-                      <div style="font-size:13.5px; font-weight:700; color:#191F28;">👍 ${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
+                      <div style="font-size:13.5px; font-weight:700; color:#191F28;">${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
                       ${r.detail ? `<div style="font-size:12.5px; color:#4E5968; margin-top:4px; background:#FFFFFF; padding:8px 10px; border-radius:8px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
+                    </div>
+                  `).join("")}
+              </div>
+            ` : ''}
+
+            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('myapps')">
+              <span>내가 신청한 번개</span>
+              <span style="display:inline-flex; align-items:center; gap:8px;">
+                <span style="font-size:14px; color:#8B95A1;">${myAppliedList.length}건</span>
+                <span class="tk-menu-arrow">${sec === 'myapps' ? '▾' : '›'}</span>
+              </span>
+            </button>
+            ${sec === 'myapps' ? `
+              <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
+                ${myAppliedList.length === 0
+                  ? renderEmptyStateBox('compass', '아직 신청한 번개가 없어요', '오늘 공강에 같이할 학우를 찾아봐요', '번개 보러 가기', "switchTab('홈')")
+                  : myAppliedList.map(item => `
+                    <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${item.post.id})">
+                      <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(item.post.title)}</span>
+                      <span style="font-size:12px; color:#287D62; font-weight:700;">${escHtml(item.app.status)} ›</span>
                     </div>
                   `).join("")}
               </div>
@@ -7682,7 +7984,7 @@
             ${sec === 'myposts' ? `
               <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
                 ${myPosts.length === 0
-                  ? `<div style="font-size:13.5px; color:#8B95A1;">진행 중인 번개가 없어요</div>`
+                  ? renderEmptyStateBox('plus', '아직 열린 번개가 없어요', '첫 번개를 열어볼까요?', '번개 열기', "state.active_modal='create'; render();")
                   : myPosts.map(p => `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
                       <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(p.title)}</span>
