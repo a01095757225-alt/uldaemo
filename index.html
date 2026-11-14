@@ -5201,8 +5201,12 @@
 
     function renderMeetupCard(post) {
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5 };
-      const acceptedCnt = DB.applications.filter(a => a.post_id === post.id && a.status === "승인됨").length + 1;
+      const apps = DB.applications.filter(a => a.post_id === post.id);
+      const acceptedCnt = apps.filter(a => a.status === "승인됨").length + 1;
       const isOfficial = Boolean(post.is_official);
+      const isAuthor = String(post.author_id) === String(state.user_id);
+      const myApp = apps.find(a => String(a.applicant_id) === String(state.user_id));
+      const isFull = acceptedCnt >= (post.max_participants || 2) || post.status !== "모집중";
       const authorRawTemp = (DB.users[post.author_id] && DB.users[post.author_id].manner_temp !== undefined) ? resolveUserTempForTier(post.author_id) : author.manner_temp;
       const authorTier = getTierByTemp(authorRawTemp);
       const emoji = getCatEmoji(post.category, post.title);
@@ -5211,6 +5215,18 @@
       const distM = calcDistanceMeters(state.my_lat, state.my_lng, coords[0], coords[1]);
       const walkMin = Math.max(1, Math.round(distM / 67));
       const distText = state.gps_consent ? ` · 도보 ${walkMin}분` : "";
+
+      let actionBtnHtml = "";
+      if (isAuthor) {
+        const waitCnt = apps.filter(a => a.status === "대기중").length;
+        actionBtnHtml = `<button type="button" class="btn" style="width:auto; min-height:32px; height:32px; padding:0 11px; font-size:12px; font-weight:700; border-radius:999px; background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; flex-shrink:0;" onclick="event.stopPropagation(); openDetailModal(${post.id});">${waitCnt > 0 ? `신청 ${waitCnt}건` : '내 번개'}</button>`;
+      } else if (myApp && myApp.status === "승인됨") {
+        actionBtnHtml = `<button type="button" class="btn btn-primary" style="width:auto; min-height:32px; height:32px; padding:0 11px; font-size:12px; font-weight:700; border-radius:999px; flex-shrink:0;" onclick="event.stopPropagation(); state.active_modal=null; state.nav_tab='채팅'; openChatRoom(${post.id});">대화방 ›</button>`;
+      } else if (myApp && myApp.status === "대기중") {
+        actionBtnHtml = `<span style="font-size:11.5px; font-weight:700; color:#6B7684; background:#F2F4F3; padding:5px 10px; border-radius:999px; flex-shrink:0;">대기중</span>`;
+      } else if (!isFull) {
+        actionBtnHtml = `<button type="button" class="btn btn-primary" style="width:auto; min-height:32px; height:32px; padding:0 12px; font-size:12px; font-weight:700; border-radius:999px; flex-shrink:0;" onclick="event.stopPropagation(); applyToPost(${post.id});">참여</button>`;
+      }
 
       return `
         <div class="tk-feed-item" onclick="openDetailModal(${post.id})">
@@ -5227,6 +5243,7 @@
               <span class="tk-feed-temp" data-tier="${authorTier.tier}">${authorTier.tier === 5 ? '👑 ' : ''}${authorTier.displayTemp}°C${authorTier.roleLabel ? ` · ${authorTier.roleLabel}` : ''}</span>
             </div>
           </div>
+          ${actionBtnHtml}
         </div>
       `;
     }
@@ -5452,10 +5469,15 @@
       }
     }
 
-        function setCreateTitle(t, cat) {
+    function setCreateTitle(t, cat, loc) {
       const el = document.getElementById("c_title");
       if (el) el.value = t;
       if (cat) setCreateCat(cat);
+      if (loc) {
+        const locEl = document.getElementById("c_loc");
+        if (locEl) locEl.value = loc;
+      }
+      setCreateQuickTime("30min");
     }
 
     function setCreateQuickTime(type) {
@@ -5532,9 +5554,9 @@
           <label class="label" style="font-weight:700;">어떤 모임인가요?</label>
           <input id="c_title" class="input" value="${escHtml(prefillTitle)}" placeholder="예: 학식 같이 먹어요" style="font-size:15px;" />
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin: -4px 0 16px;">
-            <button type="button" class="quick-chip" onclick="setCreateTitle('학식 같이 먹어요', '🍚 밥약')">학식 같이 먹어요</button>
-            <button type="button" class="quick-chip" onclick="setCreateTitle('도서관 카공', '☕ 카공')">도서관 카공</button>
-            <button type="button" class="quick-chip" onclick="setCreateTitle('헬스 같이 가요', '🏃 운동')">헬스 같이 가요</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('학식 같이 먹어요', '🍚 밥약', '22호관 학생회관')">학식 같이 먹어요</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('도서관 카공', '☕ 카공', '16호관 아산도서관')">도서관 카공</button>
+            <button type="button" class="quick-chip" onclick="setCreateTitle('헬스 같이 가요', '🏃 운동', '39호관 아산스포츠센터')">헬스 같이 가요</button>
           </div>
 
           <!-- 2. 카테고리 칩 (기타 선택 시만 직접 입력) -->
@@ -5807,7 +5829,20 @@
               <button class="btn btn-danger" onclick="confirmDeletePost(${post.id})">모임 취소하기</button>
             </div>
           </div>
-        ` : ""}
+        ` : (() => {
+          const myApp = apps.find(a => String(a.applicant_id) === String(state.user_id));
+          const isFull = acceptedCnt >= (post.max_participants || 2) || post.status !== "모집중";
+          if (myApp && myApp.status === "승인됨") {
+            return `<div class="uldaemo-card" style="padding:14px;"><button type="button" class="btn btn-primary" style="height:48px; font-size:15.5px; font-weight:800;" onclick="state.active_modal=null; state.nav_tab='채팅'; openChatRoom(${post.id});">💬 안심 대화방 바로 열기</button></div>`;
+          }
+          if (myApp && myApp.status === "대기중") {
+            return `<div class="uldaemo-card" style="padding:14px;"><button type="button" class="btn" disabled style="height:48px; font-size:15px; font-weight:700; background:#F2F4F3; color:#6B7684;">⏳ 참여 신청 완료 (방장 수락 대기중)</button></div>`;
+          }
+          if (isFull) {
+            return `<div class="uldaemo-card" style="padding:14px;"><button type="button" class="btn" disabled style="height:48px; font-size:15px; font-weight:700; background:#F2F4F3; color:#8B95A1;">모집이 마감된 번개예요</button></div>`;
+          }
+          return `<div class="uldaemo-card" style="padding:14px;"><button type="button" class="btn btn-primary" style="height:48px; font-size:16px; font-weight:800;" onclick="applyToPost(${post.id})">⚡ 원클릭 참여 신청하기</button></div>`;
+        })()}
       `;
     }
 
