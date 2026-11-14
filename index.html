@@ -1020,6 +1020,15 @@
       color: #1E634C;
       box-shadow: 0 2px 6px rgba(40, 125, 98, 0.14);
     }
+    .stamp-day.just-stamped {
+      animation: stampSlam 0.55s cubic-bezier(0.22, 1.28, 0.36, 1) forwards;
+    }
+    @keyframes stampSlam {
+      0% { transform: scale(1.55) rotate(-8deg); opacity: 0.35; }
+      55% { transform: scale(0.91) rotate(2deg); opacity: 1; box-shadow: 0 0 0 6px rgba(40, 125, 98, 0.22); }
+      80% { transform: scale(1.04) rotate(0deg); }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
     .stamp-day.today-target {
       background: #EEF8F3;
       border: 1.5px solid var(--primary);
@@ -1032,39 +1041,79 @@
     }
     .roulette-stage {
       position: relative;
-      width: 210px;
-      height: 210px;
+      width: 220px;
+      height: 220px;
       margin: 12px auto 10px;
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 35%, #FFFFFF 0%, #EEF8F3 100%);
+      box-shadow: 0 10px 26px rgba(25, 31, 40, 0.09), inset 0 0 0 5px #FFFFFF, inset 0 0 0 6.5px #DDF0E7;
     }
     .roulette-pin {
       position: absolute;
-      top: -12px;
+      top: -13px;
       left: 50%;
-      transform: translateX(-50%);
-      z-index: 5;
-      font-size: 20px;
-      color: #287D62;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12));
+      transform: translateX(-50%) rotate(0deg);
+      transform-origin: 50% 20%;
+      z-index: 7;
+      width: 28px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 4px 6px rgba(25, 31, 40, 0.22));
+      will-change: transform;
+      pointer-events: none;
     }
     .roulette-wheel {
-      width: 196px;
-      height: 196px;
+      width: 198px;
+      height: 198px;
       border-radius: 50%;
-      border: 3px solid #287D62;
-      box-shadow: 0 6px 18px rgba(25, 31, 40, 0.08);
+      border: 3.5px solid #287D62;
+      box-shadow: 0 6px 18px rgba(25, 31, 40, 0.08), inset 0 0 12px rgba(40, 125, 98, 0.08);
       background: conic-gradient(
         #EEF8F3 0deg 60deg,
         #FFFFFF 60deg 120deg,
-        #EEF8F3 120deg 180deg,
+        #DDF0E7 120deg 180deg,
         #FFFFFF 180deg 240deg,
         #EEF8F3 240deg 300deg,
         #FFFFFF 300deg 360deg
       );
       position: relative;
-      transition: transform 2.8s cubic-bezier(0.15, 0.85, 0.25, 1);
+      will-change: transform;
+      transition: box-shadow 0.3s ease;
+    }
+    .roulette-wheel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: repeating-conic-gradient(
+        from 0deg,
+        rgba(40, 125, 98, 0.22) 0deg 0.8deg,
+        transparent 0.8deg 60deg
+      );
+      pointer-events: none;
+    }
+    .roulette-wheel.is-spinning {
+      box-shadow: 0 10px 30px rgba(40, 125, 98, 0.26), 0 0 0 4px rgba(40, 125, 98, 0.14);
+    }
+    .roulette-peg {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      margin-left: -3.5px;
+      margin-top: -3.5px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      border: 2px solid #287D62;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      pointer-events: none;
+      z-index: 3;
     }
     .roulette-label {
       position: absolute;
@@ -1073,6 +1122,7 @@
       width: 0;
       height: 0;
       pointer-events: none;
+      z-index: 2;
     }
     .roulette-label-inner {
       display: inline-flex;
@@ -1080,17 +1130,32 @@
       justify-content: center;
       gap: 3px;
       transform: translate(-50%, -50%);
-      transition: transform 2.8s cubic-bezier(0.15, 0.85, 0.25, 1);
+      will-change: transform;
       font-size: 11px;
       font-weight: 800;
       color: #191F28;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 3px 7px;
+      background: rgba(255, 255, 255, 0.96);
+      padding: 3px 7.5px;
       border-radius: 999px;
-      border: 1px solid #E5EAE7;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+      border: 1px solid #D5E4DC;
+      box-shadow: 0 2px 6px rgba(25, 31, 40, 0.09);
       white-space: nowrap;
       letter-spacing: -0.02em;
+      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+    }
+    .roulette-label-inner.is-passing {
+      background: #EEF8F3;
+      border-color: #287D62;
+      box-shadow: 0 3px 10px rgba(40, 125, 98, 0.22);
+    }
+    .roulette-label-inner.is-winner {
+      background: #287D62;
+      color: #FFFFFF;
+      border-color: #1E6B52;
+      box-shadow: 0 0 0 3px rgba(40, 125, 98, 0.24), 0 4px 12px rgba(40, 125, 98, 0.32);
+    }
+    .roulette-label-inner.is-winner span {
+      color: #FFFFFF !important;
     }
     .tk-boost-badge {
       font-size: 10.5px;
@@ -1104,25 +1169,87 @@
     }
     .roulette-center-btn {
       position: absolute;
-      width: 56px;
-      height: 56px;
+      width: 58px;
+      height: 58px;
       border-radius: 50%;
-      background: #287D62;
+      background: linear-gradient(145deg, #2E8E70 0%, #1E6B52 100%);
       color: #FFFFFF;
-      border: 3px solid #FFFFFF;
-      box-shadow: 0 4px 12px rgba(40,125,98,0.22);
+      border: 3.5px solid #FFFFFF;
+      box-shadow: 0 6px 16px rgba(40, 125, 98, 0.28), inset 0 2px 2px rgba(255, 255, 255, 0.3);
       font-size: 11.5px;
       font-weight: 800;
       cursor: pointer;
-      z-index: 4;
+      z-index: 6;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       line-height: 1.1;
+      letter-spacing: 0.03em;
+      transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease;
     }
     .roulette-center-btn:hover {
-      transform: scale(1.05);
+      transform: scale(1.06);
+      box-shadow: 0 8px 20px rgba(40, 125, 98, 0.36), inset 0 2px 2px rgba(255, 255, 255, 0.35);
+    }
+    .roulette-center-btn:active {
+      transform: scale(0.94);
+    }
+    .roulette-center-btn.is-spinning {
+      animation: centerBtnPulse 0.7s ease-in-out infinite alternate;
+    }
+    @keyframes centerBtnPulse {
+      0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(40, 125, 98, 0.35); }
+      100% { transform: scale(1.03); box-shadow: 0 0 0 7px rgba(40, 125, 98, 0); }
+    }
+    .roulette-slot-item {
+      transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .roulette-slot-item.is-shuffling {
+      animation: slotShufflePop 0.38s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+      animation-delay: calc(var(--slot-idx, 0) * 42ms);
+    }
+    .roulette-slot-item.is-won {
+      animation: slotWinHighlight 0.55s cubic-bezier(0.22, 1.25, 0.36, 1) forwards;
+      box-shadow: 0 4px 12px rgba(40, 125, 98, 0.15);
+    }
+    @keyframes slotShufflePop {
+      0% { opacity: 0; transform: translateY(7px) scale(0.94); }
+      70% { opacity: 1; transform: translateY(-1.5px) scale(1.02); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes slotWinHighlight {
+      0% { transform: scale(0.95); }
+      55% { transform: scale(1.04); box-shadow: 0 0 0 4px rgba(40, 125, 98, 0.18); }
+      100% { transform: scale(1); }
+    }
+    .roulette-result-banner {
+      animation: winnerCardSpring 0.48s cubic-bezier(0.22, 1.25, 0.36, 1) forwards;
+      box-shadow: 0 6px 18px rgba(40, 125, 98, 0.14);
+    }
+    @keyframes winnerCardSpring {
+      0% { opacity: 0; transform: translateY(10px) scale(0.93); }
+      65% { opacity: 1; transform: translateY(-2px) scale(1.02); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .wallet-count-pop {
+      display: inline-block;
+      animation: walletNumPop 0.5s cubic-bezier(0.22, 1.28, 0.36, 1);
+    }
+    @keyframes walletNumPop {
+      0% { transform: scale(1); }
+      45% { transform: scale(1.24); color: #1E6B52; }
+      100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .stamp-day.just-stamped,
+      .roulette-center-btn.is-spinning,
+      .roulette-slot-item.is-shuffling,
+      .roulette-slot-item.is-won,
+      .roulette-result-banner,
+      .wallet-count-pop {
+        animation: none !important;
+      }
     }
 
     /* ===== 캠퍼스 광장 (밸런스 투표 & 실시간 한줄 잔디톡) ===== */
@@ -3141,6 +3268,8 @@
       u.last_checkin = today;
       u.streak_days = (u.streak_days || 1) + 1;
       u.bonus_score = (u.bonus_score || 0) + 3;
+      state.just_stamped_day = Math.min(7, u.streak_days);
+      setTimeout(() => { state.just_stamped_day = null; }, 900);
       if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
         u.coffee_tickets = (u.coffee_tickets || 0) + 1;
         showToast(`연속 ${u.streak_days}일 출석 달성! 아메리카노 추첨권 +1장 & 활동 랭킹 +3점 획득!`);
@@ -3148,6 +3277,7 @@
         showToast(`출석체크 완료! (연속 ${u.streak_days}일째 · 활동 랭킹 +3점 획득)`);
       }
       u.updated_at = Date.now();
+      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
       fireConfetti();
       saveDB(true);
       render();
@@ -6549,13 +6679,18 @@
     function changeMenuTheme(themeKey) {
       state.menu_people_filter = themeKey;
       state.last_roulette_win_idx = null;
+      state.menu_just_shuffled = true;
+      setTimeout(() => { state.menu_just_shuffled = false; }, 520);
       buildMenuBoardForTheme(themeKey, true);
       render();
     }
 
     function shuffleMenuRoulette() {
       state.last_roulette_win_idx = null;
+      state.menu_just_shuffled = true;
+      setTimeout(() => { state.menu_just_shuffled = false; }, 520);
       buildMenuBoardForTheme(state.menu_people_filter || "all", true);
+      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate(12); } catch (e) {}
       showToast("🎲 새로운 공강 메뉴 6가지로 메뉴판을 바꿨어요!");
       render();
     }
@@ -6574,10 +6709,11 @@
 
     let _isSpinningRoulette = false;
     let _currentWheelDeg = 0;
+    let _rouletteRafId = null;
 
     function spinRouletteWheel() {
       if (_isSpinningRoulette) return;
-      const mode = state.roulette_mode || "reward";
+      const mode = state.roulette_mode || "menu";
       const u = DB.users[state.user_id];
       if (!u) return;
 
@@ -6595,23 +6731,52 @@
       const sliceDeg = 360 / items.length;
       // 각 섹션의 중심 각도가 상단 핀(0도)에 오도록 회전 각도 계산
       const targetSectorCenter = winIdx * sliceDeg + (sliceDeg / 2);
-      const extraSpins = 360 * 5;
-      _currentWheelDeg = _currentWheelDeg + extraSpins + (360 - (_currentWheelDeg % 360)) + (360 - targetSectorCenter);
+      const extraSpins = 360 * 6;
+      const startDeg = _currentWheelDeg;
+      const targetDeg = startDeg + extraSpins + (360 - (startDeg % 360)) + (360 - targetSectorCenter);
+      const totalDelta = targetDeg - startDeg;
 
       const wheelEl = document.getElementById("uldaemo-roulette-wheel");
-      if (wheelEl) {
-        _isSpinningRoulette = true;
-        wheelEl.style.transform = `rotate(${_currentWheelDeg}deg)`;
-        // 원판 안의 모든 글자를 반대 각도로 동시 역회전시켜 언제나 수평(0도) 정방향 유지!
-        wheelEl.querySelectorAll(".roulette-label-inner").forEach(innerEl => {
-          const baseAngle = parseFloat(innerEl.getAttribute("data-base-angle") || "0");
-          innerEl.style.transform = `translate(-50%, -50%) rotate(${-(baseAngle + _currentWheelDeg)}deg)`;
-        });
+      const pinEl = document.getElementById("uldaemo-roulette-pin");
+      const centerBtnEl = document.getElementById("uldaemo-roulette-center-btn");
+      const labelEls = wheelEl ? Array.from(wheelEl.querySelectorAll(".roulette-label-inner")) : [];
+
+      _isSpinningRoulette = true;
+      state.last_roulette_win_idx = null;
+
+      if (wheelEl) wheelEl.classList.add("is-spinning");
+      if (centerBtnEl) centerBtnEl.classList.add("is-spinning");
+      labelEls.forEach(el => el.classList.remove("is-winner", "is-passing"));
+
+      const reducedMotion = (typeof isReducedMotionPreferred === "function") && isReducedMotionPreferred();
+      const duration = reducedMotion ? 80 : 3200;
+      const startTs = performance.now();
+      let lastPegTick = Math.floor(startDeg / 60);
+      let pinKickAngle = 0;
+
+      // 물리 감속 + 미세 탄성 정착(Overshoot settle) 커브
+      function easeRouletteSpin(t) {
+        if (t >= 1) return 1;
+        // 5차 감속 곡선에 미세한 핀 걸림 정착 반동(0.0028) 결합
+        const quintOut = 1 - Math.pow(1 - t, 5);
+        const settleBounce = Math.sin(t * Math.PI * 2.5) * Math.pow(1 - t, 3.2) * 0.0032;
+        return quintOut + settleBounce;
       }
 
-      setTimeout(() => {
+      function finalizeRouletteSpin() {
         _isSpinningRoulette = false;
+        _currentWheelDeg = targetDeg;
+        if (wheelEl) {
+          wheelEl.classList.remove("is-spinning");
+          wheelEl.style.transform = `rotate(${_currentWheelDeg}deg)`;
+        }
+        if (pinEl) pinEl.style.transform = "translateX(-50%) rotate(0deg)";
+        if (centerBtnEl) centerBtnEl.classList.remove("is-spinning");
+
         state.last_roulette_win_idx = winIdx;
+        state.just_won_roulette = true;
+        setTimeout(() => { state.just_won_roulette = false; }, 900);
+
         const won = items[winIdx];
         if (mode === "reward") {
           if (won.type === "boost") {
@@ -6644,9 +6809,69 @@
           state.last_roulette_menu = won;
           showToast(`🍴 오늘의 추천 메뉴: ${won.full}`);
         }
+
+        try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([25, 40, 45]); } catch (e) {}
+        if (typeof fireConfetti === "function") fireConfetti();
         saveDB(true);
         render();
-      }, 2850);
+      }
+
+      if (_rouletteRafId) cancelAnimationFrame(_rouletteRafId);
+
+      function stepFrame(now) {
+        const elapsed = Math.max(0, now - startTs);
+        const p = Math.min(1, elapsed / duration);
+        const eased = easeRouletteSpin(p);
+        const curDeg = startDeg + totalDelta * eased;
+        _currentWheelDeg = curDeg;
+
+        if (wheelEl) {
+          wheelEl.style.transform = `rotate(${curDeg}deg)`;
+        }
+
+        // 현재 상단 포인터(0도) 아래를 지나가는 섹션 인덱스 계산
+        const normDeg = ((360 - (curDeg % 360)) + 360) % 360;
+        const passingIdx = Math.floor(normDeg / sliceDeg) % items.length;
+
+        // 원판 안의 모든 글자를 매 프레임 동시 역회전시켜 흔들림 없이 100% 수평 정방향 유지
+        for (let i = 0; i < labelEls.length; i++) {
+          const innerEl = labelEls[i];
+          const baseAngle = parseFloat(innerEl.getAttribute("data-base-angle") || "0");
+          innerEl.style.transform = `translate(-50%, -50%) rotate(${-(baseAngle + curDeg)}deg)`;
+          if (p > 0.58 && p < 0.995) {
+            if (i === passingIdx) innerEl.classList.add("is-passing");
+            else innerEl.classList.remove("is-passing");
+          }
+        }
+
+        // 60도 경계 핀(Peg) 통과 시 상단 포인터 틱 바운스(Tick-Bounce) 물리 연출
+        const curPegTick = Math.floor(curDeg / 60);
+        if (curPegTick !== lastPegTick && !reducedMotion) {
+          lastPegTick = curPegTick;
+          const speedFactor = Math.max(0.28, 1 - p * 0.72);
+          pinKickAngle = -30 * speedFactor;
+          try {
+            if (p > 0.45 && navigator && typeof navigator.vibrate === "function") {
+              navigator.vibrate(6);
+            }
+          } catch (e) {}
+        } else {
+          pinKickAngle *= 0.80;
+          if (Math.abs(pinKickAngle) < 0.3) pinKickAngle = 0;
+        }
+
+        if (pinEl) {
+          pinEl.style.transform = `translateX(-50%) rotate(${pinKickAngle.toFixed(1)}deg)`;
+        }
+
+        if (p < 1) {
+          _rouletteRafId = requestAnimationFrame(stepFrame);
+        } else {
+          finalizeRouletteSpin();
+        }
+      }
+
+      _rouletteRafId = requestAnimationFrame(stepFrame);
     }
 
     function openMeetupFromRouletteMenu() {
@@ -6720,10 +6945,11 @@
           <div class="stamp-grid">
             ${[1, 2, 3, 4, 5, 6, 7].map(d => {
               const isStamped = d <= stampedCnt;
+              const isJustStamped = (state.just_stamped_day === d);
               const isNext = (!st.checkedInToday && d === stampedCnt + 1);
               const bonusTxt = (d === 3 || d === 6) ? "티켓+1" : (d === 7 ? "티켓+2" : "+3점");
               return `
-                <div class="stamp-day ${isStamped ? 'stamped' : ''} ${isNext ? 'today-target' : ''}" onclick="handleDailyCheckin()" style="cursor:pointer;">
+                <div class="stamp-day ${isStamped ? 'stamped' : ''} ${isJustStamped ? 'just-stamped' : ''} ${isNext ? 'today-target' : ''}" onclick="handleDailyCheckin()" style="cursor:pointer;">
                   <div style="font-size:10.5px;">${d}일차</div>
                   <div style="height:20px; display:flex; align-items:center; justify-content:center; margin:3px 0; color:${isStamped ? '#287D62' : '#6B7684'};">
                     ${isStamped ? getSvgIcon('check', 15, '#287D62', 2.5) : `<span style="width:6px; height:6px; border-radius:50%; background:${isNext ? '#287D62' : '#E5EAE7'}; display:inline-block;"></span>`}
@@ -6775,15 +7001,24 @@
 
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items:center; gap:16px; background:#F7F9F8; border:1px solid #E5EAE7; border-radius:18px; padding:16px;">
               <div class="roulette-stage">
-                <div class="roulette-pin">▼</div>
+                <div id="uldaemo-roulette-pin" class="roulette-pin">
+                  <svg width="26" height="30" viewBox="0 0 26 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 29L3.5 11.5C1.8 8.3 4.1 4.5 7.8 4.5H18.2C21.9 4.5 24.2 8.3 22.5 11.5L13 29Z" fill="#287D62" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/>
+                    <circle cx="13" cy="9.5" r="3" fill="#FFFFFF"/>
+                  </svg>
+                </div>
                 <div id="uldaemo-roulette-wheel" class="roulette-wheel" style="transform:rotate(${_currentWheelDeg}deg);">
+                  ${[0, 60, 120, 180, 240, 300].map(pegDeg => `
+                    <div class="roulette-peg" style="transform: rotate(${pegDeg - 90}deg) translate(94px, 0);"></div>
+                  `).join("")}
                   ${items.map((it, idx) => {
                     const angle = idx * 60 + 30 - 90;
                     const shortTxt = String(it.short || it.label || "").replace(/^[^\w가-힣+]+/, "").trim().slice(0, 6);
                     const counterDeg = -(angle + _currentWheelDeg);
+                    const isWonSlice = (state.last_roulette_win_idx === idx);
                     return `
                       <div class="roulette-label" style="transform: rotate(${angle}deg) translate(60px, 0);">
-                        <div class="roulette-label-inner" data-base-angle="${angle}" style="transform: translate(-50%, -50%) rotate(${counterDeg}deg);">
+                        <div class="roulette-label-inner ${isWonSlice ? 'is-winner' : ''}" data-base-angle="${angle}" style="transform: translate(-50%, -50%) rotate(${counterDeg}deg);">
                           <span style="color:#287D62;">${circledNums[idx]}</span>
                           <span>${escHtml(shortTxt)}</span>
                         </div>
@@ -6791,7 +7026,7 @@
                     `;
                   }).join("")}
                 </div>
-                <button class="roulette-center-btn" onclick="spinRouletteWheel()">
+                <button id="uldaemo-roulette-center-btn" class="roulette-center-btn" onclick="spinRouletteWheel()">
                   <span>SPIN</span>
                 </button>
               </div>
@@ -6817,8 +7052,10 @@
                     ${items.map((it, i) => {
                       const cleanLabel = String(it.label || "").replace(/^[^\w가-힣+]+/, "").trim() || it.label;
                       const isWon = (state.last_roulette_win_idx === i);
+                      const shuffleCls = state.menu_just_shuffled ? 'is-shuffling' : '';
+                      const wonCls = isWon ? 'is-won' : '';
                       return `
-                        <div style="font-size:12px; font-weight:${isWon ? '800' : '600'}; background:${isWon ? '#EEF8F3' : '#FFFFFF'}; border:${isWon ? '1.5px solid #287D62' : '1px solid #E5EAE7'}; border-radius:8px; padding:7px 9px; color:${isWon ? '#1E6B52' : '#191F28'}; display:flex; align-items:center; justify-content:space-between; gap:4px;">
+                        <div class="roulette-slot-item ${shuffleCls} ${wonCls}" style="--slot-idx:${i}; font-size:12px; font-weight:${isWon ? '800' : '600'}; background:${isWon ? '#EEF8F3' : '#FFFFFF'}; border:${isWon ? '1.5px solid #287D62' : '1px solid #E5EAE7'}; border-radius:8px; padding:7px 9px; color:${isWon ? '#1E6B52' : '#191F28'}; display:flex; align-items:center; justify-content:space-between; gap:4px;">
                           <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b style="color:#287D62; margin-right:3px;">${circledNums[i]}</b>${escHtml(cleanLabel)}</span>
                           ${isWon ? `<span style="font-size:10px; background:#287D62; color:#FFFFFF; padding:1px 5px; border-radius:999px; flex-shrink:0;">당첨</span>` : ''}
                         </div>
@@ -6828,7 +7065,7 @@
                 `}
 
                 ${state.last_roulette_result ? `
-                  <div style="background:#EEF8F3; border:1.5px solid #287D62; border-radius:12px; padding:12px 14px; margin-bottom:12px;">
+                  <div class="roulette-result-banner" style="background:#EEF8F3; border:1.5px solid #287D62; border-radius:12px; padding:12px 14px; margin-bottom:12px;">
                     <div style="font-size:11px; font-weight:800; color:#287D62; margin-bottom:2px;">🎯 이번 룰렛 당첨 결과</div>
                     <div style="font-size:13.5px; font-weight:800; color:#191F28; line-height:1.4;">
                       ${escHtml(state.last_roulette_result)}
@@ -6860,7 +7097,7 @@
                 <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
                   <div>
                     <div style="font-size:12px; font-weight:700; color:#6B7684;">⚡ 번개 상단 부스트권</div>
-                    <div style="font-size:17px; font-weight:800; color:#287D62; margin:2px 0;">${boostCnt}개</div>
+                    <div style="font-size:17px; font-weight:800; color:#287D62; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${boostCnt}개</span></div>
                     <div style="font-size:11px; color:#6B7684; line-height:1.35;">내 번개를 홈 피드 최상단에 강조 노출해요</div>
                   </div>
                   <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px; background:${boostCnt > 0 ? '#287D62' : '#FFFFFF'}; color:${boostCnt > 0 ? '#FFFFFF' : '#6B7684'}; border-color:${boostCnt > 0 ? '#287D62' : '#E5EAE7'};" onclick="useBoostCouponNow()">
@@ -6871,7 +7108,7 @@
                 <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
                   <div>
                     <div style="font-size:12px; font-weight:700; color:#6B7684;">➕ 오늘 추가 개설권</div>
-                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;">${extraPostCnt}개</div>
+                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${extraPostCnt}개</span></div>
                     <div style="font-size:11px; color:#6B7684; line-height:1.35;">일일 번개 개설 한도를 +1회 늘려줘요</div>
                   </div>
                   <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="state.active_modal='create'; render();">
@@ -6882,7 +7119,7 @@
                 <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
                   <div>
                     <div style="font-size:12px; font-weight:700; color:#6B7684;">☕ 커피 응모 · 이달의 랭킹</div>
-                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;">${myRank}위 <span style="font-size:12px; color:#287D62;">(${st.rewardScore}점)</span></div>
+                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${myRank}위 <span style="font-size:12px; color:#287D62;">(${st.rewardScore}점)</span></span></div>
                     <div style="font-size:11px; color:#6B7684; line-height:1.35;">이달의 활동 TOP 3 학우에게 커피 쿠폰 증정</div>
                   </div>
                   <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="state.profile_sec='challenge'; switchTab('마이');">
