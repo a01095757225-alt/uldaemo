@@ -2803,12 +2803,26 @@
     }
 
     let _matchCelebrationTimer = null;
-    function showMeetupMatchCelebration(post, applicantUser) {
-      const hostUser = (post && DB.users[post.author_id]) || { avatar: "🐶", nickname: "방장" };
-      const apUser = applicantUser || { avatar: "🐱", nickname: "학우" };
+    function showMeetupMatchCelebration(post, applicantUser, mode = "match") {
+      const hostUser = (post && DB.users[post.author_id]) || DB.users[state.user_id] || { avatar: "🐶", nickname: "방장" };
+      const apUser = applicantUser || { avatar: "⚡", nickname: "학우" };
       const hostAvatar = String(hostUser.avatar || "🐶").split(" ")[0];
-      const apAvatar = String(apUser.avatar || "🐱").split(" ")[0];
+      const apAvatar = mode === "create"
+        ? (typeof getCatEmoji === "function" && post ? getCatEmoji(post.category, post.title) : "⚡")
+        : String(apUser.avatar || "🐱").split(" ")[0];
       const titleTxt = post ? post.title : "캠퍼스 번개";
+      const badgeLabel = mode === "create" ? "⚡ 오픈" : (mode === "apply" ? "🙌 신청" : "⚡ 매칭");
+      const topMainTxt = mode === "create"
+        ? "🎉 새 번개 모임 오픈!"
+        : (mode === "apply" ? "⚡ 번개 참여 신청 완료!" : "🎉 번개 모임 성사!");
+      const topSubTxt = mode === "create"
+        ? `· ${escHtml(post && post.location ? post.location : "실시간 모집 시작")}`
+        : (mode === "apply" ? "· 방장 수락 시 대화방 오픈" : "· 안심 대화방 오픈");
+      const bottomTxt = mode === "create"
+        ? `[${escHtml(titleTxt)}] 모임이 등록되었어요!`
+        : (mode === "apply"
+          ? `[${escHtml(titleTxt)}] 모임에 참여를 신청했어요!`
+          : `${escHtml(apUser.nickname || "학우")}님과 [${escHtml(titleTxt)}] 매칭 완료!`);
 
       let banner = document.getElementById("meetup-match-celebration");
       if (!banner) {
@@ -2825,15 +2839,15 @@
         <div class="match-avatar-pair">
           <span class="match-avatar-circle">${hostAvatar}</span>
           <span class="match-avatar-circle second">${apAvatar}</span>
-          <span class="match-spark-badge">⚡ 매칭</span>
+          <span class="match-spark-badge">${badgeLabel}</span>
         </div>
         <div style="min-width:0; flex:1;">
           <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-            <span style="font-size:11px; font-weight:800; color:#34D399; letter-spacing:0.02em;">🎉 번개 모임 성사!</span>
-            <span style="font-size:11px; color:#9CA3AF;">· 안심 대화방 오픈</span>
+            <span style="font-size:11px; font-weight:800; color:#34D399; letter-spacing:0.02em;">${topMainTxt}</span>
+            <span style="font-size:11px; color:#9CA3AF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${topSubTxt}</span>
           </div>
           <div style="font-size:14px; font-weight:800; color:#FFFFFF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${escHtml(apUser.nickname || "학우")}님과 [${escHtml(titleTxt)}] 매칭 완료!
+            ${bottomTxt}
           </div>
         </div>
       `;
@@ -5991,8 +6005,9 @@
         actionBtnHtml = `<button type="button" class="btn btn-primary" style="width:auto; min-height:32px; height:32px; padding:0 12px; font-size:12px; font-weight:700; border-radius:999px; flex-shrink:0;" onclick="event.stopPropagation(); applyToPost(${post.id});">참여</button>`;
       }
 
+      const isNewCard = (window._justCreatedPostId === post.id);
       return `
-        <div class="tk-feed-item" onclick="openDetailModal(${post.id})">
+        <div class="tk-feed-item ${isNewCard ? 'card-pop-new' : ''}" onclick="openDetailModal(${post.id})">
           <div class="tk-feed-thumb">${emoji}</div>
           <div class="tk-feed-body">
             <div class="tk-feed-title-row">
@@ -6233,7 +6248,10 @@
         });
         notifyUser(post.author_id, `[${post.title}] 모임에 ${DB.users[state.user_id].nickname}님이 참여를 신청했어요`);
         saveDB(true);
-        showToast("참여를 신청했어요. 수락되면 대화방이 열려요");
+        try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
+        fireConfetti();
+        showMeetupMatchCelebration(post, DB.users[state.user_id], "apply");
+        showToast("참여를 신청했어요! 방장이 수락하면 대화방이 열려요");
         render();
       }
     }
@@ -6453,14 +6471,19 @@
         is_boosted: useBoost,
         status: "모집중"
       });
-      notifyFavCategory(DB.posts[0]);
+      const createdPost = DB.posts[0];
+      notifyFavCategory(createdPost);
       window._justCreatedPostId = newId;
       state.prefill_title = ""; state.prefill_loc = "";
       saveDB(true);
-      showToast("번개를 올렸어요");
       state.active_modal = null;
       state.nav_tab = "홈";
       render();
+      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([25, 40, 45]); } catch (e) {}
+      triggerLightningFlash();
+      fireConfetti({ mode: "match" });
+      showMeetupMatchCelebration(createdPost, null, "create");
+      showToast("⚡ 새 번개를 올렸어요!");
       setTimeout(() => { window._justCreatedPostId = null; }, 1200);
     }
 
