@@ -1288,8 +1288,8 @@
       transform: scale(0.98);
       filter: brightness(0.96);
     }
-    /* 지도(Leaflet) 영역, 채팅 입력창, 스크롤 영역은 터치 스케일 제외 */
-    #campus-map, #campus-map *, #home-mugeo-map, #home-mugeo-map *, #detail-map, #detail-map *, #side-map, #side-map *, .leaflet-container, .leaflet-container *, .tk-chat-input, input, textarea, select, .cat-scroll-wrap, .tk-chat-messages {
+    /* 지도(Leaflet) 영역 내부 버튼, 채팅 입력창, 스크롤 영역은 터치 스케일 제외 (Leaflet 타일·마커 translate3d 보존) */
+    .leaflet-container .btn:active, .tk-chat-input, .tk-chat-input:active, input:active, textarea:active, select:active, .cat-scroll-wrap:active, .tk-chat-messages:active {
       transform: none !important;
       filter: none !important;
     }
