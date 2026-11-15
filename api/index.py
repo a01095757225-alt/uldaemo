@@ -10,10 +10,14 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.header import Header
+from email.utils import formataddr, formatdate, make_msgid
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 DEFAULT_SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "uldaemo.official@gmail.com")
 DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "knxqjnrestyggctq")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "울대모 <noreply@uladaemo.app>").strip()
 
 
 def call_gemini_api(prompt: str) -> str:
@@ -37,6 +41,63 @@ def call_gemini_api(prompt: str) -> str:
 
 
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
+    plain_body = (
+        f"[울대모] 이메일 본인 확인 안내\n\n"
+        f"안녕하세요, 울산대학교 캠퍼스 안심 번개 매칭 플랫폼 울대모(https://www.uladaemo.app)입니다.\n"
+        f"요청하신 본인 확인 6자리 인증번호는 아래와 같습니다.\n\n"
+        f"인증번호: {otp_code}\n\n"
+        f"화면에 위 6자리 숫자를 입력해 주세요.\n"
+        f"본인이 요청하지 않은 경우 이 메일을 무시하셔도 됩니다."
+    )
+    html_body = f"""<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>울대모 이메일 본인 확인</title></head>
+<body style="margin:0; padding:20px 12px; background-color:#F7F9F8; font-family:'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;">
+  <div style="max-width:460px; margin:0 auto; padding:28px 24px; border:1px solid #E5EAE7; border-radius:16px; background-color:#FFFFFF;">
+    <div style="font-size:18px; font-weight:800; color:#287D62; margin-bottom:10px;">울대모 이메일 본인 확인 안내</div>
+    <p style="font-size:14px; color:#333D4B; line-height:1.6; margin:0 0 18px;">
+      안녕하세요! 울산대학교 캠퍼스 안심 번개 매칭 플랫폼 <b>울대모</b>입니다.<br>
+      아래 6자리 인증번호를 인증 화면에 입력해 주세요.
+    </p>
+    <div style="background-color:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:16px; text-align:center; margin-bottom:18px;">
+      <div style="font-size:11px; font-weight:700; color:#287D62; margin-bottom:4px;">본인 확인 인증번호</div>
+      <span style="font-size:28px; font-weight:800; letter-spacing:6px; color:#191F28;">{otp_code}</span>
+    </div>
+    <p style="font-size:12px; color:#6B7684; line-height:1.5; margin:0;">
+      본 메일은 울대모(uladaemo.app) 본인 확인 요청에 의해 발송되었습니다.<br>
+      타인에게 인증번호를 공유하지 마세요.
+    </p>
+  </div>
+</body>
+</html>"""
+
+    # 1순위: 무료 도메인 이메일 API (Resend - 월 3,000통 무료, DKIM/SPF 정식 서명으로 스팸함 방지)
+    if RESEND_API_KEY and not sender_email:
+        try:
+            payload = json.dumps({
+                "from": RESEND_FROM_EMAIL,
+                "to": [recipient_email],
+                "subject": "[울대모] 이메일 본인 확인 인증번호 안내",
+                "text": plain_body,
+                "html": html_body,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "uldaemo-mailer/1.0",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                if 200 <= resp.status < 300:
+                    return True, "공식 도메인 메일로 6자리 인증번호가 발송되었습니다!"
+        except Exception:
+            pass
+
+    # 2순위: Gmail / Naver SMTP 발송 (RFC-5322 표준 헤더 + Plain/HTML 멀티파트 구성으로 스팸 점수 최소화)
     sender = (sender_email or DEFAULT_SMTP_EMAIL).strip()
     pw = (app_password or DEFAULT_SMTP_PASSWORD).strip().replace(" ", "")
     if not sender or not pw:
@@ -51,23 +112,16 @@ def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", a
         smtp_host, smtp_port = "smtp.gmail.com", 465
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[울대모] 이메일 본인 확인 인증번호 [{otp_code}]"
-    msg["From"] = sender
+    msg["Subject"] = Header("[울대모] 이메일 본인 확인 인증번호 안내", "utf-8")
+    msg["From"] = formataddr((str(Header("울대모", "utf-8")), sender))
     msg["To"] = recipient_email
+    msg["Reply-To"] = sender
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg["Auto-Submitted"] = "auto-generated"
 
-    html_body = f"""
-    <div style="font-family: 'Pretendard', -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px 24px; border: 1px solid #E5E8EB; border-radius: 16px; background-color: #FFFFFF;">
-        <div style="font-size: 20px; font-weight: 800; color: #287D62; margin-bottom: 8px;">🌱 울대모 이메일 인증 안내</div>
-        <p style="font-size: 14px; color: #4E5968; line-height: 1.6; margin-bottom: 20px;">
-            안녕하세요! 캠퍼스 안심 번개 매칭 플랫폼 <b>울대모</b> 회원가입을 위한 본인 확인 인증번호입니다.<br>
-            아래 6자리 인증번호를 가입 화면에 입력해 주세요.
-        </p>
-        <div style="background-color: #EEF8F3; border: 1px solid #C5E6D6; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px;">
-            <span style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #1E634C;">{otp_code}</span>
-        </div>
-        <p style="font-size: 12px; color: #8B95A1;">본 메일은 발신 전용이며, 타인에게 인증번호를 공유하지 마세요.</p>
-    </div>
-    """
+    # 반드시 text/plain 파트를 먼저 첨부하고 text/html 파트를 뒤에 첨부해야 스팸 필터 감점을 피할 수 있음
+    msg.attach(MIMEText(plain_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
