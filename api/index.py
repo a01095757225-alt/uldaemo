@@ -346,15 +346,38 @@ _CLOUD_ISSUE = 1
 _DEFAULT_GH_TOKEN = "".join(["ghp_", "C2YNaOoKnR71EdnuaOnKD", "00AE4FaAZ2C6l54"])
 _DB_MEM_CACHE = {"ts": 0.0, "db": None}
 
+# Supabase 연결 설정 (환경변수 또는 직접 설정 지원)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_KEY = (
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("SUPABASE_KEY")
+    or os.environ.get("SUPABASE_ANON_KEY")
+    or ""
+).strip()
+
 
 def _gh_token() -> str:
     return os.environ.get("GITHUB_TOKEN", _DEFAULT_GH_TOKEN).strip()
 
 
-def load_cloud_db(force: bool = False):
-    now = time.time()
-    if not force and _DB_MEM_CACHE["db"] and (now - _DB_MEM_CACHE["ts"] < 2.0):
-        return _DB_MEM_CACHE["db"]
+def _has_supabase() -> bool:
+    return bool(SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL.startswith("http"))
+
+
+def _supabase_headers(prefer: str = "") -> dict:
+    hdrs = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "uldaemo-supabase-client/1.0",
+    }
+    if prefer:
+        hdrs["Prefer"] = prefer
+    return hdrs
+
+
+def _github_load_db():
     try:
         url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
         req = urllib.request.Request(
@@ -370,11 +393,242 @@ def load_cloud_db(force: bool = False):
             issue = json.loads(resp.read().decode("utf-8"))
             db_obj = json.loads(issue.get("body") or "{}")
             if isinstance(db_obj, dict) and "users" in db_obj:
-                _DB_MEM_CACHE["db"] = db_obj
-                _DB_MEM_CACHE["ts"] = now
                 return db_obj
     except Exception:
         pass
+    return None
+
+
+def _github_save_db(db_obj: dict) -> bool:
+    try:
+        url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
+        payload = {"body": json.dumps(db_obj, ensure_ascii=False)}
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"token {_gh_token()}",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "uldaemo-cloud-db",
+                "Content-Type": "application/json",
+            },
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req, timeout=7) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def _supabase_fetch_table(query_path: str):
+    url = f"{SUPABASE_URL}/rest/v1/{query_path}"
+    req = urllib.request.Request(url, headers=_supabase_headers(), method="GET")
+    with urllib.request.urlopen(req, timeout=6) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _supabase_load_db():
+    if not _has_supabase():
+        return None
+    try:
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_state = ex.submit(_supabase_fetch_table, "uldaemo_state?id=eq.main&select=data,updated_at")
+            f_users = ex.submit(_supabase_fetch_table, "uldaemo_users?select=*")
+            state_rows = f_state.result()
+            user_rows = f_users.result()
+
+        db_obj = None
+        if isinstance(state_rows, list) and len(state_rows) > 0:
+            raw_state = state_rows[0].get("data")
+            if isinstance(raw_state, dict) and "users" in raw_state:
+                db_obj = raw_state
+
+        # 최초 Supabase 연결 시 데이터가 비어 있다면 기존 GitHub DB에서 자동 마이그레이션 수행
+        if not db_obj:
+            gh_db = _github_load_db()
+            if isinstance(gh_db, dict) and "users" in gh_db:
+                _supabase_save_db(gh_db)
+                return gh_db
+            db_obj = {
+                "users": {},
+                "posts": [],
+                "applications": [],
+                "messages": [],
+                "notifications": [],
+                "reviews": [],
+                "polls": [],
+                "plaza_talks": [],
+            }
+
+        # uldaemo_users 테이블의 행(Row) 데이터를 병합 (Table Editor에서 직접 수정한 값 즉시 반영)
+        if isinstance(user_rows, list) and len(user_rows) > 0:
+            users_map = db_obj.setdefault("users", {})
+            now_ms = int(time.time() * 1000)
+            for row in user_rows:
+                if not isinstance(row, dict):
+                    continue
+                sid = str(row.get("student_id") or "").strip()
+                if not sid:
+                    continue
+                raw_u = row.get("raw_data") if isinstance(row.get("raw_data"), dict) else {}
+                base_u = dict(users_map.get(sid) or {})
+                base_u.update(raw_u)
+
+                # 관리자가 Supabase Table Editor에서 컬럼 값을 직접 수정했는지 감지
+                col_checks = [
+                    ("nickname", str, ""),
+                    ("department", str, "울산대"),
+                    ("mbti", str, ""),
+                    ("manner_temp", float, 36.5),
+                    ("report_count", int, 0),
+                    ("coffee_tickets", int, 0),
+                    ("boost_coupons", int, 0),
+                    ("extra_post_coupons", int, 0),
+                    ("bonus_score", int, 0),
+                    ("streak_days", int, 1),
+                ]
+                admin_edited = False
+                for col_key, cast_fn, default_val in col_checks:
+                    if row.get(col_key) is not None:
+                        try:
+                            col_val = cast_fn(row.get(col_key))
+                            raw_val = cast_fn(raw_u.get(col_key, default_val))
+                            if col_val != raw_val:
+                                base_u[col_key] = col_val
+                                admin_edited = True
+                        except Exception:
+                            pass
+
+                if admin_edited:
+                    base_u["updated_at"] = now_ms
+                users_map[sid] = base_u
+
+        return db_obj
+    except Exception:
+        return None
+
+
+def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
+    if not _has_supabase() or not isinstance(db_obj, dict):
+        return False
+    now_ms = int(time.time() * 1000)
+    ok_state = False
+    try:
+        # 1. uldaemo_state 업서트
+        state_payload = [{"id": "main", "data": db_obj, "updated_at": now_ms}]
+        req_state = urllib.request.Request(
+            f"{SUPABASE_URL}/rest/v1/uldaemo_state?on_conflict=id",
+            data=json.dumps(state_payload, ensure_ascii=False).encode("utf-8"),
+            headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+            method="POST",
+        )
+        with urllib.request.urlopen(req_state, timeout=6) as resp:
+            ok_state = 200 <= resp.status < 300
+    except Exception:
+        ok_state = False
+
+    # 2. uldaemo_users 테이블 행(Row) 단위 업서트
+    try:
+        users_dict = db_obj.get("users") or {}
+        if isinstance(users_dict, dict) and len(users_dict) > 0:
+            user_rows = []
+            for sid, u in users_dict.items():
+                if not isinstance(u, dict):
+                    continue
+                user_rows.append({
+                    "student_id": str(sid),
+                    "nickname": str(u.get("nickname") or ""),
+                    "department": str(u.get("department") or "울산대"),
+                    "mbti": str(u.get("mbti") or ""),
+                    "manner_temp": float(u.get("manner_temp") if u.get("manner_temp") is not None else 36.5),
+                    "report_count": int(u.get("report_count") or 0),
+                    "coffee_tickets": int(u.get("coffee_tickets") or 0),
+                    "boost_coupons": int(u.get("boost_coupons") or 0),
+                    "extra_post_coupons": int(u.get("extra_post_coupons") or 0),
+                    "bonus_score": int(u.get("bonus_score") or 0),
+                    "streak_days": int(u.get("streak_days") or 1),
+                    "raw_data": u,
+                    "updated_at": int(u.get("updated_at") or now_ms),
+                })
+            if user_rows:
+                req_users = urllib.request.Request(
+                    f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
+                    data=json.dumps(user_rows, ensure_ascii=False).encode("utf-8"),
+                    headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                    method="POST",
+                )
+                with urllib.request.urlopen(req_users, timeout=6):
+                    pass
+    except Exception:
+        pass
+
+    # 3. uldaemo_posts 테이블 행(Row) 단위 업서트 및 삭제 반영
+    try:
+        posts_list = db_obj.get("posts") or []
+        if isinstance(posts_list, list) and len(posts_list) > 0:
+            post_rows = []
+            for p in posts_list:
+                if not isinstance(p, dict) or not p.get("id"):
+                    continue
+                post_rows.append({
+                    "id": int(p.get("id")),
+                    "author_id": str(p.get("author_id") or ""),
+                    "title": str(p.get("title") or ""),
+                    "category": str(p.get("category") or ""),
+                    "location": str(p.get("location") or ""),
+                    "meet_date": str(p.get("meet_date") or ""),
+                    "meet_time": str(p.get("meet_time") or ""),
+                    "max_participants": int(p.get("max_participants") or 2),
+                    "status": str(p.get("status") or "모집중"),
+                    "is_official": bool(p.get("is_official")),
+                    "raw_data": p,
+                    "updated_at": int(p.get("updated_at") or now_ms),
+                })
+            if post_rows:
+                req_posts = urllib.request.Request(
+                    f"{SUPABASE_URL}/rest/v1/uldaemo_posts?on_conflict=id",
+                    data=json.dumps(post_rows, ensure_ascii=False).encode("utf-8"),
+                    headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                    method="POST",
+                )
+                with urllib.request.urlopen(req_posts, timeout=6):
+                    pass
+        if deleted_post_ids:
+            ids_csv = ",".join(str(int(x)) for x in deleted_post_ids if str(x).isdigit())
+            if ids_csv:
+                req_del = urllib.request.Request(
+                    f"{SUPABASE_URL}/rest/v1/uldaemo_posts?id=in.({ids_csv})",
+                    headers=_supabase_headers("return=minimal"),
+                    method="DELETE",
+                )
+                with urllib.request.urlopen(req_del, timeout=5):
+                    pass
+    except Exception:
+        pass
+
+    return ok_state
+
+
+def load_cloud_db(force: bool = False):
+    now = time.time()
+    if not force and _DB_MEM_CACHE["db"] and (now - _DB_MEM_CACHE["ts"] < 2.0):
+        return _DB_MEM_CACHE["db"]
+
+    # 1순위: Supabase PostgreSQL DB
+    if _has_supabase():
+        sb_db = _supabase_load_db()
+        if isinstance(sb_db, dict) and "users" in sb_db:
+            _DB_MEM_CACHE["db"] = sb_db
+            _DB_MEM_CACHE["ts"] = now
+            return sb_db
+
+    # 2순위(폴백): GitHub Issue #1 클라우드 스토리지
+    gh_db = _github_load_db()
+    if isinstance(gh_db, dict) and "users" in gh_db:
+        _DB_MEM_CACHE["db"] = gh_db
+        _DB_MEM_CACHE["ts"] = now
+        return gh_db
+
     return _DB_MEM_CACHE["db"]
 
 
@@ -526,27 +780,18 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         merged_talks.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["plaza_talks"] = merged_talks[:100]
 
-    try:
-        url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
-        payload = {"body": json.dumps(current, ensure_ascii=False)}
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"token {_gh_token()}",
-                "Accept": "application/vnd.github+json",
-                "User-Agent": "uldaemo-cloud-db",
-                "Content-Type": "application/json",
-            },
-            method="PATCH",
-        )
-        with urllib.request.urlopen(req, timeout=7) as resp:
-            if resp.status == 200:
-                _DB_MEM_CACHE["db"] = current
-                _DB_MEM_CACHE["ts"] = time.time()
-                return True, current
-    except Exception:
-        pass
+    # 1순위: Supabase PostgreSQL DB에 저장 (uldaemo_state, uldaemo_users, uldaemo_posts 동시 동기화)
+    if _has_supabase():
+        if _supabase_save_db(current, deleted_post_ids):
+            _DB_MEM_CACHE["db"] = current
+            _DB_MEM_CACHE["ts"] = time.time()
+            return True, current
+
+    # 2순위(폴백): GitHub Issue #1 클라우드 스토리지에 저장
+    if _github_save_db(current):
+        _DB_MEM_CACHE["db"] = current
+        _DB_MEM_CACHE["ts"] = time.time()
+        return True, current
     return False, current
 
 
@@ -565,7 +810,18 @@ class handler(BaseHTTPRequestHandler):
         self._send_json(200, {"ok": True})
 
     def do_GET(self):
-        self._send_json(200, {"status": "ok", "service": "uldaemo-vercel-api"})
+        # GET 호출 시 Supabase 무료 플랜 7일 절전 방지를 위한 가벼운 Keep-Alive 핑 겸용 동작
+        storage_mode = "supabase" if _has_supabase() else "github_fallback"
+        if _has_supabase():
+            try:
+                _supabase_fetch_table("uldaemo_state?id=eq.main&select=id")
+            except Exception:
+                pass
+        self._send_json(200, {
+            "status": "ok",
+            "service": "uldaemo-vercel-api",
+            "storage": storage_mode,
+        })
 
     def do_POST(self):
         try:
@@ -576,16 +832,37 @@ class handler(BaseHTTPRequestHandler):
             data = {}
 
         action = data.get("action", "")
+        if action in ("keepalive", "db_status"):
+            storage_mode = "supabase" if _has_supabase() else "github_fallback"
+            db_obj = load_cloud_db(force=False)
+            user_cnt = len((db_obj or {}).get("users") or {}) if isinstance(db_obj, dict) else 0
+            post_cnt = len((db_obj or {}).get("posts") or []) if isinstance(db_obj, dict) else 0
+            self._send_json(200, {
+                "ok": True,
+                "storage": storage_mode,
+                "users_count": user_cnt,
+                "posts_count": post_cnt,
+            })
+            return
+
         if action == "load_db":
             db_obj = load_cloud_db(force=bool(data.get("force")))
-            self._send_json(200, {"ok": bool(db_obj), "db": db_obj})
+            self._send_json(200, {
+                "ok": bool(db_obj),
+                "storage": "supabase" if _has_supabase() else "github_fallback",
+                "db": db_obj,
+            })
             return
 
         if action == "sync_db":
             client_db = data.get("db") or {}
             deleted_post_ids = data.get("deleted_post_ids") or []
             ok, merged = sync_cloud_db(client_db, deleted_post_ids)
-            self._send_json(200, {"ok": ok, "db": merged})
+            self._send_json(200, {
+                "ok": ok,
+                "storage": "supabase" if _has_supabase() else "github_fallback",
+                "db": merged,
+            })
             return
 
         if action == "ulsan_notices":
