@@ -5459,8 +5459,9 @@
               </div>
 
               ${state.pw_reset_otp_sent ? `
-                <div style="font-size:12px; color:#287D62; font-weight:600; margin:4px 0 8px;">
-                  발송된 6자리 인증번호와 새로 사용할 비밀번호(4자리 이상)를 입력해주세요.
+                <div style="font-size:12px; color:#287D62; font-weight:600; margin:4px 0 8px; line-height:1.45;">
+                  발송된 6자리 인증번호와 새로 사용할 비밀번호(4자리 이상)를 입력해주세요.<br>
+                  <span style="font-size:11.5px; color:#6B7684; font-weight:500;">💡 메일이 안 보이면 <b>스팸메일함(또는 프로모션함)</b>을 꼭 확인해주세요.</span>
                 </div>
                 <label class="label">이메일 인증번호 6자리</label>
                 <input id="reset_otp_code" class="input" placeholder="6자리 인증번호 입력" />
@@ -5493,8 +5494,9 @@
                   <button class="btn" style="height:40px;" onclick="requestEmailOtp()">인증 요청</button>
                 </div>
                 ${state.auth_code_sent ? `
-                  <div style="font-size:12px; color:#287D62; font-weight:600; margin:4px 0 6px;">
-                    입력하신 메일함(스팸함 포함)으로 발송된 <b>6자리 인증번호</b>를 입력해주세요!
+                  <div style="font-size:12px; color:#287D62; font-weight:600; margin:4px 0 6px; line-height:1.45;">
+                    입력하신 메일함으로 발송된 <b>6자리 인증번호</b>를 입력해주세요!<br>
+                    <span style="font-size:11.5px; color:#6B7684; font-weight:500;">💡 10초 내로 안 오면 <b>스팸메일함(또는 프로모션함)</b>을 확인해주세요.</span>
                   </div>
                   <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px; margin-bottom:6px;">
                     <input id="signup_otp_code" class="input" placeholder="인증번호 6자리 입력" />
