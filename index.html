@@ -2485,16 +2485,35 @@
       "무거동 대학로 (바보사거리 카페거리)": [35.542600, 129.260800, "☕"]
     };
 
-    // 울산 남구 무거동 실존 맛집 데이터 (별점 4.6점 이상 기준 · 실제 도로명주소 정밀 GPS 좌표)
+    // 울산대학교 주변(바보사거리 · 울과대 근처 · 울산대 후문) 실존 맛집 22곳 (네이버·카카오·구글 3사 평점 & 도로명 정밀 GPS)
     const MUGEO_FOOD_SPOTS = [
-      { id: "r1", name: "싱귤러커피", rating: 4.9, menu: "한옥 감성 카페·수제 디저트", address: "남구 대학로1번길 3-35", emoji: "☕", bg: "#EFE5DC", cat: "☕ 카공", lat: 35.535416, lng: 129.251486, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "싱귤러커피에서 카공·수다 해요!", kakaoQuery: "울산 무거동 싱귤러커피" },
-      { id: "r2", name: "돌돌파스타", rating: 4.8, menu: "치킨로제파스타·목살스테이크", address: "남구 대학로84번길 12", emoji: "🍝", bg: "#FFE8D6", cat: "🍚 밥약", lat: 35.541952, lng: 129.260743, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 돌돌파스타 같이 먹어요!", kakaoQuery: "울산 무거동 돌돌파스타" },
-      { id: "r3", name: "가무댕댕", rating: 4.8, menu: "추억의 경양식 수제 돈까스", address: "남구 대학로94번길 11", emoji: "🍛", bg: "#FFF3CD", cat: "🍚 밥약", lat: 35.543015, lng: 129.261318, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "울대 앞 가무댕댕 돈까스 고!", kakaoQuery: "울산 무거동 가무댕댕" },
-      { id: "r4", name: "하루 무거점", rating: 4.8, menu: "연어 사시미·나베 이자카야", address: "남구 대학로94번길 5-5", emoji: "🍣", bg: "#E0F2FE", cat: "🍻 술/번개", lat: 35.543498, lng: 129.260657, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "저녁에 바사 하루에서 한잔할 분!", kakaoQuery: "울산 무거동 하루 이자카야" },
-      { id: "r5", name: "라파르테", rating: 4.8, menu: "수제 타르트·휘낭시에 디저트", address: "남구 대학로43번길 18-14", emoji: "🍰", bg: "#FCE7F3", cat: "☕ 카공", lat: 35.540958, lng: 129.255868, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "라파르테 디저트 맛집 같이 가요", kakaoQuery: "울산 무거동 라파르테" },
-      { id: "r6", name: "종가집돼지국밥", rating: 4.7, menu: "진한 국물 돼지국밥·수육", address: "남구 대학로 40", emoji: "🍲", bg: "#FDE8E8", cat: "🍚 밥약", lat: 35.539160, lng: 129.256979, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "뜨끈한 종가집돼지국밥 같이 먹어요", kakaoQuery: "울산 무거동 종가집돼지국밥" },
-      { id: "r7", name: "핵밥 울산대점", rating: 4.7, menu: "큐브스테이크덮밥·마제소바", address: "남구 대학로 106", emoji: "🍱", bg: "#ECFDF5", cat: "🍚 밥약", lat: 35.544199, lng: 129.260682, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "핵밥에서 덮밥 같이 먹어요!", kakaoQuery: "울산 무거동 핵밥" },
-      { id: "r8", name: "쭈꾸미가 알고싶다", rating: 4.7, menu: "매콤 직화 쭈꾸미 점심특선", address: "남구 대학로94번길 5-3", emoji: "🐙", bg: "#FEE2E2", cat: "🍚 밥약", lat: 35.543390, lng: 129.260606, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "쭈꾸미가 알고싶다 점심 특선 고!", kakaoQuery: "울산 무거동 쭈꾸미가 알고싶다" }
+      // [바보사거리 · 울산대 정문 구역]
+      { id: "r1", zone: "basa", zoneLabel: "바보사거리", name: "가무댕댕", rating: 4.8, naverRating: 4.8, kakaoRating: 4.8, googleRating: 4.7, menu: "추억의 경양식 수제 돈까스", address: "남구 대학로94번길 11", emoji: "🍛", bg: "#FFF3CD", cat: "🍚 밥약", lat: 35.543015, lng: 129.261318, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "울대 앞 가무댕댕 돈까스 고!", kakaoQuery: "울산 무거동 가무댕댕" },
+      { id: "r2", zone: "basa", zoneLabel: "바보사거리", name: "돌돌파스타", rating: 4.8, naverRating: 4.9, kakaoRating: 4.8, googleRating: 4.7, menu: "치킨로제파스타·화덕피자", address: "남구 대학로84번길 12", emoji: "🍝", bg: "#FFE8D6", cat: "🍚 밥약", lat: 35.541952, lng: 129.260743, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 돌돌파스타 같이 먹어요!", kakaoQuery: "울산 무거동 돌돌파스타" },
+      { id: "r3", zone: "basa", zoneLabel: "바보사거리", name: "기린카페", rating: 4.8, naverRating: 4.8, kakaoRating: 4.9, googleRating: 4.7, menu: "샤케라또·말차라떼 카공 카페", address: "남구 대학로84번길 5-7", emoji: "☕", bg: "#EFE5DC", cat: "☕ 카공", lat: 35.542741, lng: 129.260190, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "기린카페에서 카공·수다 해요!", kakaoQuery: "울산 무거동 기린카페" },
+      { id: "r4", zone: "basa", zoneLabel: "바보사거리", name: "테디스 카페", rating: 4.7, naverRating: 4.8, kakaoRating: 4.7, googleRating: 4.6, menu: "수제 카이막·바스크치즈케이크", address: "남구 대학로84번길 5-13", emoji: "🍰", bg: "#FCE7F3", cat: "☕ 카공", lat: 35.542961, lng: 129.260402, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "테디스 카이막 디저트 같이 먹어요!", kakaoQuery: "울산 무거동 테디스" },
+      { id: "r5", zone: "basa", zoneLabel: "바보사거리", name: "하루 무거점", rating: 4.7, naverRating: 4.8, kakaoRating: 4.7, googleRating: 4.6, menu: "연어 사시미·나베 이자카야", address: "남구 대학로94번길 5-5", emoji: "🍣", bg: "#E0F2FE", cat: "🍻 술/번개", lat: 35.543498, lng: 129.260657, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "저녁에 바사 하루에서 한잔할 분!", kakaoQuery: "울산 무거동 하루 이자카야" },
+      { id: "r6", zone: "basa", zoneLabel: "바보사거리", name: "쭈꾸미가 알고싶다", rating: 4.6, naverRating: 4.7, kakaoRating: 4.6, googleRating: 4.5, menu: "매콤 직화 쭈꾸미 점심특선", address: "남구 대학로94번길 5-3", emoji: "🐙", bg: "#FEE2E2", cat: "🍚 밥약", lat: 35.543390, lng: 129.260606, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "쭈꾸미가 알고싶다 점심 특선 고!", kakaoQuery: "울산 무거동 쭈꾸미가 알고싶다" },
+      { id: "r7", zone: "basa", zoneLabel: "바보사거리", name: "봉대박스파게티", rating: 4.5, naverRating: 4.6, kakaoRating: 4.5, googleRating: 4.4, menu: "뚝배기 해장 봉골레 파스타", address: "남구 대학로94번길 5-22", emoji: "🍝", bg: "#FFEDD5", cat: "🍚 밥약", lat: 35.543774, lng: 129.261072, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "봉대박스파게티 해장 파스타 드실 분!", kakaoQuery: "울산 무거동 봉대박스파게티" },
+      { id: "r8", zone: "basa", zoneLabel: "바보사거리", name: "우마이도 울산대점", rating: 4.5, naverRating: 4.6, kakaoRating: 4.4, googleRating: 4.5, menu: "진한 돈코츠 라멘·교자", address: "남구 대학로84번길 8", emoji: "🍜", bg: "#FEF3C7", cat: "🍚 밥약", lat: 35.542063, lng: 129.260557, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 우마이도 돈코츠 라멘 같이 먹어요", kakaoQuery: "울산 무거동 우마이도" },
+      { id: "r9", zone: "basa", zoneLabel: "바보사거리", name: "덤 칼국수·돈가스", rating: 4.4, naverRating: 4.5, kakaoRating: 4.4, googleRating: 4.3, menu: "시원한 냉칼국수·수제돈가스", address: "남구 대학로84번길 5-5", emoji: "🥟", bg: "#E0E7FF", cat: "🍚 밥약", lat: 35.542601, lng: 129.260284, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 덤에서 칼국수랑 돈가스 먹어요!", kakaoQuery: "울산 무거동 덤 칼국수" },
+      { id: "r10", zone: "basa", zoneLabel: "바보사거리", name: "공차 울산대학로점", rating: 4.3, naverRating: 4.5, kakaoRating: 4.2, googleRating: 4.2, menu: "블랙밀크티·타로버블티 카공", address: "남구 대학로 96", emoji: "🧋", bg: "#F3E8FF", cat: "☕ 카공", lat: 35.543395, lng: 129.260278, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "정문 앞 공차에서 버블티 마시며 카공해요", kakaoQuery: "울산 무거동 공차 울산대학로점" },
+
+      // [울과대(울산과학대 서부캠퍼스) 근처 구역]
+      { id: "r11", zone: "uc", zoneLabel: "울과대 근처", name: "라파르테", rating: 4.8, naverRating: 4.9, kakaoRating: 4.8, googleRating: 4.7, menu: "수제 타르트·휘낭시에 디저트", address: "남구 대학로43번길 18-14", emoji: "🥧", bg: "#FCE7F3", cat: "☕ 카공", lat: 35.540958, lng: 129.255868, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "라파르테 디저트 맛집 같이 가요", kakaoQuery: "울산 무거동 라파르테" },
+      { id: "r12", zone: "uc", zoneLabel: "울과대 근처", name: "미토식당", rating: 4.6, naverRating: 4.7, kakaoRating: 4.6, googleRating: 4.5, menu: "진한 소고기 베트남 쌀국수·분짜", address: "남구 대학로64번길 7", emoji: "🍲", bg: "#DCFCE7", cat: "🍚 밥약", lat: 35.540714, lng: 129.258922, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "미토식당 쌀국수 따뜻하게 한 그릇 해요!", kakaoQuery: "울산 무거동 미토식당" },
+      { id: "r13", zone: "uc", zoneLabel: "울과대 근처", name: "종가집돼지국밥", rating: 4.6, naverRating: 4.7, kakaoRating: 4.6, googleRating: 4.5, menu: "진한 국물 돼지국밥·수육백반", address: "남구 대학로 40", emoji: "🍚", bg: "#FDE8E8", cat: "🍚 밥약", lat: 35.539160, lng: 129.256979, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "뜨끈한 종가집돼지국밥 같이 먹어요", kakaoQuery: "울산 무거동 종가집돼지국밥" },
+      { id: "r14", zone: "uc", zoneLabel: "울과대 근처", name: "리원카페", rating: 4.5, naverRating: 4.6, kakaoRating: 4.5, googleRating: 4.4, menu: "아늑한 수제 디저트·라떼 맛집", address: "남구 대학로64번길 7-16", emoji: "☕", bg: "#F5F5F4", cat: "☕ 카공", lat: 35.540943, lng: 129.259689, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "울과대 근처 리원카페에서 조용히 카공해요", kakaoQuery: "울산 무거동 리원카페" },
+      { id: "r15", zone: "uc", zoneLabel: "울과대 근처", name: "핸떡분식", rating: 4.4, naverRating: 4.5, kakaoRating: 4.4, googleRating: 4.3, menu: "수제 튀김·즉석 떡볶이 세트", address: "남구 대학로76번길 7-14", emoji: "🍢", bg: "#FEE2E2", cat: "🍚 밥약", lat: 35.541890, lng: 129.260360, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "핸떡분식에서 떡볶이랑 튀김 같이 먹어요!", kakaoQuery: "울산 무거동 핸떡분식" },
+      { id: "r16", zone: "uc", zoneLabel: "울과대 근처", name: "정통집 울산대점", rating: 4.3, naverRating: 4.4, kakaoRating: 4.3, googleRating: 4.2, menu: "특제 돼지김치구이·치즈볶음밥", address: "남구 대학로76번길 10", emoji: "🥩", bg: "#FFEDD5", cat: "🍚 밥약", lat: 35.541117, lng: 129.259952, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "정통집 돼지김치구이 같이 드실 분!", kakaoQuery: "울산 무거동 정통집" },
+      { id: "r17", zone: "uc", zoneLabel: "울과대 근처", name: "빽보이피자 무거점", rating: 4.2, naverRating: 4.4, kakaoRating: 4.1, googleRating: 4.1, menu: "토핑 가득 가성비 수제 피자", address: "남구 대학로64번길 7-19", emoji: "🍕", bg: "#FEF9C3", cat: "🍚 밥약", lat: 35.541321, lng: 129.259624, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "빽보이피자 반반 피자 같이 시켜 먹어요", kakaoQuery: "울산 무거동 빽보이피자" },
+      { id: "r18", zone: "uc", zoneLabel: "울과대 근처", name: "지코바치킨 울대점", rating: 4.1, naverRating: 4.3, kakaoRating: 4.0, googleRating: 4.0, menu: "숯불 양념구이 치밥 정석", address: "남구 대학로76번길 7-6", emoji: "🍗", bg: "#FFE4E6", cat: "🍻 술/번개", lat: 35.541498, lng: 129.260025, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "저녁에 지코바 숯불치킨 치밥 같이 해요!", kakaoQuery: "울산 무거동 지코바치킨 울대점" },
+
+      // [울산대 후문 · 기숙사 · 아산스포츠센터 근처 구역]
+      { id: "r19", zone: "back", zoneLabel: "울산대 후문", name: "발레나식스 무거점", rating: 4.7, naverRating: 4.8, kakaoRating: 4.7, googleRating: 4.6, menu: "스페셜티 로스터리 대형 카공 카페", address: "남구 대학로147번길 48", emoji: "☕", bg: "#E0F2FE", cat: "☕ 카공", lat: 35.548850, lng: 129.260077, locName: "39호관 아산스포츠센터", defaultTitle: "후문 발레나식스 카페에서 여유롭게 카공해요", kakaoQuery: "울산 무거동 발레나식스" },
+      { id: "r20", zone: "back", zoneLabel: "울산대 후문", name: "핵밥 울산대점", rating: 4.6, naverRating: 4.7, kakaoRating: 4.6, googleRating: 4.5, menu: "큐브스테이크덮밥·마제소바", address: "남구 대학로 106", emoji: "🍱", bg: "#ECFDF5", cat: "🍚 밥약", lat: 35.544199, lng: 129.260682, locName: "39호관 아산스포츠센터", defaultTitle: "핵밥에서 덮밥·마제소바 같이 먹어요!", kakaoQuery: "울산 무거동 핵밥" },
+      { id: "r21", zone: "back", zoneLabel: "울산대 후문", name: "언양닭칼국수 무거점", rating: 4.4, naverRating: 4.5, kakaoRating: 4.4, googleRating: 4.3, menu: "진한 닭반마리 칼국수·왕만두", address: "남구 대학로 120", emoji: "🍲", bg: "#FEF3C7", cat: "🍚 밥약", lat: 35.545300, lng: 129.261241, locName: "39호관 아산스포츠센터", defaultTitle: "든든한 언양닭칼국수 같이 먹으러 가요!", kakaoQuery: "울산 무거동 언양닭칼국수" },
+      { id: "r22", zone: "back", zoneLabel: "울산대 후문", name: "써브웨이 무거점", rating: 4.2, naverRating: 4.4, kakaoRating: 4.1, googleRating: 4.1, menu: "커스텀 샌드위치·쿠키 세트", address: "남구 대학로 108", emoji: "🥪", bg: "#DCFCE7", cat: "🍚 밥약", lat: 35.544391, lng: 129.260687, locName: "39호관 아산스포츠센터", defaultTitle: "공강에 써브웨이 샌드위치 가볍게 드실 분!", kakaoQuery: "울산 무거동 써브웨이" }
     ];
 
     const AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"];
@@ -3730,7 +3749,10 @@
       smtp_sender: localStorage.getItem("uldaemo_smtp_sender") || "",
       smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || "",
       expanded_post_ids: { 1: true },
-      pc_accordions: { notifs: false, map: false, cafeteria: false }
+      pc_accordions: { notifs: false, map: false, cafeteria: false },
+      food_min_rating: 4.4,
+      food_platform: "all",
+      food_zone: "all"
     };
 
     function persistLogin(uid) {
@@ -6123,9 +6145,46 @@
       render();
     }
 
+    function getSpotScoreByPlatform(spot, platform) {
+      if (!spot) return 0;
+      if (platform === "naver") return Number(spot.naverRating || spot.rating || 0);
+      if (platform === "kakao") return Number(spot.kakaoRating || spot.rating || 0);
+      if (platform === "google") return Number(spot.googleRating || spot.rating || 0);
+      return Number(spot.rating || 0);
+    }
+
+    function getFilteredFoodSpots() {
+      const minRating = Number(state.food_min_rating || 4.4);
+      const platform = state.food_platform || "all";
+      const zone = state.food_zone || "all";
+      return MUGEO_FOOD_SPOTS.filter(s => {
+        if (zone !== "all" && s.zone !== zone) return false;
+        const score = getSpotScoreByPlatform(s, platform);
+        return score + 1e-6 >= minRating;
+      });
+    }
+
+    function setFoodMapFilter(patch) {
+      if (!patch || typeof patch !== "object") return;
+      if (patch.min_rating !== undefined) {
+        const clamped = Math.max(4.0, Math.min(4.8, Math.round(Number(patch.min_rating) * 10) / 10));
+        state.food_min_rating = clamped;
+      }
+      if (patch.platform !== undefined) state.food_platform = patch.platform;
+      if (patch.zone !== undefined) state.food_zone = patch.zone;
+      if (patch.expanded !== undefined) state.home_food_map_expanded = Boolean(patch.expanded);
+
+      const wrap = document.getElementById("home-mugeo-map-wrap");
+      if (wrap) {
+        wrap.outerHTML = renderMugeoFoodMapSection();
+        initHomeMugeoMap();
+      } else {
+        render();
+      }
+    }
+
     function toggleHomeFoodMapExpand() {
-      state.home_food_map_expanded = !state.home_food_map_expanded;
-      render();
+      setFoodMapFilter({ expanded: !state.home_food_map_expanded });
     }
 
     function initHomeMugeoMap() {
@@ -6134,43 +6193,67 @@
       try {
         if (window._homeMugeoMap) { window._homeMugeoMap.remove(); window._homeMugeoMap = null; }
         const isExpanded = Boolean(state.home_food_map_expanded);
-        const mugeoBounds = L.latLngBounds([35.5330, 129.2450], [35.5525, 129.2675]);
+        const platform = state.food_platform || "all";
+        const zone = state.food_zone || "all";
+
+        // 지도 탭과 동일하게 학교 주변(바보사거리 · 울과대 · 울산대 후문)으로 영역 엄격 제한
+        const mugeoBounds = L.latLngBounds([35.5375, 129.2465], [35.5525, 129.2675]);
+        const zoneViewMap = {
+          all:  { center: [35.5426, 129.2598], zoom: isExpanded ? 16 : 15 },
+          basa: { center: [35.5429, 129.2606], zoom: 17 },
+          uc:   { center: [35.5409, 129.2588], zoom: 16 },
+          back: { center: [35.5455, 129.2607], zoom: 16 }
+        };
+        const viewCfg = zoneViewMap[zone] || zoneViewMap.all;
+
         const map = L.map("home-mugeo-map", {
           zoomControl: true,
           attributionControl: false,
           scrollWheelZoom: false,
-          minZoom: 14,
+          minZoom: 15,
           maxZoom: 19,
           maxBounds: mugeoBounds,
           maxBoundsViscosity: 1.0
-        }).setView([35.5418, 129.2585], isExpanded ? 16 : 15);
+        }).setView(viewCfg.center, viewCfg.zoom);
         window._homeMugeoMap = map;
 
         // 지도 탭과 동일한 상세 한글 도로명/건물명 OpenStreetMap 타일 적용
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
-        // 별점 4.6점 이상 실제 무거동 맛집만 지도에 표시
-        const qualifiedSpots = MUGEO_FOOD_SPOTS.filter(s => s.rating >= 4.6).slice(0, isExpanded ? 8 : 5);
-        if (qualifiedSpots.length > 0) {
+        const qualifiedSpots = getFilteredFoodSpots();
+        if (qualifiedSpots.length > 0 && zone === "all") {
           map.fitBounds(L.latLngBounds(qualifiedSpots.map(s => [s.lat, s.lng])), {
-            padding: [34, 34],
+            padding: [28, 28],
             maxZoom: isExpanded ? 16 : 15
           });
         }
 
+        const platBadgeMap = {
+          all:    { prefix: "★", color: "#FF6F0F" },
+          naver:  { prefix: "N ★", color: "#03C75A" },
+          kakao:  { prefix: "K ★", color: "#D97706" },
+          google: { prefix: "G ★", color: "#2563EB" }
+        };
+        const pBadge = platBadgeMap[platform] || platBadgeMap.all;
+
         qualifiedSpots.forEach(s => {
-          const kakaoUrl = `https://map.kakao.com/link/search/${encodeURIComponent(s.kakaoQuery)}`;
+          const dispScore = getSpotScoreByPlatform(s, platform);
+          const queryEnc = encodeURIComponent(s.kakaoQuery || `울산 무거동 ${s.name}`);
+          const naverUrl = `https://map.naver.com/p/search/${queryEnc}`;
+          const kakaoUrl = `https://map.kakao.com/link/search/${queryEnc}`;
+          const googleUrl = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+
           const icon = L.divIcon({
             className: "karrot-food-marker",
             html: `
               <div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%, -82%); cursor:pointer;">
-                <div style="width:38px; height:38px; border-radius:50%; background:${s.bg}; border:2.5px solid #FFFFFF; box-shadow:0 3px 10px rgba(0,0,0,0.22); display:flex; align-items:center; justify-content:center; font-size:19px; position:relative;">
+                <div style="width:36px; height:36px; border-radius:50%; background:${s.bg}; border:2.5px solid #FFFFFF; box-shadow:0 3px 10px rgba(0,0,0,0.22); display:flex; align-items:center; justify-content:center; font-size:18px; position:relative;">
                   ${s.emoji}
                   <div style="position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid #FFFFFF;"></div>
                 </div>
-                <div style="margin-top:4px; text-align:center; line-height:1.18; white-space:nowrap; text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0 1px 4px rgba(255,255,255,0.95);">
-                  <div style="font-size:11px; font-weight:800; color:#FF6F0F;">★ ${s.rating.toFixed(1)}</div>
-                  <div style="font-size:11.5px; font-weight:800; color:#191F28;">${escHtml(s.name)}</div>
+                <div style="margin-top:3px; text-align:center; line-height:1.15; white-space:nowrap; text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0 1px 4px rgba(255,255,255,0.95);">
+                  <div style="font-size:10.5px; font-weight:800; color:${pBadge.color};">${pBadge.prefix} ${dispScore.toFixed(1)}</div>
+                  <div style="font-size:11px; font-weight:800; color:#191F28;">${escHtml(s.name)}</div>
                 </div>
               </div>
             `,
@@ -6178,17 +6261,24 @@
           });
 
           const popupHtml = `
-            <div style="min-width:190px; font-family:inherit; padding:2px;">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:3px;">
-                <span style="font-size:14px; font-weight:800; color:#191F28;">${s.emoji} ${escHtml(s.name)}</span>
-                <span style="font-size:12px; font-weight:800; color:#FF6F0F;">★ ${s.rating.toFixed(1)}</span>
+            <div style="min-width:215px; font-family:inherit; padding:2px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
+                <span style="font-size:13.5px; font-weight:800; color:#191F28;">${s.emoji} ${escHtml(s.name)}</span>
+                <span style="font-size:10.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 6px; border-radius:6px;">${escHtml(s.zoneLabel || '학교주변')}</span>
               </div>
               <div style="font-size:11.5px; color:#6B7684; margin-bottom:3px;">${escHtml(s.menu)}</div>
-              ${s.address ? `<div style="font-size:11px; color:#287D62; font-weight:600; margin-bottom:10px;">📍 ${escHtml(s.address)}</div>` : '<div style="margin-bottom:8px;"></div>'}
-              <div style="display:flex; gap:6px;">
-                <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:6px 0; border-radius:8px; background:#FEE500; color:#191919; font-size:11.5px; font-weight:800; text-decoration:none;">카카오맵</a>
-                <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="flex:1.2; padding:6px 0; border-radius:8px; border:none; background:#287D62; color:#FFFFFF; font-size:11.5px; font-weight:700; cursor:pointer;">⚡ 밥약 올리기</button>
+              ${s.address ? `<div style="font-size:10.5px; color:#4E5968; font-weight:600; margin-bottom:7px;">📍 ${escHtml(s.address)}</div>` : ''}
+              <div style="display:flex; gap:4px; margin-bottom:8px; background:#F8FAFC; padding:5px 6px; border-radius:8px; border:1px solid #E5EAE7; font-size:10.5px; font-weight:700; justify-content:space-around;">
+                <span style="color:#03C75A;">N ★${Number(s.naverRating || s.rating).toFixed(1)}</span>
+                <span style="color:#D97706;">K ★${Number(s.kakaoRating || s.rating).toFixed(1)}</span>
+                <span style="color:#2563EB;">G ★${Number(s.googleRating || s.rating).toFixed(1)}</span>
               </div>
+              <div style="display:flex; gap:4px; margin-bottom:6px;">
+                <a href="${naverUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#03C75A; color:#FFFFFF; font-size:10.5px; font-weight:800; text-decoration:none;">네이버</a>
+                <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#FEE500; color:#191919; font-size:10.5px; font-weight:800; text-decoration:none;">카카오</a>
+                <a href="${googleUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-size:10.5px; font-weight:800; text-decoration:none;">구글맵</a>
+              </div>
+              <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="width:100%; padding:6px 0; border-radius:8px; border:none; background:#287D62; color:#FFFFFF; font-size:11.5px; font-weight:800; cursor:pointer;">⚡ 이 맛집으로 밥약·카공 올리기</button>
             </div>
           `;
           L.marker([s.lat, s.lng], { icon }).addTo(map).bindPopup(popupHtml);
@@ -6198,23 +6288,70 @@
 
     function renderMugeoFoodMapSection() {
       const isExpanded = Boolean(state.home_food_map_expanded);
-      const mapHeight = isExpanded ? "380px" : "225px";
+      const mapHeight = isExpanded ? "390px" : "245px";
+      const minRating = Number(state.food_min_rating || 4.4);
+      const platform = state.food_platform || "all";
+      const zone = state.food_zone || "all";
+      const filteredCnt = getFilteredFoodSpots().length;
+      const ratingSteps = [4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8];
+
+      const zones = [
+        { k: "all", label: "학교주변 전체" },
+        { k: "basa", label: "바보사거리·정문" },
+        { k: "uc", label: "울과대 근처" },
+        { k: "back", label: "울산대 후문" }
+      ];
+      const platforms = [
+        { k: "all", label: "⭐ 3사 통합", activeBg: "#191F28", activeColor: "#FFFFFF" },
+        { k: "naver", label: "🟢 네이버", activeBg: "#03C75A", activeColor: "#FFFFFF" },
+        { k: "kakao", label: "🟡 카카오", activeBg: "#FEE500", activeColor: "#191919" },
+        { k: "google", label: "🔵 구글", activeBg: "#2563EB", activeColor: "#FFFFFF" }
+      ];
 
       return `
-        <div style="position:relative; border-radius:16px; overflow:hidden; border:1px solid #E5EAE7; margin: 6px 0 18px; box-shadow:0 2px 10px rgba(0,0,0,0.04); background:#F2F4F3;">
-          <!-- 당근 스타일: 지도 속에 실제 별점 4.6+ 가게 핀이 바로 보이는 미니 위젯 -->
-          <div id="home-mugeo-map" style="width:100%; height:${mapHeight}; transition:height 0.25s ease; background:repeating-linear-gradient(45deg, #EEF2F0 0px, #EEF2F0 14px, #F6F8F7 14px, #F6F8F7 28px);"></div>
+        <div id="home-mugeo-map-wrap" style="border-radius:16px; overflow:hidden; border:1px solid #E5EAE7; margin: 6px 0 18px; box-shadow:0 2px 10px rgba(0,0,0,0.04); background:#FFFFFF;">
+          <!-- 상단 컨트롤 패널: 구역 선택 + 플랫폼(네이버/카카오/구글) + 평점 0.1점 단위 조절 -->
+          <div style="padding:10px 12px 8px; border-bottom:1px solid #EEF2F0; background:#F9FBFA;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:7px; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                ${zones.map(z => {
+                  const active = zone === z.k;
+                  return `<button type="button" onclick="setFoodMapFilter({ zone: '${z.k}' })" style="border:1px solid ${active ? '#287D62' : '#E5EAE7'}; background:${active ? '#EEF8F3' : '#FFFFFF'}; color:${active ? '#287D62' : '#4E5968'}; border-radius:999px; padding:4px 9px; font-size:11px; font-weight:${active ? '800' : '600'}; cursor:pointer;">${z.label}</button>`;
+                }).join("")}
+              </div>
+              <button type="button" onclick="toggleHomeFoodMapExpand()" style="background:#FFFFFF; border:1px solid #D1D6DB; border-radius:999px; padding:4px 10px; font-size:11px; font-weight:800; color:#191F28; display:inline-flex; align-items:center; gap:4px; cursor:pointer; flex-shrink:0;">
+                <span>${isExpanded ? '지도 접기 ✕' : '지도 크게 ↗'}</span>
+              </button>
+            </div>
 
-          <!-- 우측 상단 플로팅 알약 버튼 ('내 주변 맛집 ↗' 스타일) -->
-          <button type="button" onclick="toggleHomeFoodMapExpand()" style="position:absolute; top:12px; right:12px; z-index:450; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:7px 14px; font-size:12.5px; font-weight:800; color:#191F28; box-shadow:0 3px 10px rgba(0,0,0,0.12); display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-            <span>🍴</span>
-            <span>무거동 맛집 (★4.6+)</span>
-            <span style="color:#6B7684; font-size:12px;">${isExpanded ? '✕' : '↗'}</span>
-          </button>
+            <!-- 플랫폼 선택 (통합 / 네이버 / 카카오 / 구글) + 검색 결과 수 -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:7px; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                ${platforms.map(p => {
+                  const active = platform === p.k;
+                  return `<button type="button" onclick="setFoodMapFilter({ platform: '${p.k}' })" style="border:1px solid ${active ? 'transparent' : '#E5EAE7'}; background:${active ? p.activeBg : '#FFFFFF'}; color:${active ? p.activeColor : '#4E5968'}; border-radius:8px; padding:3.5px 8px; font-size:11px; font-weight:800; cursor:pointer;">${p.label}</button>`;
+                }).join("")}
+              </div>
+              <span style="font-size:11px; font-weight:800; color:#287D62;">🍴 ${filteredCnt}곳 표시중</span>
+            </div>
 
-          <!-- 좌측 하단 은은한 안내 칩 -->
-          <div style="position:absolute; bottom:10px; left:10px; z-index:450; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); border-radius:999px; padding:4px 10px; font-size:10.5px; font-weight:700; color:#4E5968; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-            카카오맵 평점 기준 · 핀 클릭 시 상세/밥약
+            <!-- 평점 기준 0.1점 단위 선택 바 (4.0+ ~ 4.8+) -->
+            <div style="display:flex; align-items:center; gap:4px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none;">
+              <span style="font-size:11px; font-weight:800; color:#4E5968; flex-shrink:0; margin-right:2px;">평점 기준</span>
+              <button type="button" onclick="setFoodMapFilter({ min_rating: ${(minRating - 0.1).toFixed(1)} })" style="width:22px; height:22px; border-radius:6px; border:1px solid #D1D6DB; background:#FFFFFF; color:#191F28; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;" title="0.1점 낮추기">−</button>
+              ${ratingSteps.map(r => {
+                const active = Math.abs(minRating - r) < 0.05;
+                return `<button type="button" onclick="setFoodMapFilter({ min_rating: ${r.toFixed(1)} })" style="border:1px solid ${active ? '#FF6F0F' : '#E5EAE7'}; background:${active ? '#FFF4EB' : '#FFFFFF'}; color:${active ? '#FF6F0F' : '#6B7684'}; border-radius:999px; padding:2.5px 7.5px; font-size:10.5px; font-weight:${active ? '800' : '600'}; cursor:pointer; flex-shrink:0;">★${r.toFixed(1)}+</button>`;
+              }).join("")}
+              <button type="button" onclick="setFoodMapFilter({ min_rating: ${(minRating + 0.1).toFixed(1)} })" style="width:22px; height:22px; border-radius:6px; border:1px solid #D1D6DB; background:#FFFFFF; color:#191F28; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;" title="0.1점 높이기">+</button>
+            </div>
+          </div>
+
+          <div style="position:relative;">
+            <div id="home-mugeo-map" style="width:100%; height:${mapHeight}; transition:height 0.25s ease; background:repeating-linear-gradient(45deg, #EEF2F0 0px, #EEF2F0 14px, #F6F8F7 14px, #F6F8F7 28px);"></div>
+            <div style="position:absolute; bottom:8px; left:10px; z-index:450; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); border-radius:999px; padding:3.5px 10px; font-size:10px; font-weight:700; color:#4E5968; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+              학교 주변 한정 · 핀 클릭 시 네이버/카카오/구글 평점 & 밥약 개설
+            </div>
           </div>
         </div>
       `;
