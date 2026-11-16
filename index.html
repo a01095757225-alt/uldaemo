@@ -2485,16 +2485,16 @@
       "무거동 대학로 (바보사거리 카페거리)": [35.542600, 129.260800, "☕"]
     };
 
-    // 울산 남구 무거동 실존 맛집 데이터 (별점 4.6점 이상 기준 필터링)
+    // 울산 남구 무거동 실존 맛집 데이터 (별점 4.6점 이상 기준 · 실제 도로명주소 정밀 GPS 좌표)
     const MUGEO_FOOD_SPOTS = [
-      { id: "r1", name: "싱귤러커피", rating: 4.9, menu: "한옥 감성 카페·수제 디저트", emoji: "☕", bg: "#EFE5DC", cat: "☕ 카공", lat: 35.5458, lng: 129.2588, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "싱귤러커피에서 카공·수다 해요!", kakaoQuery: "울산 무거동 싱귤러커피" },
-      { id: "r2", name: "돌돌파스타", rating: 4.8, menu: "치킨로제파스타·목살스테이크", emoji: "🍝", bg: "#FFE8D6", cat: "🍚 밥약", lat: 35.5432, lng: 129.2602, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 돌돌파스타 같이 먹어요!", kakaoQuery: "울산 무거동 돌돌파스타" },
-      { id: "r3", name: "가무댕댕", rating: 4.8, menu: "추억의 경양식 수제 돈까스", emoji: "🍛", bg: "#FFF3CD", cat: "🍚 밥약", lat: 35.5438, lng: 129.2598, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "울대 앞 가무댕댕 돈까스 고!", kakaoQuery: "울산 무거동 가무댕댕" },
-      { id: "r4", name: "하루 무거점", rating: 4.8, menu: "연어 사시미·나베 이자카야", emoji: "🍣", bg: "#E0F2FE", cat: "🍻 술/번개", lat: 35.5429, lng: 129.2614, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "저녁에 바사 하루에서 한잔할 분!", kakaoQuery: "울산 무거동 하루 이자카야" },
-      { id: "r5", name: "라파르테", rating: 4.8, menu: "수제 타르트·휘낭시에 디저트", emoji: "🍰", bg: "#FCE7F3", cat: "☕ 카공", lat: 35.5441, lng: 129.2618, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "라파르테 디저트 맛집 같이 가요", kakaoQuery: "울산 무거동 라파르테" },
-      { id: "r6", name: "종가집돼지국밥", rating: 4.7, menu: "진한 국물 돼지국밥·수육", emoji: "🍲", bg: "#FDE8E8", cat: "🍚 밥약", lat: 35.5430, lng: 129.2610, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "뜨끈한 종가집돼지국밥 같이 먹어요", kakaoQuery: "울산 무거동 종가집돼지국밥" },
-      { id: "r7", name: "핵밥 울산대점", rating: 4.7, menu: "큐브스테이크덮밥·마제소바", emoji: "🍱", bg: "#ECFDF5", cat: "🍚 밥약", lat: 35.5426, lng: 129.2605, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "핵밥에서 덮밥 같이 먹어요!", kakaoQuery: "울산 무거동 핵밥" },
-      { id: "r8", name: "쭈꾸미가 알고싶다", rating: 4.7, menu: "매콤 직화 쭈꾸미 점심특선", emoji: "🐙", bg: "#FEE2E2", cat: "🍚 밥약", lat: 35.5434, lng: 129.2609, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "쭈꾸미가 알고싶다 점심 특선 고!", kakaoQuery: "울산 무거동 쭈꾸미가 알고싶다" }
+      { id: "r1", name: "싱귤러커피", rating: 4.9, menu: "한옥 감성 카페·수제 디저트", address: "남구 대학로1번길 3-35", emoji: "☕", bg: "#EFE5DC", cat: "☕ 카공", lat: 35.535416, lng: 129.251486, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "싱귤러커피에서 카공·수다 해요!", kakaoQuery: "울산 무거동 싱귤러커피" },
+      { id: "r2", name: "돌돌파스타", rating: 4.8, menu: "치킨로제파스타·목살스테이크", address: "남구 대학로84번길 12", emoji: "🍝", bg: "#FFE8D6", cat: "🍚 밥약", lat: 35.541952, lng: 129.260743, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "바사 돌돌파스타 같이 먹어요!", kakaoQuery: "울산 무거동 돌돌파스타" },
+      { id: "r3", name: "가무댕댕", rating: 4.8, menu: "추억의 경양식 수제 돈까스", address: "남구 대학로94번길 11", emoji: "🍛", bg: "#FFF3CD", cat: "🍚 밥약", lat: 35.543015, lng: 129.261318, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "울대 앞 가무댕댕 돈까스 고!", kakaoQuery: "울산 무거동 가무댕댕" },
+      { id: "r4", name: "하루 무거점", rating: 4.8, menu: "연어 사시미·나베 이자카야", address: "남구 대학로94번길 5-5", emoji: "🍣", bg: "#E0F2FE", cat: "🍻 술/번개", lat: 35.543498, lng: 129.260657, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "저녁에 바사 하루에서 한잔할 분!", kakaoQuery: "울산 무거동 하루 이자카야" },
+      { id: "r5", name: "라파르테", rating: 4.8, menu: "수제 타르트·휘낭시에 디저트", address: "남구 대학로43번길 18-14", emoji: "🍰", bg: "#FCE7F3", cat: "☕ 카공", lat: 35.540958, lng: 129.255868, locName: "무거동 대학로 (바보사거리 카페거리)", defaultTitle: "라파르테 디저트 맛집 같이 가요", kakaoQuery: "울산 무거동 라파르테" },
+      { id: "r6", name: "종가집돼지국밥", rating: 4.7, menu: "진한 국물 돼지국밥·수육", address: "남구 대학로 40", emoji: "🍲", bg: "#FDE8E8", cat: "🍚 밥약", lat: 35.539160, lng: 129.256979, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "뜨끈한 종가집돼지국밥 같이 먹어요", kakaoQuery: "울산 무거동 종가집돼지국밥" },
+      { id: "r7", name: "핵밥 울산대점", rating: 4.7, menu: "큐브스테이크덮밥·마제소바", address: "남구 대학로 106", emoji: "🍱", bg: "#ECFDF5", cat: "🍚 밥약", lat: 35.544199, lng: 129.260682, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "핵밥에서 덮밥 같이 먹어요!", kakaoQuery: "울산 무거동 핵밥" },
+      { id: "r8", name: "쭈꾸미가 알고싶다", rating: 4.7, menu: "매콤 직화 쭈꾸미 점심특선", address: "남구 대학로94번길 5-3", emoji: "🐙", bg: "#FEE2E2", cat: "🍚 밥약", lat: 35.543390, lng: 129.260606, locName: "울산대학교 정문 (바보사거리)", defaultTitle: "쭈꾸미가 알고싶다 점심 특선 고!", kakaoQuery: "울산 무거동 쭈꾸미가 알고싶다" }
     ];
 
     const AVATARS = ["🐶", "🐱", "🦊", "🐻", "🐰", "🐹"];
@@ -6134,16 +6134,16 @@
       try {
         if (window._homeMugeoMap) { window._homeMugeoMap.remove(); window._homeMugeoMap = null; }
         const isExpanded = Boolean(state.home_food_map_expanded);
-        const mugeoBounds = L.latLngBounds([35.5375, 129.2465], [35.5525, 129.2675]);
+        const mugeoBounds = L.latLngBounds([35.5330, 129.2450], [35.5525, 129.2675]);
         const map = L.map("home-mugeo-map", {
           zoomControl: true,
           attributionControl: false,
           scrollWheelZoom: false,
-          minZoom: 15,
+          minZoom: 14,
           maxZoom: 19,
           maxBounds: mugeoBounds,
           maxBoundsViscosity: 1.0
-        }).setView([35.5436, 129.2606], isExpanded ? 17 : 16);
+        }).setView([35.5418, 129.2585], isExpanded ? 16 : 15);
         window._homeMugeoMap = map;
 
         // 지도 탭과 동일한 상세 한글 도로명/건물명 OpenStreetMap 타일 적용
@@ -6151,6 +6151,12 @@
 
         // 별점 4.6점 이상 실제 무거동 맛집만 지도에 표시
         const qualifiedSpots = MUGEO_FOOD_SPOTS.filter(s => s.rating >= 4.6).slice(0, isExpanded ? 8 : 5);
+        if (qualifiedSpots.length > 0) {
+          map.fitBounds(L.latLngBounds(qualifiedSpots.map(s => [s.lat, s.lng])), {
+            padding: [34, 34],
+            maxZoom: isExpanded ? 16 : 15
+          });
+        }
 
         qualifiedSpots.forEach(s => {
           const kakaoUrl = `https://map.kakao.com/link/search/${encodeURIComponent(s.kakaoQuery)}`;
@@ -6172,12 +6178,13 @@
           });
 
           const popupHtml = `
-            <div style="min-width:185px; font-family:inherit; padding:2px;">
+            <div style="min-width:190px; font-family:inherit; padding:2px;">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:3px;">
                 <span style="font-size:14px; font-weight:800; color:#191F28;">${s.emoji} ${escHtml(s.name)}</span>
                 <span style="font-size:12px; font-weight:800; color:#FF6F0F;">★ ${s.rating.toFixed(1)}</span>
               </div>
-              <div style="font-size:11.5px; color:#6B7684; margin-bottom:10px;">${escHtml(s.menu)}</div>
+              <div style="font-size:11.5px; color:#6B7684; margin-bottom:3px;">${escHtml(s.menu)}</div>
+              ${s.address ? `<div style="font-size:11px; color:#287D62; font-weight:600; margin-bottom:10px;">📍 ${escHtml(s.address)}</div>` : '<div style="margin-bottom:8px;"></div>'}
               <div style="display:flex; gap:6px;">
                 <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:6px 0; border-radius:8px; background:#FEE500; color:#191919; font-size:11.5px; font-weight:800; text-decoration:none;">카카오맵</a>
                 <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="flex:1.2; padding:6px 0; border-radius:8px; border:none; background:#287D62; color:#FFFFFF; font-size:11.5px; font-weight:700; cursor:pointer;">⚡ 밥약 올리기</button>
