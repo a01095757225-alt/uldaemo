@@ -6199,10 +6199,10 @@
         // 지도 탭과 동일하게 학교 주변(바보사거리 · 울과대 · 울산대 후문)으로 영역 엄격 제한
         const mugeoBounds = L.latLngBounds([35.5375, 129.2465], [35.5525, 129.2675]);
         const zoneViewMap = {
-          all:  { center: [35.5426, 129.2598], zoom: isExpanded ? 16 : 15 },
+          all:  { center: [35.5427, 129.2602], zoom: 16 },
           basa: { center: [35.5429, 129.2606], zoom: 17 },
-          uc:   { center: [35.5409, 129.2588], zoom: 16 },
-          back: { center: [35.5455, 129.2607], zoom: 16 }
+          uc:   { center: [35.5410, 129.2592], zoom: 16 },
+          back: { center: [35.5452, 129.2608], zoom: 16 }
         };
         const viewCfg = zoneViewMap[zone] || zoneViewMap.all;
 
@@ -6220,19 +6220,13 @@
         // 지도 탭과 동일한 상세 한글 도로명/건물명 OpenStreetMap 타일 적용
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
-        const qualifiedSpots = getFilteredFoodSpots();
-        if (qualifiedSpots.length > 0 && zone === "all") {
-          map.fitBounds(L.latLngBounds(qualifiedSpots.map(s => [s.lat, s.lng])), {
-            padding: [28, 28],
-            maxZoom: isExpanded ? 16 : 15
-          });
-        }
+        const qualifiedSpots = getFilteredFoodSpots().slice().sort((a, b) => getSpotScoreByPlatform(b, platform) - getSpotScoreByPlatform(a, platform));
 
         const platBadgeMap = {
-          all:    { prefix: "★", color: "#FF6F0F" },
-          naver:  { prefix: "N ★", color: "#03C75A" },
-          kakao:  { prefix: "K ★", color: "#D97706" },
-          google: { prefix: "G ★", color: "#2563EB" }
+          all:    { prefix: "★", color: "#FF6F0F", border: "#E5EAE7" },
+          naver:  { prefix: "N★", color: "#03C75A", border: "#BBF7D0" },
+          kakao:  { prefix: "K★", color: "#D97706", border: "#FDE68A" },
+          google: { prefix: "G★", color: "#2563EB", border: "#BFDBFE" }
         };
         const pBadge = platBadgeMap[platform] || platBadgeMap.all;
 
@@ -6243,25 +6237,24 @@
           const kakaoUrl = `https://map.kakao.com/link/search/${queryEnc}`;
           const googleUrl = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
 
+          // 깔끔한 1줄 캡슐형 마커 (네이버/당근 지도 스타일: 겹침 최소화)
           const icon = L.divIcon({
             className: "karrot-food-marker",
             html: `
-              <div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%, -82%); cursor:pointer;">
-                <div style="width:36px; height:36px; border-radius:50%; background:${s.bg}; border:2.5px solid #FFFFFF; box-shadow:0 3px 10px rgba(0,0,0,0.22); display:flex; align-items:center; justify-content:center; font-size:18px; position:relative;">
-                  ${s.emoji}
-                  <div style="position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid #FFFFFF;"></div>
+              <div style="display:inline-flex; flex-direction:column; align-items:center; transform:translate(-50%, -100%); cursor:pointer;">
+                <div style="display:inline-flex; align-items:center; gap:4px; padding:3.5px 8px; border-radius:999px; background:#FFFFFF; border:1.5px solid ${pBadge.border}; box-shadow:0 2px 8px rgba(0,0,0,0.15); white-space:nowrap;">
+                  <span style="font-size:12.5px; line-height:1;">${s.emoji}</span>
+                  <span style="font-size:11px; font-weight:800; color:#191F28; letter-spacing:-0.2px;">${escHtml(s.name)}</span>
+                  <span style="font-size:10.5px; font-weight:800; color:${pBadge.color};">${pBadge.prefix}${dispScore.toFixed(1)}</span>
                 </div>
-                <div style="margin-top:3px; text-align:center; line-height:1.15; white-space:nowrap; text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0 1px 4px rgba(255,255,255,0.95);">
-                  <div style="font-size:10.5px; font-weight:800; color:${pBadge.color};">${pBadge.prefix} ${dispScore.toFixed(1)}</div>
-                  <div style="font-size:11px; font-weight:800; color:#191F28;">${escHtml(s.name)}</div>
-                </div>
+                <div style="width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #FFFFFF; filter:drop-shadow(0 1px 1px rgba(0,0,0,0.12));"></div>
               </div>
             `,
             iconSize: [0, 0]
           });
 
           const popupHtml = `
-            <div style="min-width:215px; font-family:inherit; padding:2px;">
+            <div style="min-width:210px; font-family:inherit; padding:2px;">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
                 <span style="font-size:13.5px; font-weight:800; color:#191F28;">${s.emoji} ${escHtml(s.name)}</span>
                 <span style="font-size:10.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 6px; border-radius:6px;">${escHtml(s.zoneLabel || '학교주변')}</span>
@@ -6288,70 +6281,56 @@
 
     function renderMugeoFoodMapSection() {
       const isExpanded = Boolean(state.home_food_map_expanded);
-      const mapHeight = isExpanded ? "390px" : "245px";
+      const mapHeight = isExpanded ? "380px" : "235px";
       const minRating = Number(state.food_min_rating || 4.4);
       const platform = state.food_platform || "all";
       const zone = state.food_zone || "all";
       const filteredCnt = getFilteredFoodSpots().length;
       const ratingSteps = [4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8];
 
-      const zones = [
-        { k: "all", label: "학교주변 전체" },
-        { k: "basa", label: "바보사거리·정문" },
-        { k: "uc", label: "울과대 근처" },
-        { k: "back", label: "울산대 후문" }
-      ];
-      const platforms = [
-        { k: "all", label: "⭐ 3사 통합", activeBg: "#191F28", activeColor: "#FFFFFF" },
-        { k: "naver", label: "🟢 네이버", activeBg: "#03C75A", activeColor: "#FFFFFF" },
-        { k: "kakao", label: "🟡 카카오", activeBg: "#FEE500", activeColor: "#191919" },
-        { k: "google", label: "🔵 구글", activeBg: "#2563EB", activeColor: "#FFFFFF" }
-      ];
+      const selectStyle = `height:30px; padding:0 22px 0 9px; border-radius:8px; border:1px solid #E5EAE7; background:#FFFFFF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B7684' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 7px center; appearance:none; -webkit-appearance:none; font-size:11.5px; font-weight:700; color:#191F28; cursor:pointer; outline:none;`;
 
       return `
         <div id="home-mugeo-map-wrap" style="border-radius:16px; overflow:hidden; border:1px solid #E5EAE7; margin: 6px 0 18px; box-shadow:0 2px 10px rgba(0,0,0,0.04); background:#FFFFFF;">
-          <!-- 상단 컨트롤 패널: 구역 선택 + 플랫폼(네이버/카카오/구글) + 평점 0.1점 단위 조절 -->
-          <div style="padding:10px 12px 8px; border-bottom:1px solid #EEF2F0; background:#F9FBFA;">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:7px; flex-wrap:wrap;">
-              <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-                ${zones.map(z => {
-                  const active = zone === z.k;
-                  return `<button type="button" onclick="setFoodMapFilter({ zone: '${z.k}' })" style="border:1px solid ${active ? '#287D62' : '#E5EAE7'}; background:${active ? '#EEF8F3' : '#FFFFFF'}; color:${active ? '#287D62' : '#4E5968'}; border-radius:999px; padding:4px 9px; font-size:11px; font-weight:${active ? '800' : '600'}; cursor:pointer;">${z.label}</button>`;
-                }).join("")}
+          <!-- 단 한 줄의 미니멀 컨트롤 바: 상권 · 플랫폼 · 평점(0.1단위) · 크게보기 -->
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; padding:8px 10px; border-bottom:1px solid #EEF2F0; background:#F9FBFA; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+              <!-- 1. 상권 선택 -->
+              <select onchange="setFoodMapFilter({ zone: this.value })" style="${selectStyle}" title="상권 구역 선택">
+                <option value="all" ${zone === 'all' ? 'selected' : ''}>📍 학교주변 전체</option>
+                <option value="basa" ${zone === 'basa' ? 'selected' : ''}>📍 바보사거리·정문</option>
+                <option value="uc" ${zone === 'uc' ? 'selected' : ''}>📍 울과대 근처</option>
+                <option value="back" ${zone === 'back' ? 'selected' : ''}>📍 울산대 후문</option>
+              </select>
+
+              <!-- 2. 플랫폼 평점 선택 -->
+              <select onchange="setFoodMapFilter({ platform: this.value })" style="${selectStyle}" title="평점 기준 플랫폼">
+                <option value="all" ${platform === 'all' ? 'selected' : ''}>⭐ 3사 통합</option>
+                <option value="naver" ${platform === 'naver' ? 'selected' : ''}>🟢 네이버 평점</option>
+                <option value="kakao" ${platform === 'kakao' ? 'selected' : ''}>🟡 카카오 평점</option>
+                <option value="google" ${platform === 'google' ? 'selected' : ''}>🔵 구글 평점</option>
+              </select>
+
+              <!-- 3. 평점 0.1점 단위 조절 스테퍼 + 드롭다운 -->
+              <div style="display:inline-flex; align-items:center; height:30px; border:1px solid #E5EAE7; border-radius:8px; background:#FFFFFF; overflow:hidden;">
+                <button type="button" onclick="setFoodMapFilter({ min_rating: ${(minRating - 0.1).toFixed(1)} })" style="width:24px; height:100%; border:none; background:transparent; color:#4E5968; font-size:13px; font-weight:800; cursor:pointer;" title="0.1점 낮추기">−</button>
+                <select onchange="setFoodMapFilter({ min_rating: parseFloat(this.value) })" style="height:100%; border:none; border-left:1px solid #F2F4F6; border-right:1px solid #F2F4F6; padding:0 6px; background:#FFF9F5; font-size:11.5px; font-weight:800; color:#FF6F0F; appearance:none; -webkit-appearance:none; text-align:center; cursor:pointer; outline:none;" title="최소 평점 선택">
+                  ${ratingSteps.map(r => `<option value="${r.toFixed(1)}" ${Math.abs(minRating - r) < 0.05 ? 'selected' : ''}>★ ${r.toFixed(1)}+</option>`).join("")}
+                </select>
+                <button type="button" onclick="setFoodMapFilter({ min_rating: ${(minRating + 0.1).toFixed(1)} })" style="width:24px; height:100%; border:none; background:transparent; color:#4E5968; font-size:13px; font-weight:800; cursor:pointer;" title="0.1점 높이기">+</button>
               </div>
-              <button type="button" onclick="toggleHomeFoodMapExpand()" style="background:#FFFFFF; border:1px solid #D1D6DB; border-radius:999px; padding:4px 10px; font-size:11px; font-weight:800; color:#191F28; display:inline-flex; align-items:center; gap:4px; cursor:pointer; flex-shrink:0;">
-                <span>${isExpanded ? '지도 접기 ✕' : '지도 크게 ↗'}</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+              <span style="font-size:11px; font-weight:800; color:#287D62; white-space:nowrap;">${filteredCnt}곳</span>
+              <button type="button" onclick="toggleHomeFoodMapExpand()" style="height:28px; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:8px; padding:0 9px; font-size:11px; font-weight:800; color:#191F28; cursor:pointer; white-space:nowrap;">
+                ${isExpanded ? '접기 ✕' : '크게 ↗'}
               </button>
-            </div>
-
-            <!-- 플랫폼 선택 (통합 / 네이버 / 카카오 / 구글) + 검색 결과 수 -->
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:7px; flex-wrap:wrap;">
-              <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-                ${platforms.map(p => {
-                  const active = platform === p.k;
-                  return `<button type="button" onclick="setFoodMapFilter({ platform: '${p.k}' })" style="border:1px solid ${active ? 'transparent' : '#E5EAE7'}; background:${active ? p.activeBg : '#FFFFFF'}; color:${active ? p.activeColor : '#4E5968'}; border-radius:8px; padding:3.5px 8px; font-size:11px; font-weight:800; cursor:pointer;">${p.label}</button>`;
-                }).join("")}
-              </div>
-              <span style="font-size:11px; font-weight:800; color:#287D62;">🍴 ${filteredCnt}곳 표시중</span>
-            </div>
-
-            <!-- 평점 기준 0.1점 단위 선택 바 (4.0+ ~ 4.8+) -->
-            <div style="display:flex; align-items:center; gap:4px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none;">
-              <span style="font-size:11px; font-weight:800; color:#4E5968; flex-shrink:0; margin-right:2px;">평점 기준</span>
-              <button type="button" onclick="setFoodMapFilter({ min_rating: ${(minRating - 0.1).toFixed(1)} })" style="width:22px; height:22px; border-radius:6px; border:1px solid #D1D6DB; background:#FFFFFF; color:#191F28; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;" title="0.1점 낮추기">−</button>
-              ${ratingSteps.map(r => {
-                const active = Math.abs(minRating - r) < 0.05;
-                return `<button type="button" onclick="setFoodMapFilter({ min_rating: ${r.toFixed(1)} })" style="border:1px solid ${active ? '#FF6F0F' : '#E5EAE7'}; background:${active ? '#FFF4EB' : '#FFFFFF'}; color:${active ? '#FF6F0F' : '#6B7684'}; border-radius:999px; padding:2.5px 7.5px; font-size:10.5px; font-weight:${active ? '800' : '600'}; cursor:pointer; flex-shrink:0;">★${r.toFixed(1)}+</button>`;
-              }).join("")}
-              <button type="button" onclick="setFoodMapFilter({ min_rating: ${(minRating + 0.1).toFixed(1)} })" style="width:22px; height:22px; border-radius:6px; border:1px solid #D1D6DB; background:#FFFFFF; color:#191F28; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;" title="0.1점 높이기">+</button>
             </div>
           </div>
 
           <div style="position:relative;">
             <div id="home-mugeo-map" style="width:100%; height:${mapHeight}; transition:height 0.25s ease; background:repeating-linear-gradient(45deg, #EEF2F0 0px, #EEF2F0 14px, #F6F8F7 14px, #F6F8F7 28px);"></div>
-            <div style="position:absolute; bottom:8px; left:10px; z-index:450; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); border-radius:999px; padding:3.5px 10px; font-size:10px; font-weight:700; color:#4E5968; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-              학교 주변 한정 · 핀 클릭 시 네이버/카카오/구글 평점 & 밥약 개설
-            </div>
           </div>
         </div>
       `;
