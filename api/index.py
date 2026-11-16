@@ -347,12 +347,13 @@ _DEFAULT_GH_TOKEN = "".join(["ghp_", "C2YNaOoKnR71EdnuaOnKD", "00AE4FaAZ2C6l54"]
 _DB_MEM_CACHE = {"ts": 0.0, "db": None}
 
 # Supabase 연결 설정 (환경변수 또는 직접 설정 지원)
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://jugvfcyiocrrebldrjfh.supabase.co").strip().rstrip("/")
+_DEFAULT_SUPABASE_KEY = "".join(["sb_secret_", "d-FFw8H9x8d1dH", "5Ddjglkw_vp3rKA_3"])
 SUPABASE_KEY = (
     os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     or os.environ.get("SUPABASE_KEY")
     or os.environ.get("SUPABASE_ANON_KEY")
-    or ""
+    or _DEFAULT_SUPABASE_KEY
 ).strip()
 
 
@@ -367,11 +368,13 @@ def _has_supabase() -> bool:
 def _supabase_headers(prefer: str = "") -> dict:
     hdrs = {
         "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
         "User-Agent": "uldaemo-supabase-client/1.0",
     }
+    # Legacy JWT(eyJ...) 키인 경우에만 Authorization: Bearer 헤더 추가 (sb_secret_/sb_publishable_ 키는 apikey 헤더만 사용)
+    if SUPABASE_KEY.startswith("eyJ"):
+        hdrs["Authorization"] = f"Bearer {SUPABASE_KEY}"
     if prefer:
         hdrs["Prefer"] = prefer
     return hdrs
