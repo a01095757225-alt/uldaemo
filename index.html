@@ -3750,7 +3750,7 @@
       smtp_pw: localStorage.getItem("uldaemo_smtp_pw") || "",
       expanded_post_ids: { 1: true },
       pc_accordions: { notifs: false, map: false, cafeteria: false },
-      food_min_rating: 4.4,
+      food_min_rating: 4.6,
       food_platform: "all",
       food_zone: "all"
     };
@@ -6154,11 +6154,17 @@
     }
 
     function getFilteredFoodSpots() {
-      const minRating = Number(state.food_min_rating || 4.4);
+      const minRating = Number(state.food_min_rating || 4.6);
       const platform = state.food_platform || "all";
       const zone = state.food_zone || "all";
+      const homeCat = state.home_cat || "전체";
       return MUGEO_FOOD_SPOTS.filter(s => {
         if (zone !== "all" && s.zone !== zone) return false;
+        if (homeCat !== "전체") {
+          if (homeCat.includes("밥") && !s.cat.includes("밥")) return false;
+          if (homeCat.includes("카공") && !s.cat.includes("카공")) return false;
+          if ((homeCat.includes("술") || homeCat.includes("번개")) && !s.cat.includes("술")) return false;
+        }
         const score = getSpotScoreByPlatform(s, platform);
         return score + 1e-6 >= minRating;
       });
@@ -6229,60 +6235,84 @@
           google: { prefix: "G★", color: "#2563EB", border: "#BFDBFE" }
         };
         const pBadge = platBadgeMap[platform] || platBadgeMap.all;
+        const markerLayer = L.layerGroup().addTo(map);
 
-        qualifiedSpots.forEach(s => {
-          const dispScore = getSpotScoreByPlatform(s, platform);
-          const queryEnc = encodeURIComponent(s.kakaoQuery || `울산 무거동 ${s.name}`);
-          const naverUrl = `https://map.naver.com/p/search/${queryEnc}`;
-          const kakaoUrl = `https://map.kakao.com/link/search/${queryEnc}`;
-          const googleUrl = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+        // 줌 레벨 및 화면 픽셀 거리 기반 스마트 마커 렌더링 (네이버·카카오 지도처럼 겹치는 핀은 미니 도트로 축소)
+        function renderSmartFoodMarkers() {
+          markerLayer.clearLayers();
+          const curZoom = map.getZoom();
+          const maxFullLabels = curZoom >= 18 ? 22 : (curZoom === 17 ? (isExpanded ? 12 : 8) : (isExpanded ? 7 : 4));
+          const placedLabelPts = [];
 
-          // 깔끔한 1줄 캡슐형 마커 (네이버/당근 지도 스타일: 겹침 최소화)
-          const icon = L.divIcon({
-            className: "karrot-food-marker",
-            html: `
+          qualifiedSpots.forEach(s => {
+            const dispScore = getSpotScoreByPlatform(s, platform);
+            const pt = map.latLngToContainerPoint([s.lat, s.lng]);
+            const collides = placedLabelPts.some(p => Math.abs(pt.x - p.x) < 88 && Math.abs(pt.y - p.y) < 30);
+            const showFullLabel = (!collides && placedLabelPts.length < maxFullLabels);
+            if (showFullLabel) {
+              placedLabelPts.push(pt);
+            }
+
+            const queryEnc = encodeURIComponent(s.kakaoQuery || `울산 무거동 ${s.name}`);
+            const naverUrl = `https://map.naver.com/p/search/${queryEnc}`;
+            const kakaoUrl = `https://map.kakao.com/link/search/${queryEnc}`;
+            const googleUrl = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+
+            const markerHtml = showFullLabel ? `
               <div style="display:inline-flex; flex-direction:column; align-items:center; transform:translate(-50%, -100%); cursor:pointer;">
-                <div style="display:inline-flex; align-items:center; gap:4px; padding:3.5px 8px; border-radius:999px; background:#FFFFFF; border:1.5px solid ${pBadge.border}; box-shadow:0 2px 8px rgba(0,0,0,0.15); white-space:nowrap;">
+                <div style="display:inline-flex; align-items:center; gap:4px; padding:3.5px 8px; border-radius:999px; background:#FFFFFF; border:1.5px solid ${pBadge.border}; box-shadow:0 2px 8px rgba(0,0,0,0.16); white-space:nowrap;">
                   <span style="font-size:12.5px; line-height:1;">${s.emoji}</span>
                   <span style="font-size:11px; font-weight:800; color:#191F28; letter-spacing:-0.2px;">${escHtml(s.name)}</span>
                   <span style="font-size:10.5px; font-weight:800; color:${pBadge.color};">${pBadge.prefix}${dispScore.toFixed(1)}</span>
                 </div>
                 <div style="width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #FFFFFF; filter:drop-shadow(0 1px 1px rgba(0,0,0,0.12));"></div>
               </div>
-            `,
-            iconSize: [0, 0]
-          });
+            ` : `
+              <div title="${escHtml(s.name)} (${pBadge.prefix}${dispScore.toFixed(1)})" style="width:24px; height:24px; border-radius:50%; background:${s.bg}; border:2px solid #FFFFFF; box-shadow:0 2px 6px rgba(0,0,0,0.22); display:flex; align-items:center; justify-content:center; font-size:12.5px; transform:translate(-50%, -50%); cursor:pointer;">
+                ${s.emoji}
+              </div>
+            `;
 
-          const popupHtml = `
-            <div style="min-width:210px; font-family:inherit; padding:2px;">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
-                <span style="font-size:13.5px; font-weight:800; color:#191F28;">${s.emoji} ${escHtml(s.name)}</span>
-                <span style="font-size:10.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 6px; border-radius:6px;">${escHtml(s.zoneLabel || '학교주변')}</span>
+            const icon = L.divIcon({
+              className: "karrot-food-marker",
+              html: markerHtml,
+              iconSize: [0, 0]
+            });
+
+            const popupHtml = `
+              <div style="min-width:210px; font-family:inherit; padding:2px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
+                  <span style="font-size:13.5px; font-weight:800; color:#191F28;">${s.emoji} ${escHtml(s.name)}</span>
+                  <span style="font-size:10.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 6px; border-radius:6px;">${escHtml(s.zoneLabel || '학교주변')}</span>
+                </div>
+                <div style="font-size:11.5px; color:#6B7684; margin-bottom:3px;">${escHtml(s.menu)}</div>
+                ${s.address ? `<div style="font-size:10.5px; color:#4E5968; font-weight:600; margin-bottom:7px;">📍 ${escHtml(s.address)}</div>` : ''}
+                <div style="display:flex; gap:4px; margin-bottom:8px; background:#F8FAFC; padding:5px 6px; border-radius:8px; border:1px solid #E5EAE7; font-size:10.5px; font-weight:700; justify-content:space-around;">
+                  <span style="color:#03C75A;">N ★${Number(s.naverRating || s.rating).toFixed(1)}</span>
+                  <span style="color:#D97706;">K ★${Number(s.kakaoRating || s.rating).toFixed(1)}</span>
+                  <span style="color:#2563EB;">G ★${Number(s.googleRating || s.rating).toFixed(1)}</span>
+                </div>
+                <div style="display:flex; gap:4px; margin-bottom:6px;">
+                  <a href="${naverUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#03C75A; color:#FFFFFF; font-size:10.5px; font-weight:800; text-decoration:none;">네이버</a>
+                  <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#FEE500; color:#191919; font-size:10.5px; font-weight:800; text-decoration:none;">카카오</a>
+                  <a href="${googleUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-size:10.5px; font-weight:800; text-decoration:none;">구글맵</a>
+                </div>
+                <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="width:100%; padding:6px 0; border-radius:8px; border:none; background:#287D62; color:#FFFFFF; font-size:11.5px; font-weight:800; cursor:pointer;">⚡ 이 맛집으로 밥약·카공 올리기</button>
               </div>
-              <div style="font-size:11.5px; color:#6B7684; margin-bottom:3px;">${escHtml(s.menu)}</div>
-              ${s.address ? `<div style="font-size:10.5px; color:#4E5968; font-weight:600; margin-bottom:7px;">📍 ${escHtml(s.address)}</div>` : ''}
-              <div style="display:flex; gap:4px; margin-bottom:8px; background:#F8FAFC; padding:5px 6px; border-radius:8px; border:1px solid #E5EAE7; font-size:10.5px; font-weight:700; justify-content:space-around;">
-                <span style="color:#03C75A;">N ★${Number(s.naverRating || s.rating).toFixed(1)}</span>
-                <span style="color:#D97706;">K ★${Number(s.kakaoRating || s.rating).toFixed(1)}</span>
-                <span style="color:#2563EB;">G ★${Number(s.googleRating || s.rating).toFixed(1)}</span>
-              </div>
-              <div style="display:flex; gap:4px; margin-bottom:6px;">
-                <a href="${naverUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#03C75A; color:#FFFFFF; font-size:10.5px; font-weight:800; text-decoration:none;">네이버</a>
-                <a href="${kakaoUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#FEE500; color:#191919; font-size:10.5px; font-weight:800; text-decoration:none;">카카오</a>
-                <a href="${googleUrl}" target="_blank" style="flex:1; text-align:center; padding:5px 0; border-radius:7px; background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-size:10.5px; font-weight:800; text-decoration:none;">구글맵</a>
-              </div>
-              <button type="button" onclick="openCreateWithFoodSpot('${s.id}')" style="width:100%; padding:6px 0; border-radius:8px; border:none; background:#287D62; color:#FFFFFF; font-size:11.5px; font-weight:800; cursor:pointer;">⚡ 이 맛집으로 밥약·카공 올리기</button>
-            </div>
-          `;
-          L.marker([s.lat, s.lng], { icon }).addTo(map).bindPopup(popupHtml);
-        });
+            `;
+            L.marker([s.lat, s.lng], { icon, zIndexOffset: showFullLabel ? 300 : 50 }).addTo(markerLayer).bindPopup(popupHtml);
+          });
+        }
+
+        renderSmartFoodMarkers();
+        map.on("zoomend", renderSmartFoodMarkers);
       } catch (e) { console.error("initHomeMugeoMap err:", e); }
     }
 
     function renderMugeoFoodMapSection() {
       const isExpanded = Boolean(state.home_food_map_expanded);
       const mapHeight = isExpanded ? "380px" : "235px";
-      const minRating = Number(state.food_min_rating || 4.4);
+      const minRating = Number(state.food_min_rating || 4.6);
       const platform = state.food_platform || "all";
       const zone = state.food_zone || "all";
       const filteredCnt = getFilteredFoodSpots().length;
