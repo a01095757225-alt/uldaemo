@@ -2490,8 +2490,8 @@
     function renderWithoutMapFlicker() {
       const mainBody = document.getElementById("main-body-content");
       const currentUser = DB.users[state.user_id];
-      if (!mainBody || !currentUser || state.nav_tab === "지도" || state.active_modal === "detail") {
-        // 지도 탭이나 상세 모달이 아닌 일반 상황에서 mainBody가 없으면 전체 렌더
+      if (!mainBody || !currentUser || state.nav_tab === "지도" || state.active_modal === "detail" || state.active_modal === "food_map") {
+        // 지도 탭이나 상세/맛집지도 모달이 아닌 일반 상황에서 mainBody가 없으면 전체 렌더
         if (!mainBody) render();
         return;
       }
@@ -2526,6 +2526,9 @@
           bodyHtml = renderProfileTab(currentUser);
         }
         mainBody.innerHTML = bodyHtml;
+        if (!state.active_modal && state.nav_tab === "홈") {
+          setTimeout(initHomeMugeoMap, 50);
+        }
 
         Object.keys(savedInputs).forEach(id => {
           const el = document.getElementById(id);
@@ -3392,11 +3395,23 @@
     }
 
     // 1) 홈 화면: 당근 스타일 심플 미니 프리뷰 지도 (대표 맛집 3곳만 겹침 없이 표시 · 클릭 시 맛집지도 창 오픈)
+    let _homeFoodMapRetry = 0;
     function initHomeMugeoMap() {
       const el = document.getElementById("home-mugeo-map");
-      if (!el || typeof L === "undefined") return;
+      if (!el) return;
+      if (typeof L === "undefined") {
+        if (_homeFoodMapRetry < 20) {
+          _homeFoodMapRetry++;
+          setTimeout(initHomeMugeoMap, 250);
+        }
+        return;
+      }
+      _homeFoodMapRetry = 0;
       try {
-        if (window._homeMugeoMap) { window._homeMugeoMap.remove(); window._homeMugeoMap = null; }
+        if (window._homeMugeoMap) {
+          try { window._homeMugeoMap.remove(); } catch (e) {}
+          window._homeMugeoMap = null;
+        }
         const map = L.map("home-mugeo-map", {
           zoomControl: false,
           attributionControl: false,
@@ -3410,6 +3425,8 @@
         window._homeMugeoMap = map;
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+        setTimeout(() => { try { if (window._homeMugeoMap === map) map.invalidateSize(false); } catch (e) {} }, 120);
+        setTimeout(() => { try { if (window._homeMugeoMap === map) map.invalidateSize(false); } catch (e) {} }, 350);
 
         // 좌(미토식당) · 중(기린카페) · 우(가무댕댕) 간격이 넓어 절대 겹치지 않는 대표 맛집 3곳만 미니 프리뷰에 표시
         const previewSpots = [
