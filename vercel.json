@@ -2,6 +2,8 @@
   "version": 2,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
+    { "src": "css/**", "use": "@vercel/static" },
+    { "src": "js/**", "use": "@vercel/static" },
     { "src": "promo.html", "use": "@vercel/static" },
     { "src": "sw.js", "use": "@vercel/static" },
     { "src": "manifest.json", "use": "@vercel/static" },
@@ -13,6 +15,8 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "api/index.py" },
+    { "src": "/css/(.*)", "dest": "/css/$1", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" } },
+    { "src": "/js/(.*)", "dest": "/js/$1", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" } },
     { "src": "/promo", "dest": "/promo.html" },
     { "src": "/promo.html", "dest": "/promo.html" },
     { "src": "/sw.js", "dest": "/sw.js", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate", "Service-Worker-Allowed": "/" } },
