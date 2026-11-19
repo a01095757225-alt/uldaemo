@@ -214,24 +214,60 @@ function closeTimetableModal() {
 
 function toggleTimetableSlot(day, period) {
   state._tt_draft = state._tt_draft || {};
+  state._tt_names_draft = state._tt_names_draft || JSON.parse(JSON.stringify((DB.users[state.user_id] && DB.users[state.user_id].timetable_names) || {}));
   const arr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
   const idx = arr.indexOf(Number(period));
-  if (idx >= 0) arr.splice(idx, 1);
-  else arr.push(Number(period));
+  const slotKey = `${day}_${period}`;
+  if (idx >= 0) {
+    arr.splice(idx, 1);
+    delete state._tt_names_draft[slotKey];
+    if (state._tt_selected_slot === slotKey) state._tt_selected_slot = null;
+  } else {
+    arr.push(Number(period));
+    state._tt_selected_slot = slotKey;
+  }
   arr.sort((a, b) => a - b);
   state._tt_draft[day] = arr;
 
   const btn = document.getElementById(`tt_cell_${day}_${period}`);
   if (btn) {
     const isBusy = arr.includes(Number(period));
+    const sName = (state._tt_names_draft && state._tt_names_draft[slotKey]) ? String(state._tt_names_draft[slotKey]).slice(0, 4) : "수업";
     btn.style.background = isBusy ? "#287D62" : "#FFFFFF";
-    btn.style.color = isBusy ? "#FFFFFF" : "#8B95A1";
-    btn.style.borderColor = isBusy ? "#287D62" : "#E5EAE7";
-    btn.textContent = isBusy ? "수업" : "공강";
+    btn.style.color = isBusy ? "#FFFFFF" : "#98A2B3";
+    btn.style.borderColor = isBusy ? "#287D62" : "transparent";
+    btn.textContent = isBusy ? sName : "";
   }
   const summaryEl = document.getElementById("tt-draft-summary");
   if (summaryEl) {
     summaryEl.textContent = buildTimetableDraftSummary(state._tt_draft);
+  }
+  const courseInput = document.getElementById("tt-course-name-input");
+  const courseLabel = document.getElementById("tt-course-slot-label");
+  if (courseInput && courseLabel) {
+    if (state._tt_selected_slot) {
+      const [sd, sp] = state._tt_selected_slot.split("_");
+      courseLabel.textContent = `${sd} ${sp}교시 수업명`;
+      courseInput.value = (state._tt_names_draft && state._tt_names_draft[state._tt_selected_slot]) || "";
+      courseInput.disabled = false;
+    } else {
+      courseLabel.textContent = "수업 칸 선택";
+      courseInput.value = "";
+      courseInput.disabled = true;
+    }
+  }
+}
+
+function updateSelectedSlotCourseName(val) {
+  if (!state._tt_selected_slot) return;
+  state._tt_names_draft = state._tt_names_draft || {};
+  const clean = String(val || "").trim().slice(0, 12);
+  if (clean) state._tt_names_draft[state._tt_selected_slot] = clean;
+  else delete state._tt_names_draft[state._tt_selected_slot];
+  const [sd, sp] = state._tt_selected_slot.split("_");
+  const btn = document.getElementById(`tt_cell_${sd}_${sp}`);
+  if (btn) {
+    btn.textContent = clean ? clean.slice(0, 4) : "수업";
   }
 }
 
@@ -240,13 +276,15 @@ function buildTimetableDraftSummary(ttObj) {
   const targetDay = TT_DAYS.includes(todayDay) ? todayDay : "월";
   const busy = new Set(Array.isArray(ttObj && ttObj[targetDay]) ? ttObj[targetDay].map(Number) : []);
   const free = TT_PERIODS.filter(p => !busy.has(p));
-  if (free.length === 0) return `${targetDay}요일은 풀강이에요 😅`;
-  if (free.length === TT_PERIODS.length) return `수업 있는 교시를 눌러서 표시해 주세요 (나머지는 자동 공강 처리)`;
-  return `${targetDay}요일 공강: ${formatContiguousPeriods(free)}`;
+  if (free.length === 0) return `${targetDay}요일은 풀강이에요`;
+  if (free.length === TT_PERIODS.length) return `수업이 있는 칸만 눌러주세요 (빈 칸은 자동 공강)`;
+  return `${targetDay}요일 내 공강 · ${formatContiguousPeriods(free)}`;
 }
 
 function resetTimetableDraft() {
   state._tt_draft = { "월": [], "화": [], "수": [], "목": [], "금": [] };
+  state._tt_names_draft = {};
+  state._tt_selected_slot = null;
   render();
   showToast("시간표를 초기화했어요.");
 }
@@ -260,12 +298,15 @@ function saveUserTimetable() {
     clean[d] = Array.isArray(draft[d]) ? [...new Set(draft[d].map(Number))].sort((a, b) => a - b) : [];
   });
   u.timetable = clean;
+  u.timetable_names = state._tt_names_draft || u.timetable_names || {};
   u.timetable_saved = true;
   u.updated_at = Date.now();
   saveDB(true);
   state._tt_draft = null;
+  state._tt_names_draft = null;
+  state._tt_selected_slot = null;
   state.timetable_tab = "mates";
-  showToast("✅ 시간표가 저장되었어요! 공강이 겹치는 메이트를 확인해 보세요.");
+  showToast("시간표가 저장되었어요! 공강이 겹치는 학우를 확인해 보세요.");
   render();
 }
 
@@ -279,7 +320,7 @@ function inviteGonggangMate(mateUid, meetDate, meetTime) {
   state.active_modal = "create";
   render();
   if (mate) {
-    showToast(`⚡ ${mate.nickname}님과의 공강 시간(${state.prefill_date} ${state.prefill_time})이 자동 입력되었어요!`);
+    showToast(`${mate.nickname}님과의 공강 시간(${state.prefill_date} ${state.prefill_time})이 자동 입력되었어요.`);
   }
 }
 
@@ -288,101 +329,112 @@ function renderTimetableModal() {
   if (!u) return "";
   const curTab = state.timetable_tab || "mates";
   const draft = state._tt_draft || u.timetable || {};
+  const namesMap = state._tt_names_draft || u.timetable_names || {};
   const hasSaved = hasUserTimetable(state.user_id);
   const mates = hasSaved ? getGonggangMates() : [];
+  const selSlot = state._tt_selected_slot || null;
+  const selSlotLabel = selSlot ? `${selSlot.split("_")[0]} ${selSlot.split("_")[1]}교시 수업명` : "수업 칸 선택";
+  const selSlotVal = selSlot ? (namesMap[selSlot] || "") : "";
 
-  return `
-    <div class="uldaemo-card" style="padding:18px 16px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <button type="button" onclick="closeTimetableModal()" style="width:32px; height:32px; border-radius:50%; border:1px solid #E5EAE7; background:#FFFFFF; color:#191F28; font-size:15px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-          <div>
-            <div style="font-size:17px; font-weight:800; color:#191F28;">🗓️ 내 시간표 · 공강 메이트</div>
-            <div style="font-size:11.5px; color:#6B7684;">시간표를 입력하면 공강이 겹치는 학우를 찾아줘요</div>
-          </div>
-        </div>
-        <button type="button" onclick="closeTimetableModal()" style="border:none; background:#F2F4F6; color:#4E5968; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">닫기 ✕</button>
+  const editorHtml = `
+    <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:800; color:#191F28;">내 수업 시간표</span>
+        <button type="button" onclick="resetTimetableDraft()" style="border:none; background:none; color:#98A2B3; font-size:12px; font-weight:600; cursor:pointer;">초기화</button>
+      </div>
+      <div id="tt-draft-summary" style="font-size:12px; color:#287D62; font-weight:700; margin-bottom:12px;">
+        ${escHtml(buildTimetableDraftSummary(draft))}
       </div>
 
-      <!-- 세그먼트 탭 -->
-      <div style="display:inline-flex; width:100%; background:#F2F4F3; padding:4px; border-radius:12px; gap:4px; margin-bottom:16px;">
-        <button type="button" onclick="state.timetable_tab='mates'; render();" style="flex:1; border:none; padding:9px 10px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; ${curTab==='mates' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 1px 4px rgba(0,0,0,0.08);' : 'background:transparent; color:#8B95A1;'}">
-          ⚡ 공강 메이트 (${mates.length})
-        </button>
-        <button type="button" onclick="state._tt_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable||{})); state.timetable_tab='edit'; render();" style="flex:1; border:none; padding:9px 10px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; ${curTab==='edit' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 1px 4px rgba(0,0,0,0.08);' : 'background:transparent; color:#8B95A1;'}">
-          🗓️ 내 시간표 설정
-        </button>
-      </div>
-
-      ${curTab === "edit" ? `
-        <div id="tt-draft-summary" style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:10px; padding:9px 12px; margin-bottom:12px; font-size:12px; color:#287D62; font-weight:700;">
-          ${escHtml(buildTimetableDraftSummary(draft))}
-        </div>
-
-        <div style="display:grid; grid-template-columns: 44px repeat(5, 1fr); gap:4px; margin-bottom:14px; user-select:none;">
+      <div style="background:#F7F9F8; border-radius:16px; padding:12px 10px; margin-bottom:12px;">
+        <div style="display:grid; grid-template-columns: 36px repeat(5, 1fr); gap:5px; user-select:none;">
           <div></div>
-          ${TT_DAYS.map(d => `<div style="text-align:center; font-size:12px; font-weight:800; color:#191F28; padding:4px 0;">${d}</div>`).join("")}
+          ${TT_DAYS.map(d => `<div style="text-align:center; font-size:12px; font-weight:700; color:#6B7684; padding:2px 0 4px;">${d}</div>`).join("")}
           ${TT_PERIODS.map(p => `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10.5px; color:#6B7684; font-weight:700; line-height:1.1;">
-              <span>${p}교시</span>
-              <span style="font-size:9.5px; color:#8B95A1;">${8 + p}:00</span>
+            <div style="display:flex; align-items:center; justify-content:center; font-size:11px; color:#98A2B3; font-weight:700;">
+              ${p}
             </div>
             ${TT_DAYS.map(d => {
               const isBusy = Array.isArray(draft[d]) && draft[d].map(Number).includes(p);
+              const sName = namesMap[`${d}_${p}`] ? String(namesMap[`${d}_${p}`]).slice(0, 4) : "수업";
               return `
-                <button type="button" id="tt_cell_${d}_${p}" onclick="toggleTimetableSlot('${d}', ${p})" style="height:34px; border-radius:8px; border:1px solid ${isBusy ? '#287D62' : '#E5EAE7'}; background:${isBusy ? '#287D62' : '#FFFFFF'}; color:${isBusy ? '#FFFFFF' : '#8B95A1'}; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.12s;">
-                  ${isBusy ? '수업' : '공강'}
+                <button type="button" id="tt_cell_${d}_${p}" onclick="toggleTimetableSlot('${d}', ${p})" style="height:32px; border-radius:8px; border:1px solid ${isBusy ? '#287D62' : 'transparent'}; background:${isBusy ? '#287D62' : '#FFFFFF'}; color:${isBusy ? '#FFFFFF' : '#98A2B3'}; font-size:10.5px; font-weight:700; cursor:pointer; transition:all 0.12s; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  ${isBusy ? escHtml(sName) : ''}
                 </button>
               `;
             }).join("")}
           `).join("")}
         </div>
+      </div>
 
-        <div style="display:flex; gap:8px;">
-          <button type="button" class="btn" style="flex:0.4; background:#F2F4F6; color:#4E5968;" onclick="resetTimetableDraft()">초기화</button>
-          <button type="button" class="btn btn-primary" style="flex:1;" onclick="saveUserTimetable()">✅ 시간표 저장 & 메이트 찾기</button>
+      <!-- 선택 칸 수업명 한 줄 입력 (선택) -->
+      <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; border-radius:14px; padding:6px 10px 6px 14px; margin-bottom:14px;">
+        <span id="tt-course-slot-label" style="font-size:11.5px; font-weight:700; color:#6B7684; white-space:nowrap;">${escHtml(selSlotLabel)}</span>
+        <input id="tt-course-name-input" type="text" maxlength="12" value="${escHtml(selSlotVal)}" ${selSlot ? '' : 'disabled'} placeholder="수업명 입력 (선택)" oninput="updateSelectedSlotCourseName(this.value)" style="flex:1; min-width:0; height:32px; border:none; background:transparent; font-size:13px; color:#191F28; outline:none;" />
+      </div>
+
+      <button type="button" onclick="saveUserTimetable()" style="width:100%; height:46px; border-radius:23px; border:none; background:#287D62; color:#FFFFFF; font-size:14.5px; font-weight:800; cursor:pointer;">시간표 저장</button>
+    </div>
+  `;
+
+  const matesHtml = `
+    <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:18px;">
+      <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:4px;">공강이 겹치는 학우 ${mates.length}명</div>
+      <div style="font-size:12px; color:#6B7684; margin-bottom:14px;">단과대와 매너온도만 블라인드로 표시돼요</div>
+
+      ${!hasSaved ? `
+        <div style="text-align:center; padding:32px 16px; background:#F7F9F8; border-radius:16px;">
+          <div style="font-size:14.5px; font-weight:800; color:#191F28; margin-bottom:6px;">내 시간표를 먼저 등록해 주세요</div>
+          <div style="font-size:12.5px; color:#6B7684; margin-bottom:14px; line-height:1.5;">수업 있는 칸만 누르면 공강이 겹치는 학우를 찾아드려요.</div>
+          ${!isPC() ? `<button type="button" onclick="state._tt_draft={}; state.timetable_tab='edit'; render();" style="height:38px; padding:0 18px; border-radius:19px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer;">시간표 입력하기 ›</button>` : ''}
+        </div>
+      ` : (mates.length === 0 ? `
+        <div style="text-align:center; padding:32px 16px; background:#F7F9F8; border-radius:16px;">
+          <div style="font-size:14.5px; font-weight:800; color:#191F28; margin-bottom:6px;">아직 공강이 겹치는 학우가 없어요</div>
+          <div style="font-size:12px; color:#6B7684; margin-bottom:14px;">먼저 내 공강 시간에 맞춰 번개를 열어보는 건 어떨까요?</div>
+          <button type="button" onclick="state.active_modal='create'; render();" style="height:38px; padding:0 18px; border-radius:19px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer;">내 공강에 번개 열기</button>
         </div>
       ` : `
-        ${!hasSaved ? `
-          <div style="text-align:center; padding:28px 16px; background:#F7F9F8; border-radius:16px; border:1px dashed #C5E6D6;">
-            <div style="font-size:32px; margin-bottom:8px;">🗓️</div>
-            <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:6px;">내 시간표를 먼저 등록해 주세요!</div>
-            <div style="font-size:12.5px; color:#6B7684; margin-bottom:14px; line-height:1.5;">수업 있는 시간만 톡톡 누르면<br>공강이 겹치는 학우들과 자동으로 매칭해 드려요.</div>
-            <button type="button" class="btn btn-primary" style="width:auto; padding:0 18px;" onclick="state._tt_draft={}; state.timetable_tab='edit'; render();">10초 만에 시간표 입력하기 ›</button>
-          </div>
-        ` : (mates.length === 0 ? `
-          <div style="text-align:center; padding:28px 16px; background:#F7F9F8; border-radius:16px;">
-            <div style="font-size:28px; margin-bottom:8px;">🌱</div>
-            <div style="font-size:14.5px; font-weight:800; color:#191F28; margin-bottom:6px;">아직 시간표를 등록한 다른 학우가 없어요</div>
-            <div style="font-size:12px; color:#6B7684; margin-bottom:14px;">학우들이 시간표를 등록하면 공강이 겹치는 메이트가 여기에 나타나요!<br>먼저 내 공강 시간에 맞춰 번개를 열어보는 건 어떨까요?</div>
-            <button type="button" class="btn btn-primary" style="width:auto; padding:0 16px;" onclick="state.active_modal='create'; render();">⚡ 내 공강에 번개 열기</button>
-          </div>
-        ` : `
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            ${mates.map(m => {
-              const tier = getTierByTemp(m.user.manner_temp || 36.5);
-              return `
-                <div style="padding:13px 14px; border-radius:14px; border:1px solid #E5EAE7; background:#FFFFFF; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                  <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-                    <div style="width:42px; height:42px; border-radius:50%; background:#EEF8F3; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
-                      ${String(m.user.avatar || '🐶').split(' ')[0]}
-                    </div>
-                    <div style="min-width:0; flex:1;">
-                      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                        <span style="font-size:14px; font-weight:800; color:#191F28;">${escHtml(m.user.nickname || '학우')}</span>
-                        <span class="temp-chip" data-tier="${tier.tier}">${tier.displayTemp}°C</span>
-                        <span style="font-size:11px; font-weight:800; color:#287D62; background:#EEF8F3; padding:2px 7px; border-radius:999px;">공강 ${m.overlap.pct}% 일치 (주 ${m.overlap.overlapHours}h)</span>
-                      </div>
-                      <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">${escHtml(m.user.department || '울산대')} · ${escHtml(m.user.mbti || 'MBTI 비공개')}</div>
-                      <div style="font-size:11.5px; font-weight:700; color:#1E6B52; margin-top:4px;">🗓️ ${escHtml(m.overlap.highlightText)}</div>
-                    </div>
-                  </div>
-                  <button type="button" onclick="inviteGonggangMate('${m.uid}', '${m.overlap.bestMeetDate}', '${m.overlap.bestMeetTime}')" style="flex-shrink:0; padding:8px 11px; border-radius:10px; border:none; background:#287D62; color:#FFFFFF; font-size:12px; font-weight:800; cursor:pointer;">⚡ 번개 제안</button>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${mates.map(m => {
+            const tier = getTierByTemp(m.user.manner_temp || 36.5);
+            const broadDept = typeof getBroadCollege === "function" ? getBroadCollege(m.user.department) : (m.user.department || "울산대");
+            return `
+              <div style="padding:14px 16px; border-radius:16px; background:#F7F9F8; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="min-width:0; flex:1;">
+                  <div style="font-size:14.5px; font-weight:800; color:#191F28;">${escHtml(tier.name)} · ${tier.displayTemp}°C · ${escHtml(broadDept)}</div>
+                  <div style="font-size:12.5px; font-weight:700; color:#287D62; margin-top:4px;">${escHtml(m.overlap.highlightText)}</div>
+                  <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">주 ${m.overlap.overlapHours}시간 공강 일치 (${m.overlap.pct}%)</div>
                 </div>
-              `;
-            }).join("")}
-          </div>
-        `)}
+                <button type="button" onclick="inviteGonggangMate('${m.uid}', '${m.overlap.bestMeetDate}', '${m.overlap.bestMeetTime}')" style="flex-shrink:0; height:34px; padding:0 14px; border-radius:17px; border:none; background:#FFFFFF; color:#287D62; font-size:12px; font-weight:700; cursor:pointer;">번개 열기</button>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `)}
+    </div>
+  `;
+
+  return `
+    <div style="max-width:920px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" onclick="closeTimetableModal()" style="width:36px; height:36px; border-radius:18px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:16px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
+          <h1 style="margin:0; font-size:22px; font-weight:800; color:#191F28;">시간표 · 공강 메이트</h1>
+        </div>
+      </div>
+
+      ${isPC() ? `
+        <div class="pc-tt-2col">
+          ${editorHtml}
+          ${matesHtml}
+        </div>
+      ` : `
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <button type="button" onclick="state.timetable_tab='mates'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'mates' ? '#191F28' : '#F7F9F8'}; color:${curTab === 'mates' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">공강 메이트 ${mates.length}</button>
+          <button type="button" onclick="state._tt_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable||{})); state._tt_names_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable_names||{})); state.timetable_tab='edit'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'edit' ? '#191F28' : '#F7F9F8'}; color:${curTab === 'edit' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">내 시간표 입력</button>
+        </div>
+        ${curTab === 'edit' ? editorHtml : matesHtml}
       `}
     </div>
   `;
