@@ -2101,6 +2101,51 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     align-items: start;
   }
 
+  /* PC 세부 화면 v2 (모던 미니멀 2열/3열 와이드 그리드) */
+  .pc-create-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+  .pc-create-col-right {
+    border-left: 1px solid #F2F4F3;
+    padding-left: 28px;
+  }
+  .pc-detail-2col {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .pc-food-split {
+    display: grid;
+    grid-template-columns: 380px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .pc-food-split #full-food-map {
+    height: 540px !important;
+  }
+  .pc-tt-2col {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .pc-cafe-3col {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: stretch;
+  }
+  .pc-noti-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+
   /* PC 광장 폭 */
   .tk-plaza-wrap { max-width: 720px; }
   .tk-balance-opt { height: 64px; }
