@@ -3746,17 +3746,9 @@
       return `
         <div class="tk-pc-home-header">
           <h1 class="tk-page-title">오늘, 같이 할래요?</h1>
-          <div class="tk-search-box">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B0B8C1" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-            <input id="home-search-input" type="text" placeholder="번개 검색 · 학식, 카공, 러닝" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
-          </div>
-        </div>
-
-        <!-- 모바일 전용 통합 검색바 (피그마 ① 홈 개선안) -->
-        <div class="only-mobile" style="margin: 2px 0 12px;">
-          <div style="display:flex; align-items:center; gap:10px; height:44px; padding:0 14px; border-radius:14px; background:#F7F9F8;">
+          <div class="tk-search-box" style="height:44px; border-radius:14px; background:#F7F9F8;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#98A2B3" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-            <input id="home-search-input-m" type="text" placeholder="번개 검색 · 학식, 카공, 러닝" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" style="flex:1; border:none; background:transparent; font-size:14px; color:#191F28; outline:none;" />
+            <input id="home-search-input" type="text" placeholder="번개 검색 · 학식, 카공, 러닝" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
           </div>
         </div>
 
