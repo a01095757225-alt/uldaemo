@@ -1921,27 +1921,33 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
   .fab-create { display: none !important; }
 
   .app-shell.wide {
-    max-width: 1240px;
+    max-width: 1320px;
     padding: 0;
     min-height: 100dvh;
+    background: #F7F9F8;
   }
   .app-shell.wide .app-layout {
     display: grid;
-    grid-template-columns: 232px minmax(0, 1fr) 300px;
+    grid-template-columns: 240px minmax(0, 1fr) 340px;
     gap: 0;
     min-height: 100dvh;
     align-items: stretch;
   }
   .app-shell.wide .app-layout.no-right-panel {
-    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .app-shell.wide .app-layout.is-map-layout .main-col {
+    padding: 0;
+    background: #FFFFFF;
   }
 
-  /* 좌측 사이드바 */
+  /* 좌측 사이드바 (피그마 PC 개선안) */
   .app-shell.wide .pc-sidebar {
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #F2F4F3;
-    padding: 24px 16px;
+    background: #FFFFFF;
+    border-right: 1px solid #E5E8EB;
+    padding: 24px 20px;
     position: sticky;
     top: 0;
     height: 100dvh;
@@ -1950,21 +1956,28 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 0 8px;
+    padding: 0 4px;
     margin-bottom: 28px;
     cursor: pointer;
   }
-  .side-nav { display: flex; flex-direction: column; gap: 4px; }
+  .side-nav { display: flex; flex-direction: column; gap: 6px; }
   .side-nav-btn {
     height: 44px;
     padding: 0 14px;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 500;
     color: #6B7684;
   }
   .side-nav-btn:hover { background: #F7F9F8; color: #191F28; }
-  .side-nav-btn.active { background: #F2F4F3; color: #191F28; font-weight: 700; }
+  .side-nav-btn.active {
+    background: #EEF8F3;
+    color: #287D62;
+    font-weight: 700;
+  }
+  .side-nav-btn.active .side-nav-icon svg {
+    stroke: #287D62 !important;
+  }
   .side-dot {
     background: #287D62;
     color: #FFFFFF;
@@ -1984,78 +1997,128 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     justify-content: center;
     gap: 6px;
     height: 48px;
-    margin-top: 24px;
-    border-radius: 12px;
+    margin-top: 22px;
+    border-radius: 24px !important;
+    background: #287D62 !important;
+    color: #FFFFFF !important;
     font-size: 15px;
     font-weight: 700;
   }
   .side-user {
     margin-top: auto !important;
-    padding: 16px 8px 0;
+    padding: 16px 4px 0;
     border: none;
-    border-top: 1px solid #F2F4F3;
+    border-top: 1px solid #E5E8EB;
     border-radius: 0;
     background: transparent;
   }
 
   /* 중앙 메인 영역 */
   .app-shell.wide .main-col {
-    padding: 32px;
+    padding: 32px 36px;
     min-width: 0;
   }
   .app-shell.wide .app-layout.is-chat-layout .main-col {
     padding: 0;
+    background: #FFFFFF;
   }
   .tk-page-title { font-size: 28px; }
-  .tk-pc-home-header { margin-bottom: 22px; }
-  .tk-pc-home-header .tk-page-title { display: block; }
-  .tk-search-box { width: 260px; height: 44px; }
+  .tk-pc-home-header {
+    display: block;
+    margin-bottom: 14px;
+  }
+  .tk-pc-home-header .tk-page-title { display: block; font-size: 30px; margin-bottom: 14px; }
+  .tk-search-box {
+    width: 100%;
+    height: 48px !important;
+    border-radius: 16px !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #E5E8EB !important;
+  }
+  .cat-btn {
+    background: #FFFFFF;
+    border: 1.5px solid #E5E8EB;
+    color: #6B7684;
+  }
+  .cat-btn.active, .cat-btn.active:hover {
+    background: #191F28;
+    border-color: #191F28;
+    color: #FFFFFF;
+  }
 
   /* PC 홈: 2열 카드 그리드 */
   .tk-feed-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
-    margin-top: 14px;
+    margin-top: 12px;
   }
-  .tk-feed-item {
-    margin: 0;
-    padding: 20px;
-    border: 1px solid #F2F4F3;
-    border-radius: 16px;
-  }
-  .tk-feed-item:hover {
-    background: #FFFFFF;
-    box-shadow: 0 6px 20px rgba(25, 31, 40, 0.08);
-    transform: translateY(-2px);
-  }
-  .tk-feed-thumb { width: 64px; height: 64px; font-size: 28px; }
 
-  /* PC 우측 요약 패널 */
+  /* PC 우측 4단 카드 패널 */
   .app-shell.wide .pc-right {
-    display: block;
-    border-left: 1px solid #F2F4F3;
-    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-left: none;
+    padding: 32px 24px 32px 0;
     position: sticky;
     top: 0;
     height: 100dvh;
+    overflow-y: auto;
+  }
+
+  /* PC 지도: 왼쪽 번개 목록(360px) + 오른쪽 풀 지도 2열 분할 */
+  .pc-map-split {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    min-height: 100dvh;
+    background: #FFFFFF;
+  }
+  .pc-map-list-col {
+    border-right: 1px solid #E5E8EB;
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+  .pc-map-canvas-col {
+    position: relative;
+    height: 100dvh;
+  }
+  .pc-map-canvas-col #campus-map {
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* PC 내 정보: 활동 / 설정 2열 분할 */
+  .pc-profile-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
   }
 
   /* PC 광장 폭 */
-  .tk-plaza-wrap { max-width: 640px; }
+  .tk-plaza-wrap { max-width: 720px; }
   .tk-balance-opt { height: 64px; }
 
-  /* PC 대화: 좌측 340px 목록 / 우측 대화방 2단 분할 */
+  /* PC 대화: 좌측 360px 목록 / 우측 대화방 2단 분할 */
   .tk-chat-split {
     display: flex;
     min-height: 100dvh;
+    background: #FFFFFF;
   }
   .tk-chat-split .tk-chat-list-pane {
     display: block !important;
-    width: 340px;
-    border-right: 1px solid #F2F4F3;
-    padding: 24px;
+    width: 360px;
+    border-right: 1px solid #E5E8EB;
+    padding: 28px 20px;
     flex-shrink: 0;
+    height: 100dvh;
+    overflow-y: auto;
   }
   .tk-chat-split .tk-chat-room-pane {
     display: flex !important;
