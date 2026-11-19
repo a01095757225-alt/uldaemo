@@ -5305,7 +5305,7 @@
       }
       const nearPosts = activePosts.map(p => {
         const c = getBuildingCoords(p.location);
-        const distM = calcDistanceM(state.my_lat, state.my_lng, c[0], c[1]);
+        const distM = calcDistanceMeters(state.my_lat, state.my_lng, c[0], c[1]);
         const walkMin = Math.max(1, Math.round(distM / 67));
         return { post: p, distM, walkMin };
       }).sort((a, b) => a.distM - b.distM);
