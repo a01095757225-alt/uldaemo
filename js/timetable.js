@@ -297,8 +297,8 @@ function renderTimetableModal() {
         <div style="display:flex; align-items:center; gap:8px;">
           <button type="button" onclick="closeTimetableModal()" style="width:32px; height:32px; border-radius:50%; border:1px solid #E5EAE7; background:#FFFFFF; color:#191F28; font-size:15px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
           <div>
-            <div style="font-size:17px; font-weight:800; color:#191F28;">🗓️ 공강 시간표 매칭</div>
-            <div style="font-size:11.5px; color:#6B7684;">내 수업 시간은 비공개 · 겹치는 공강만 서로 찾아요</div>
+            <div style="font-size:17px; font-weight:800; color:#191F28;">🗓️ 내 시간표 · 공강 메이트</div>
+            <div style="font-size:11.5px; color:#6B7684;">시간표를 입력하면 공강이 겹치는 학우를 찾아줘요</div>
           </div>
         </div>
         <button type="button" onclick="closeTimetableModal()" style="border:none; background:#F2F4F6; color:#4E5968; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;">닫기 ✕</button>
@@ -315,9 +315,8 @@ function renderTimetableModal() {
       </div>
 
       ${curTab === "edit" ? `
-        <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:10px 12px; margin-bottom:12px;">
-          <div style="font-size:12px; font-weight:800; color:#287D62; margin-bottom:2px;">🛡️ 사생활 안심 보호</div>
-          <div id="tt-draft-summary" style="font-size:11.5px; color:#1E6B52; font-weight:600;">${escHtml(buildTimetableDraftSummary(draft))}</div>
+        <div id="tt-draft-summary" style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:10px; padding:9px 12px; margin-bottom:12px; font-size:12px; color:#287D62; font-weight:700;">
+          ${escHtml(buildTimetableDraftSummary(draft))}
         </div>
 
         <div style="display:grid; grid-template-columns: 44px repeat(5, 1fr); gap:4px; margin-bottom:14px; user-select:none;">
