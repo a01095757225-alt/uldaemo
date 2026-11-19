@@ -2460,3 +2460,7 @@ body[data-tier="5"] .tier-avatar-frame.is-self,
   }
 }
 
+.leaflet-control-attribution {
+  display: none !important;
+}
+
