@@ -35,6 +35,7 @@
 
   <script src="/js/data.js?v=20261118"></script>
   <script src="/js/effects.js?v=20261118"></script>
+  <script src="/js/timetable.js?v=20261119"></script>
   <script>
     window.onerror = function(msg, url, line, col, error) {
       console.error("Global JS Error:", msg, line, col, error);
@@ -2295,6 +2296,8 @@
           bodyHtml = renderDetailModal();
         } else if (state.active_modal === "food_map") {
           bodyHtml = renderFoodMapModal();
+        } else if (state.active_modal === "timetable") {
+          bodyHtml = renderTimetableModal();
         } else if (state.nav_tab === "홈") {
           bodyHtml = renderHomeTab();
         } else if (state.nav_tab === "광장") {
@@ -2490,7 +2493,7 @@
     function renderWithoutMapFlicker() {
       const mainBody = document.getElementById("main-body-content");
       const currentUser = DB.users[state.user_id];
-      if (!mainBody || !currentUser || state.nav_tab === "지도" || state.active_modal === "detail" || state.active_modal === "food_map") {
+      if (!mainBody || !currentUser || state.nav_tab === "지도" || state.active_modal === "detail" || state.active_modal === "food_map" || state.active_modal === "timetable") {
         // 지도 탭이나 상세/맛집지도 모달이 아닌 일반 상황에서 mainBody가 없으면 전체 렌더
         if (!mainBody) render();
         return;
@@ -3217,6 +3220,7 @@
             <div class="tk-feed-title-row">
               ${isOfficial ? `<span class="tk-official-badge">공식</span>` : ''}
               ${post.is_boosted ? `<span class="tk-boost-badge">⚡ 부스트</span>` : ''}
+              ${(typeof isPostMatchingMyFreeTime === "function" && isPostMatchingMyFreeTime(post)) ? `<span style="font-size:10.5px; font-weight:800; color:#287D62; background:#EEF8F3; border:1px solid #C5E6D6; padding:1.5px 6px; border-radius:6px; flex-shrink:0;">⚡ 내 공강</span>` : ''}
               ${getPostTimeChip(post)}
               <span class="tk-feed-title">${escHtml(post.title)}</span>
             </div>
@@ -3234,6 +3238,9 @@
     function getFilteredHomePosts() {
       // 시작 시각이 1시간 이상 지난 번개는 홈 피드에서 정리 (내 모임/참여 목록에서는 유지)
       let list = (DB.posts || []).filter(p => p && p.status === "모집중" && !isPostExpired(p));
+      if (state.home_free_only && typeof isPostMatchingMyFreeTime === "function") {
+        list = list.filter(p => isPostMatchingMyFreeTime(p));
+      }
       if (state.home_cat !== "전체") {
         list = list.filter(p => p.category && p.category.includes(state.home_cat));
       }
@@ -3703,6 +3710,33 @@
 
         ${renderMugeoFoodMapSection()}
 
+        ${(() => {
+          const hasTT = typeof hasUserTimetable === "function" && hasUserTimetable(state.user_id);
+          const mateCnt = (hasTT && typeof getGonggangMates === "function") ? getGonggangMates().length : 0;
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 14px; margin:0 0 12px; border-radius:14px; background:#EEF8F3; border:1px solid #C5E6D6;">
+              <button type="button" onclick="openTimetableModal()" style="display:flex; align-items:center; gap:8px; background:none; border:none; padding:0; cursor:pointer; text-align:left; min-width:0; flex:1;">
+                <span style="font-size:17px; flex-shrink:0;">🗓️</span>
+                <span style="min-width:0;">
+                  <span style="display:block; font-size:13px; font-weight:800; color:#1E6B52; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    ${hasTT ? `내 공강에 맞는 메이트 ${mateCnt}명` : `내 시간표 등록하고 공강 메이트 찾기`}
+                  </span>
+                  <span style="display:block; font-size:11px; color:#287D62; font-weight:600;">
+                    ${hasTT ? `터치하여 겹치는 공강 메이트 & 시간표 보기 ›` : `10초 입력으로 공강이 겹치는 학우 자동 매칭 ›`}
+                  </span>
+                </span>
+              </button>
+              ${hasTT ? `
+                <button type="button" onclick="state.home_free_only=!state.home_free_only; render();" style="flex-shrink:0; border:1px solid ${state.home_free_only ? '#287D62' : '#C5E6D6'}; background:${state.home_free_only ? '#287D62' : '#FFFFFF'}; color:${state.home_free_only ? '#FFFFFF' : '#287D62'}; border-radius:999px; padding:6px 11px; font-size:11.5px; font-weight:800; cursor:pointer;">
+                  ${state.home_free_only ? '⚡ 내 공강만 ✓' : '⚡ 내 공강만'}
+                </button>
+              ` : `
+                <button type="button" onclick="openTimetableModal('edit')" style="flex-shrink:0; border:none; background:#287D62; color:#FFFFFF; border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:800; cursor:pointer;">입력하기</button>
+              `}
+            </div>
+          `;
+        })()}
+
         <div id="home-feed-list-wrap">
           ${renderHomeFeedListHtml()}
         </div>
@@ -3837,20 +3871,23 @@
             <input id="c_cat_custom" class="input" placeholder="새로운 카테고리를 입력하세요 (예: 🎤 코노)" oninput="document.getElementById('c_cat').value = this.value.trim() || '💬 기타'" />
           </div>
 
-          <!-- 3. 모임 시간 (빠른 칩 & 날짜·시간) -->
+          <!-- 3. 모임 시간 (빠른 칩 & 내 공강 칩 & 날짜·시간) -->
           <label class="label" style="font-weight:700; margin-top:8px;">언제 만날까요?</label>
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
             <button type="button" id="time_chip_now" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('now')">지금</button>
             <button type="button" id="time_chip_30min" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('30min')">30분 뒤</button>
             <button type="button" id="time_chip_dinner" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('dinner')">오늘 저녁</button>
             <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" onclick="setCreateQuickTime('tomorrow_lunch')">내일 점심</button>
+            ${(typeof getMyQuickFreeSlotsForCreate === "function" ? getMyQuickFreeSlotsForCreate() : []).map(sl => `
+              <button type="button" class="quick-chip time-quick-chip" style="border-color:#C5E6D6; background:#EEF8F3; color:#1E6B52;" onclick="applyQuickFreeSlotToCreate('${sl.date}', '${sl.time}')">${escHtml(sl.label)}</button>
+            `).join("")}
           </div>
           <div class="row-2" style="margin-bottom:16px;">
             <div>
-              <input id="c_date" type="date" class="input" value="${getTodayStr()}" min="${getTodayStr()}" style="font-size:13.5px;" />
+              <input id="c_date" type="date" class="input" value="${escHtml(state.prefill_date || getTodayStr())}" min="${getTodayStr()}" style="font-size:13.5px;" />
             </div>
             <div>
-              <input id="c_time" type="time" class="input" value="12:30" style="font-size:13.5px;" />
+              <input id="c_time" type="time" class="input" value="${escHtml(state.prefill_time || '12:30')}" style="font-size:13.5px;" />
             </div>
           </div>
 
@@ -3947,8 +3984,11 @@
       });
       const createdPost = DB.posts[0];
       notifyFavCategory(createdPost);
+      if (state.invite_mate_id && DB.users[state.invite_mate_id]) {
+        notifyUser(state.invite_mate_id, `🗓️ [공강 메이트 제안] 공강 시간이 겹치는 학우가 "${title}" 번개를 열었어요! · 📍${location} ${meet_time}`, newId);
+      }
       window._justCreatedPostId = newId;
-      state.prefill_title = ""; state.prefill_loc = "";
+      state.prefill_title = ""; state.prefill_loc = ""; state.prefill_date = ""; state.prefill_time = ""; state.invite_mate_id = null;
       saveDB(true);
       state.active_modal = null;
       state.nav_tab = "홈";
@@ -6386,6 +6426,14 @@
                 ` : ""}
               </div>
             ` : ''}
+
+            <button type="button" class="tk-menu-row" onclick="openTimetableModal()">
+              <span>🗓️ 내 시간표 · 공강 메이트</span>
+              <span style="display:inline-flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '#287D62' : '#8B95A1'}; font-weight:700;">${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '등록됨' : '미등록'}</span>
+                <span class="tk-menu-arrow">›</span>
+              </span>
+            </button>
 
             <button type="button" class="tk-menu-row" onclick="toggleProfileSection('edit')">
               <span>프로필 정보 · 관심 카테고리 수정</span>
