@@ -2177,6 +2177,14 @@
       return "✨";
     }
 
+    function openCreateWithTodayCafeteria(dishTitle) {
+      state.prefill_title = `오늘 학식(${dishTitle.slice(0, 14)}) 같이 먹어요`;
+      state.prefill_cat = "🍚 밥약";
+      state.prefill_loc = "22호관 학생회관";
+      state.active_modal = "create";
+      render();
+    }
+
     function renderPcRightSidePanel(unreadCnt, newNoticeCnt) {
       loadCafeteriaMenu(false);
       const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
@@ -2188,65 +2196,102 @@
       const meal = hour < 10 ? "breakfast" : (hour < 14 ? "lunch" : "dinner");
       const mealList = dayData[meal] || [];
       const mainDishes = mealList.filter(item => !item.startsWith("[") && item !== "쌀밥" && !item.includes("김치") && !item.includes("단무지"));
-      const dishTitle = mainDishes.slice(0, 2).map(x => x.replace(/\([^)]*\)/g, "").trim()).join(" · ") || "제육볶음 · 계란국";
+      const dishTitle = mainDishes.slice(0, 2).map(x => x.replace(/\([^)]*\)/g, "").trim()).join(" · ") || "닭살바베큐조림 · 순두부찌개";
 
       const st = getUserStatsAndBadges(state.user_id);
       const { activeChats } = getMyActiveChatRooms();
-      const totalNotifs = unreadCnt + newNoticeCnt;
+      const noticeItems = (NOTICES && Array.isArray(NOTICES.items) && NOTICES.items.length > 0)
+        ? NOTICES.items.slice(0, 3)
+        : DEFAULT_MEETUP_NOTICES.slice(0, 3);
+      const isPlazaTab = (state.nav_tab === "광장" && !state.active_modal);
 
       return `
         <aside class="pc-right">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:13px; font-weight:600; color:#8B95A1;">오늘의 학식</span>
-            <button type="button" class="press-flat" style="font-size:12px; font-weight:600; color:#287D62; background:none; border:none; cursor:pointer;" onclick="openCafeteriaModal()">전체 식단 ›</button>
+          <!-- 1) 오늘의 학식 카드 (+ 이날 밥약 열기 버튼) -->
+          <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:700; color:#6B7684;">오늘의 학식</span>
+              <button type="button" style="font-size:12px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="openCafeteriaModal()">전체 식단 ›</button>
+            </div>
+            <div style="margin-top:8px; font-size:15px; font-weight:800; color:#191F28; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="openCafeteriaModal()">${escHtml(dishTitle)}</div>
+            <div style="font-size:12px; color:#6B7684; margin-top:4px;">학생회관 · 청운학사 11:30–13:30</div>
+            <button type="button" onclick="openCreateWithTodayCafeteria('${escHtml(dishTitle)}')" style="width:100%; height:40px; margin-top:12px; border-radius:20px; border:none; background:#EEF8F3; color:#287D62; font-size:13.5px; font-weight:800; cursor:pointer;">
+              이날 밥약 열기
+            </button>
           </div>
-          <div style="margin-top:8px; font-size:16px; font-weight:700; color:#191F28; cursor:pointer;" onclick="openCafeteriaModal()">${escHtml(dishTitle)}</div>
-          <div style="font-size:13px; color:#8B95A1; margin-top:2px;">학생회관 · 청운학사 11:30 – 13:30</div>
 
-          <div style="height:1px; background:#F2F4F3; margin:20px 0;"></div>
-
-          <button type="button" class="press-row" style="width:100%; display:flex; align-items:center; gap:12px; background:none; border:none; padding:4px 0; cursor:pointer; text-align:left;" onclick="handleDailyCheckin()">
-            <span style="width:40px; height:40px; border-radius:50%; background:${st.checkedInToday ? '#287D62' : '#F2F4F3'}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${st.checkedInToday ? '#FFFFFF' : '#B0B8C1'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-            </span>
-            <span style="flex:1; min-width:0;">
-              <span style="display:block; font-size:15px; font-weight:700; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</span>
-              <span style="display:block; font-size:13px; color:#8B95A1;">연속 ${st.streakDays}일째</span>
-            </span>
-          </button>
-
-          <div style="height:1px; background:#F2F4F3; margin:20px 0;"></div>
-
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <span style="font-size:13px; font-weight:600; color:#8B95A1;">진행 중인 대화</span>
-            ${activeChats.length > 0 ? `<button type="button" style="font-size:12px; font-weight:600; color:#8B95A1; background:none; border:none; cursor:pointer;" onclick="switchTab('채팅')">전체 ›</button>` : ''}
-          </div>
-          ${activeChats.length === 0 ? `
-            <div style="font-size:13px; color:#6B7684; padding:8px 0;">아직 대화가 없어요 · 번개에 참여하면 안심 채팅이 열려요</div>
-          ` : activeChats.slice(0, 3).map(r => {
-            const partner = DB.users[r.partnerId] || { avatar: "🐶", nickname: r.partnerId };
-            const otherNames = r.otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
-            const lastTxt = r.lastMsg ? (r.lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : r.lastMsg.text) : "첫 인사를 나눠보세요";
-            return `
-              <div class="press-row" style="display:flex; align-items:center; gap:12px; padding:8px; margin:0 -8px; border-radius:12px; cursor:pointer;" onclick="state.nav_tab='채팅'; state.active_modal=null; openChatRoom(${r.post.id});">
-                <span style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${partner.avatar.split(" ")[0]}</span>
-                <div style="min-width:0; flex:1;">
-                  <div style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</div>
-                  <div style="font-size:13px; color:#8B95A1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(lastTxt)}</div>
-                </div>
-                ${r.unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;">${r.unreadInRoom}</span>` : ''}
+          <!-- 2) 오늘 출석하기 카드 (+3점 알약) -->
+          <div onclick="handleDailyCheckin()" style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+              <span style="width:40px; height:40px; border-radius:20px; background:${st.checkedInToday ? '#287D62' : '#EEF8F3'}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${st.checkedInToday ? '#FFFFFF' : '#287D62'}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+              </span>
+              <div style="min-width:0;">
+                <div style="font-size:15px; font-weight:800; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:2px;">연속 ${st.streakDays}일째</div>
               </div>
-            `;
-          }).join("")}
+            </div>
+            <span style="height:32px; padding:0 14px; border-radius:16px; background:${st.checkedInToday ? '#EEF8F3' : '#287D62'}; color:${st.checkedInToday ? '#287D62' : '#FFFFFF'}; font-size:12.5px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+              ${st.checkedInToday ? '완료' : '+3점'}
+            </span>
+          </div>
 
-          <div style="height:1px; background:#F2F4F3; margin:20px 0;"></div>
+          <!-- 3) 광장 탭일 때는 '메뉴 룰렛' 카드 / 그 외 탭일 때는 '진행 중인 대화' 카드 -->
+          ${isPlazaTab ? `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px;">
+              <div style="font-size:12px; font-weight:700; color:#6B7684;">메뉴 룰렛</div>
+              <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:6px;">오늘 뭐 먹지?</div>
+              <button type="button" onclick="state.plaza_view='roulette'; render();" style="width:100%; height:40px; margin-top:12px; border-radius:20px; border:none; background:#EEF8F3; color:#287D62; font-size:13.5px; font-weight:800; cursor:pointer;">
+                SPIN 하러 가기
+              </button>
+            </div>
+          ` : `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12px; font-weight:700; color:#6B7684;">진행 중인 대화</span>
+                ${activeChats.length > 0 ? `<button type="button" style="font-size:12px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="switchTab('채팅')">전체 ›</button>` : ''}
+              </div>
+              ${activeChats.length === 0 ? `
+                <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:8px;">아직 대화가 없어요</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:4px;">번개에 참여하면 안심 채팅방이 열려요</div>
+                <button type="button" onclick="switchTab('홈')" style="margin-top:10px; padding:0; background:none; border:none; color:#287D62; font-size:13px; font-weight:800; cursor:pointer;">
+                  번개 둘러보기 ›
+                </button>
+              ` : `
+                <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                  ${activeChats.slice(0, 2).map(r => {
+                    const lastTxt = r.lastMsg ? (r.lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : r.lastMsg.text) : "첫 인사를 나눠보세요";
+                    return `
+                      <div onclick="state.nav_tab='채팅'; state.active_modal=null; openChatRoom(${r.post.id});" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:12px; background:#F7F9F8; cursor:pointer;">
+                        <div style="min-width:0; flex:1;">
+                          <div style="font-size:13.5px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(r.post.title)}</div>
+                          <div style="font-size:12px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(lastTxt)}</div>
+                        </div>
+                        ${r.unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;">${r.unreadInRoom}</span>` : `<span style="color:#287D62; font-size:13px; font-weight:700;">›</span>`}
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              `}
+            </div>
+          `}
 
-          <button type="button" class="press-row" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:8px; margin:0 -8px; border-radius:12px; background:none; border:none; cursor:pointer;" onclick="toggleNotificationsModal()">
-            <span style="font-size:14px; font-weight:600; color:#4E5968;">알림 · 울산대 공지</span>
-            ${totalNotifs > 0
-              ? `<span style="background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;">${totalNotifs}</span>`
-              : `<span style="color:#B0B8C1; font-size:16px;">›</span>`}
-          </button>
+          <!-- 4) 알림 · 울산대 공지 카드 (최근 3건 미리보기) -->
+          <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-size:12px; font-weight:700; color:#6B7684;">알림 · 울산대 공지${(unreadCnt + newNoticeCnt) > 0 ? ` (${unreadCnt + newNoticeCnt})` : ''}</span>
+              <button type="button" style="font-size:12px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="openUlsanNoticesModal(event)">전체 ›</button>
+            </div>
+            ${noticeItems.map((item, idx) => {
+              const shortDate = String(item.date || "").replace(/^\d{4}-/, "");
+              return `
+                <a href="${escHtml(item.link || 'https://www.ulsan.ac.kr')}" target="_blank" rel="noopener" style="display:block; text-decoration:none; padding:${idx === 0 ? '2px 0 8px' : '8px 0'}; ${idx < noticeItems.length - 1 ? 'border-bottom:1px solid #E5E8EB;' : ''}">
+                  <div style="font-size:13px; font-weight:600; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.title)}</div>
+                  <div style="font-size:11px; color:#98A2B3; margin-top:3px;">${escHtml(shortDate)}</div>
+                </a>
+              `;
+            }).join("")}
+          </div>
         </aside>
       `;
     }
@@ -2324,11 +2369,12 @@
         checkAndShowTierLevelUp(state.user_id, myTempForTier);
         scheduleTierLevelUpAnimation();
 
+        const sideFirstChar = String(currentUser.nickname || "학").trim().charAt(0) || "학";
         const sidebarHtml = `
           <aside class="pc-sidebar">
             <div class="side-logo" onclick="switchTab('홈')">
-              <img src="/icon-192.png" alt="울대모" width="32" height="32" style="width:32px; height:32px; border-radius:8px; flex-shrink:0; display:block;" />
-              <span style="font-size:19px; font-weight:800; color:#191F28; letter-spacing:-0.03em;">울대모</span>
+              <span style="width:36px; height:36px; border-radius:10px; background:#287D62; color:#FFFFFF; font-size:18px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">울</span>
+              <span style="font-size:20px; font-weight:800; color:#191F28; letter-spacing:-0.03em;">울대모</span>
             </div>
 
             <nav class="side-nav">
@@ -2337,7 +2383,7 @@
                 return `
                   <button class="side-nav-btn ${on ? 'active' : ''}" data-nav-key="${n.key}" onclick="switchTab('${n.key}')">
                     <span class="side-nav-icon">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${on ? '#191F28' : '#8B95A1'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.iconSvg}</svg>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${on ? '#287D62' : '#6B7684'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.iconSvg}</svg>
                     </span>
                     <span style="flex:1; text-align:left;">${n.label}</span>
                     ${n.key === '채팅' && unreadChatCnt > 0 ? `<span class="side-dot">${unreadChatCnt}</span>` : ''}
@@ -2347,28 +2393,28 @@
             </nav>
 
             <button type="button" class="btn btn-primary side-create-btn" onclick="state.active_modal='create'; render();">
-              ${getSvgIcon('plus', 17, '#FFFFFF', 2.6)}<span>번개 만들기</span>
+              <span>+ 번개 만들기</span>
             </button>
 
             <div class="side-user" onclick="switchTab('마이')" style="cursor:pointer;">
-              <div style="display:flex; align-items:center; gap:12px;">
-                <span class="tier-avatar-frame is-self" style="width:36px; height:36px; border-radius:50%; background:#F2F4F3; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">${currentUser.avatar.split(" ")[0]}</span>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="width:40px; height:40px; border-radius:20px; background:#EEF8F3; color:#287D62; font-size:16px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(sideFirstChar)}</span>
                 <div style="min-width:0; flex:1;">
                   <div style="font-size:14px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(currentUser.nickname)}</div>
-                  <div style="font-size:12px; color:var(--tier-text); font-weight:700;">${myTierInfo.tier === 5 ? '👑 ' : ''}${escHtml(myTierInfo.name)}${myTierInfo.roleLabel ? ` · ${escHtml(myTierInfo.roleLabel)}` : ''}</div>
+                  <div style="font-size:12px; color:#287D62; font-weight:600; margin-top:1px;">${myTierInfo.tier === 5 ? '👑 ' : ''}${escHtml(myTierInfo.name)} · ${myTierInfo.displayTemp}°C</div>
                 </div>
               </div>
             </div>
           </aside>
         `;
 
-        const hideRightPanel = (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "마이"));
+        const hideRightPanel = (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "지도"));
         const rightHtml = hideRightPanel ? "" : renderPcRightSidePanel(unreadCnt, newNoticeCnt);
 
         const isMobileChatOpen = (!isPC() && state.nav_tab === "채팅" && !state.active_modal && !state.chat_list_mode && state.active_chat_post_id);
 
         root.innerHTML = `
-          <div class="app-layout ${hideRightPanel ? 'no-right-panel' : ''} ${(!state.active_modal && state.nav_tab === '채팅') ? 'is-chat-layout' : ''}">
+          <div class="app-layout ${hideRightPanel ? 'no-right-panel' : ''} ${(!state.active_modal && state.nav_tab === '채팅') ? 'is-chat-layout' : ''} ${(!state.active_modal && state.nav_tab === '지도') ? 'is-map-layout' : ''}">
             ${sidebarHtml}
             <main class="main-col">
               ${(state.nav_tab === "홈" && !state.active_modal) ? `
@@ -3743,8 +3789,10 @@
     }
 
     function renderHomeTab() {
+      const currentUser = DB.users[state.user_id] || { nickname: "학우" };
       return `
         <div class="tk-pc-home-header">
+          <div class="only-pc" style="display:block; font-size:14px; font-weight:500; color:#6B7684; margin-bottom:4px;">안녕하세요, ${escHtml(currentUser.nickname)}님</div>
           <h1 class="tk-page-title">오늘, 같이 할래요?</h1>
           <div class="tk-search-box" style="height:44px; border-radius:14px; background:#F7F9F8;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#98A2B3" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
@@ -5077,18 +5125,18 @@
           </div>
 
           <!-- 세그먼트 서브 탭: 밸런스 게임 vs 룰렛 · 메뉴추천 -->
-          <div style="display:flex; width:100%; background:#F7F9F8; height:44px; padding:4px; border-radius:14px; gap:4px; margin-bottom:16px;">
-            <button type="button" onclick="state.plaza_view='balance'; render();" style="flex:1; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.18s; ${state.plaza_view==='balance' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 2px 6px rgba(0,0,0,0.08);' : 'background:transparent; color:#6B7684;'}">
+          <div style="display:flex; width:100%; background:#FFFFFF; border:1.5px solid #E5E8EB; height:48px; padding:4px; border-radius:16px; gap:4px; margin-bottom:16px;">
+            <button type="button" onclick="state.plaza_view='balance'; render();" style="flex:1; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.18s; ${state.plaza_view==='balance' ? 'background:#EEF8F3; color:#287D62;' : 'background:transparent; color:#6B7684;'}">
               밸런스 게임
             </button>
-            <button type="button" onclick="state.plaza_view='roulette'; render();" style="flex:1; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.18s; ${state.plaza_view==='roulette' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 2px 6px rgba(0,0,0,0.08);' : 'background:transparent; color:#6B7684;'}">
+            <button type="button" onclick="state.plaza_view='roulette'; render();" style="flex:1; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.18s; ${state.plaza_view==='roulette' ? 'background:#EEF8F3; color:#287D62;' : 'background:transparent; color:#6B7684;'}">
               룰렛 · 메뉴추천
             </button>
           </div>
 
           ${state.plaza_view === 'roulette' ? renderStampAndRouletteCard() : `
             ${state.show_poll_form ? `
-              <div style="background:#F7F9F8; border-radius:18px; padding:18px; margin-bottom:16px;">
+              <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:18px; margin-bottom:16px;">
                 <div style="font-size:15px; font-weight:800; margin-bottom:10px; color:#191F28;">새로운 밸런스 투표 만들기</div>
                 <select id="plaza_poll_tag" class="select">
                   <option value="음식">음식</option>
@@ -5116,29 +5164,32 @@
               const progressPct = total >= 5 ? pctA : Math.min(100, Math.round((total / 5) * 100));
 
               return `
-                <div style="margin-bottom:22px;">
-                  <div style="font-size:12px; font-weight:700; color:#287D62; margin-bottom:4px;">오늘의 밸런스</div>
-                  <div style="font-size:19px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:12px;">${escHtml(cleanQ)}</div>
+                <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:20px; margin-bottom:20px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:12.5px; font-weight:700; color:#287D62;">오늘의 밸런스</span>
+                    <button type="button" style="font-size:12.5px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="drawRandomViralPoll()">다른 질문 ›</button>
+                  </div>
+                  <div style="font-size:20px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:14px;">${escHtml(cleanQ)}</div>
 
                   <!-- 2열 큰 A / B 카드 -->
-                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
                     ${[['A', p.opt_a, pctA], ['B', p.opt_b, pctB]].map(([k, label, pct]) => {
                       const picked = (myPick === k);
                       const cleanOpt = String(label || "").replace(/^[^\w가-힣]+\s*/, "").trim() || label;
                       return `
-                        <button type="button" onclick="voteBalancePoll(${p.id}, '${k}')" style="min-height:160px; border-radius:20px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; text-align:left; cursor:pointer; transition:all 0.16s ease; background:${picked ? '#EEF8F3' : '#F7F9F8'}; border:${picked ? '2.5px solid #287D62' : '2px solid transparent'};">
-                          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                            <span style="width:32px; height:32px; border-radius:16px; background:${picked ? '#287D62' : '#E5E8EB'}; color:${picked ? '#FFFFFF' : '#6B7684'}; font-size:14px; font-weight:800; display:inline-flex; align-items:center; justify-content:center;">${k}</span>
-                            ${myPick && total >= 5 ? `<span style="font-size:14px; font-weight:800; color:${picked ? '#287D62' : '#6B7684'};">${pct}%</span>` : ""}
+                        <button type="button" onclick="voteBalancePoll(${p.id}, '${k}')" style="min-height:142px; border-radius:18px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; text-align:left; cursor:pointer; transition:all 0.16s ease; background:${picked ? '#EEF8F3' : '#F7F9F8'}; border:${picked ? '2px solid #287D62' : '2px solid transparent'};">
+                          <div style="display:flex; align-items:flex-start; gap:10px; width:100%;">
+                            <span style="width:32px; height:32px; border-radius:16px; background:${picked ? '#287D62' : '#FFFFFF'}; color:${picked ? '#FFFFFF' : '#6B7684'}; font-size:14px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${k}</span>
+                            <div style="font-size:14.5px; font-weight:700; color:#191F28; line-height:1.38; word-break:keep-all; flex:1;">
+                              ${escHtml(cleanOpt)}
+                            </div>
                           </div>
-                          <div style="font-size:15px; font-weight:700; color:#191F28; line-height:1.35; margin:10px 0; word-break:keep-all;">
-                            ${escHtml(cleanOpt)}
-                          </div>
-                          <div>
+                          <div style="display:flex; justify-content:flex-end; align-items:center; width:100%; margin-top:10px;">
+                            ${myPick && total >= 5 ? `<span style="font-size:13.5px; font-weight:800; color:${picked ? '#287D62' : '#6B7684'}; margin-right:6px;">${pct}%</span>` : ""}
                             ${picked ? `
-                              <span style="display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:11px; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700;">내 선택</span>
+                              <span style="display:inline-flex; align-items:center; height:24px; padding:0 11px; border-radius:12px; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700;">내 선택</span>
                             ` : `
-                              <span style="font-size:12px; font-weight:600; color:#98A2B3;">선택하기</span>
+                              <span style="font-size:12px; font-weight:600; color:#98A2B3;">선택</span>
                             `}
                           </div>
                         </button>
@@ -5146,18 +5197,15 @@
                     }).join("")}
                   </div>
 
-                  <!-- 하단 게이지 & 다른 질문 -->
-                  <div style="height:8px; border-radius:4px; background:#E5E8EB; overflow:hidden; margin-bottom:6px;">
+                  <!-- 하단 게이지 & 참여 안내 -->
+                  <div style="height:8px; border-radius:4px; background:#E5E8EB; overflow:hidden; margin-bottom:8px;">
                     <div style="width:${progressPct}%; height:100%; background:#287D62; border-radius:4px; transition:width 0.3s ease;"></div>
                   </div>
                   <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                     <span style="font-size:12px; color:#6B7684; font-weight:500;">
-                      ${total < 5 ? `${Math.max(1, 5 - total)}명 더 투표하면 결과가 공개돼요` : `총 ${total}명 참여 · A ${pctA}% vs B ${pctB}%`}
+                      ${total < 5 ? `${Math.max(1, 5 - total)}명 더 투표하면 결과가 공개돼요 (현재 ${total}/5명)` : `총 ${total}명 참여 · A ${pctA}% vs B ${pctB}%`}
                     </span>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                      ${renderReplyButton('p', p)}
-                      <button type="button" style="font-size:13px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="drawRandomViralPoll()">다른 질문 ›</button>
-                    </div>
+                    ${renderReplyButton('p', p)}
                   </div>
                   ${renderReplyThread('p', p)}
                 </div>
@@ -5165,12 +5213,21 @@
             }).join("")}
 
             ${polls.length > 1 ? `
-              <button type="button" style="width:100%; height:40px; border:none; border-radius:12px; background:#F7F9F8; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
+              <button type="button" style="width:100%; height:40px; border:1px solid #E5E8EB; border-radius:12px; background:#FFFFFF; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
                 ${showAll ? '투표 접기' : `다른 밸런스 투표 ${hiddenCount}개 더보기`}
               </button>
             ` : ""}
 
-            <div style="font-size:17px; font-weight:800; color:#191F28; margin:16px 0 10px;">한줄 이야기</div>
+            <div style="font-size:18px; font-weight:800; color:#191F28; margin:16px 0 10px;">한줄 이야기</div>
+
+            <!-- 상단 한줄 남기기 입력 바 (피그마 ④ 광장 개선안) -->
+            <div style="display:flex; align-items:center; gap:8px; background:#FFFFFF; border:1.5px solid #E5E8EB; height:52px; border-radius:16px; padding:0 10px 0 16px; margin-bottom:12px;">
+              <select id="plaza_talk_cat" style="display:none;"><option value="수다/질문" selected>수다/질문</option></select>
+              <input id="plaza_talk_in" type="text" style="flex:1; height:40px; border:none; background:transparent; font-size:14px; color:#191F28; outline:none;" placeholder="한줄 남기기" onkeydown="if(event.key==='Enter') submitPlazaTalk()" />
+              <button type="button" onclick="submitPlazaTalk()" title="등록" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                등록
+              </button>
+            </div>
 
             <div>
               ${[...talks].sort((a, b) => {
@@ -5183,33 +5240,22 @@
                 const liked = likes.includes(state.user_id);
                 const replyCnt = (t.replies || []).filter(r => !r.deleted).length;
                 return `
-                  <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:13px 14px; margin-bottom:10px;">
-                    <div style="font-size:15px; font-weight:500; color:#191F28; line-height:1.45;">
+                  <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:14px 16px; margin-bottom:10px;">
+                    <div style="font-size:15px; font-weight:700; color:#191F28; line-height:1.45;">
                       ${tTier.tier >= 4 ? `<span class="tier-badge-pill" data-tier="${tTier.tier}" style="margin-right:6px; font-size:10.5px; padding:1px 7px;">${tTier.tier === 5 ? '👑 울대 레전드' : '⚡ 인싸 학우'}</span>` : ''}${escHtml(t.text)}
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                      <span style="font-size:12px; color:#98A2B3;">블라인드 학우 · ${escHtml(t.created_at || "방금")}</span>
-                      <div style="display:flex; align-items:center; gap:10px;">
-                        <button type="button" style="border:none; background:none; color:${liked ? '#E85D75' : '#6B7684'}; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer; padding:2px 4px;" onclick="toggleTalkLike(${t.id})">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="${liked ? '#E85D75' : 'none'}" stroke="${liked ? '#E85D75' : '#6B7684'}" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>
-                          <span>${likes.length}</span>
-                        </button>
-                        <button type="button" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer; padding:2px 4px;" onclick="toggleReplyBox('t', ${t.id})">답글 ${replyCnt}</button>
-                      </div>
+                    <div style="font-size:12px; color:#98A2B3; margin-top:4px;">블라인드 학우 · ${escHtml(t.created_at || "방금")}</div>
+                    <div style="display:flex; align-items:center; gap:14px; margin-top:8px;">
+                      <button type="button" style="border:none; background:none; color:${liked ? '#E85D75' : '#6B7684'}; font-size:12.5px; font-weight:700; display:inline-flex; align-items:center; gap:5px; cursor:pointer; padding:2px 0;" onclick="toggleTalkLike(${t.id})">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="${liked ? '#E85D75' : 'none'}" stroke="${liked ? '#E85D75' : '#6B7684'}" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>
+                        <span>${likes.length}</span>
+                      </button>
+                      <button type="button" style="border:none; background:none; color:#6B7684; font-size:12.5px; font-weight:600; cursor:pointer; padding:2px 0;" onclick="toggleReplies('t', ${t.id})">답글 ${replyCnt}</button>
                     </div>
                     ${renderReplyThread('t', t)}
                   </div>
                 `;
               }).join("")}
-            </div>
-
-            <!-- 하단 캡슐 한줄 남기기 입력 바 -->
-            <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; height:48px; border-radius:24px; padding:0 8px 0 18px; margin-top:12px;">
-              <select id="plaza_talk_cat" style="display:none;"><option value="수다/질문" selected>수다/질문</option></select>
-              <input id="plaza_talk_in" type="text" style="flex:1; height:40px; border:none; background:transparent; font-size:14px; color:#191F28; outline:none;" placeholder="한줄 남기기" onkeydown="if(event.key==='Enter') submitPlazaTalk()" />
-              <button type="button" onclick="submitPlazaTalk()" title="등록" style="width:32px; height:32px; border-radius:16px; border:none; background:#287D62; color:#FFFFFF; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-              </button>
             </div>
           `}
         </div>
@@ -5241,6 +5287,16 @@
     // =========================================================
     // 7. 캠퍼스 지도 탭 (Leaflet + 울산대 62개 호관 + 내 현위치 GPS)
     // =========================================================
+    function selectMapPost(postId) {
+      state.selected_map_post_id = Number(postId);
+      const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
+      if (post && window._leafletMap) {
+        const c = getBuildingCoords(post.location);
+        window._leafletMap.setView([c[0], c[1]], 17, { animate: true });
+      }
+      render();
+    }
+
     function renderMapTab() {
       const buildingList = Object.keys(ULSAN_CAMPUS_COORDS);
       let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p));
@@ -5253,6 +5309,108 @@
         const walkMin = Math.max(1, Math.round(distM / 67));
         return { post: p, distM, walkMin };
       }).sort((a, b) => a.distM - b.distM);
+
+      if ((!state.selected_map_post_id || !nearPosts.some(x => Number(x.post.id) === Number(state.selected_map_post_id))) && nearPosts.length > 0) {
+        state.selected_map_post_id = Number(nearPosts[0].post.id);
+      }
+
+      const renderNearPostCards = (forPc = false) => {
+        if (nearPosts.length === 0) {
+          return `
+            <div style="background:#F7F9F8; border-radius:16px; padding:22px 16px; text-align:center;">
+              <div style="font-size:14px; font-weight:700; color:#191F28;">선택한 카테고리의 주변 번개가 없어요</div>
+              <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">직접 새 번개를 열어 주변 학우를 불러보세요</div>
+            </div>
+          `;
+        }
+        return nearPosts.map(({ post, walkMin }) => {
+          const cBadge = getCatKoreanBadge(post.category, post.title);
+          const apps = (DB.applications || []).filter(a => Number(a.post_id) === Number(post.id) && a.status === "승인됨");
+          const acceptedCnt = apps.length + 1;
+          const maxP = Math.max(2, Number(post.max_participants) || 2);
+          const isMyPost = String(post.author_id) === String(state.user_id);
+          const myApp = (DB.applications || []).find(a => Number(a.post_id) === Number(post.id) && String(a.applicant_id) === String(state.user_id));
+          const isSelected = Number(state.selected_map_post_id) === Number(post.id);
+
+          let btnHtml = `<button type="button" onclick="event.stopPropagation(); applyToPost(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">${acceptedCnt}/${maxP} 신청</button>`;
+          if (isMyPost) {
+            btnHtml = `<button type="button" onclick="event.stopPropagation(); openDetailModal(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:1px solid #C5E6D6; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">${acceptedCnt}/${maxP} 관리</button>`;
+          } else if (myApp && myApp.status === "승인됨") {
+            btnHtml = `<button type="button" onclick="event.stopPropagation(); switchTab('채팅'); openChatRoom(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#191F28; color:#FFFFFF; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">대화방 ›</button>`;
+          } else if (myApp && myApp.status === "대기중") {
+            btnHtml = `<span style="height:28px; padding:0 11px; border-radius:14px; background:#FFF4E5; color:#C26A00; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; flex-shrink:0;">수락 대기</span>`;
+          }
+
+          const clickAttr = forPc ? `onclick="selectMapPost(${post.id})" ondblclick="openDetailModal(${post.id})"` : `onclick="openDetailModal(${post.id})"`;
+          const cardBg = isSelected && forPc ? "#EEF8F3" : "#F7F9F8";
+          const cardBorder = isSelected && forPc ? "2px solid #287D62" : "2px solid transparent";
+
+          return `
+            <div ${clickAttr} style="background:${cardBg}; border:${cardBorder}; border-radius:16px; padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all 0.15s ease;">
+              <div style="width:44px; height:44px; border-radius:12px; background:${cBadge.bg}; color:${cBadge.color}; font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                ${cBadge.char}
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  ${state.gps_consent ? `도보 ${walkMin}분 · ` : ""}${escHtml(post.location)} · ${escHtml(post.meet_time)}
+                </div>
+              </div>
+              ${btnHtml}
+            </div>
+          `;
+        }).join("");
+      };
+
+      if (isPC()) {
+        return `
+          <div class="pc-map-split">
+            <div class="pc-map-list-col">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:20px; font-weight:800; color:#191F28;">주변 번개 ${nearPosts.length}개</span>
+                <span style="font-size:13px; color:#6B7684; font-weight:500;">가까운 순</span>
+              </div>
+              <div style="margin-bottom:12px;">
+                ${renderCategoryChips("map_cat")}
+              </div>
+              <div style="flex:1; overflow-y:auto;">
+                ${renderNearPostCards(true)}
+              </div>
+              <div style="margin-top:auto; padding-top:12px;">
+                <div style="background:#EEF8F3; border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:10px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z"/></svg>
+                  <span style="font-size:12px; font-weight:700; color:#287D62; line-height:1.4;">내 위치는 건물 단위로만 사용하고,<br/>다른 학우에게는 보이지 않아요</span>
+                </div>
+              </div>
+            </div>
+            <div class="pc-map-canvas-col">
+              <!-- 상단 플로팅 안심 위치 알약 바 -->
+              <div style="position:absolute; top:20px; left:20px; z-index:450; height:44px; border-radius:22px; background:#FFFFFF; box-shadow:0 4px 14px rgba(0,0,0,0.14); display:inline-flex; align-items:center; padding:0 16px; gap:10px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z"/></svg>
+                <span style="font-size:13px; font-weight:700; color:#191F28;">울대모 · 내 위치는 건물 단위로만 써요</span>
+                ${state.gps_consent ? `
+                  <select class="select" style="width:auto; min-width:140px; margin-bottom:0; height:28px; padding:0 8px; font-size:11.5px; border-radius:8px; margin-left:4px;" onchange="changeMyBuilding(this.value)">
+                    ${buildingList.map(b => `<option value="${b}" ${state.my_building === b ? "selected" : ""}>${b}</option>`).join("")}
+                  </select>
+                ` : ""}
+              </div>
+
+              <!-- 우측 상단 줌 컨트롤 -->
+              <div style="position:absolute; top:20px; right:20px; z-index:450; background:#FFFFFF; border-radius:14px; box-shadow:0 4px 12px rgba(0,0,0,0.14); display:flex; flex-direction:column; overflow:hidden;">
+                <button type="button" onclick="if(window._leafletMap) window._leafletMap.zoomIn();" style="width:40px; height:40px; border:none; border-bottom:1px solid #E5E8EB; background:#FFFFFF; font-size:18px; font-weight:700; color:#191F28; cursor:pointer;">+</button>
+                <button type="button" onclick="if(window._leafletMap) window._leafletMap.zoomOut();" style="width:40px; height:40px; border:none; background:#FFFFFF; font-size:18px; font-weight:700; color:#191F28; cursor:pointer;">−</button>
+              </div>
+
+              <!-- 우측 하단 현위치 버튼 -->
+              <button type="button" onclick="requestRealGps()" title="현위치로 이동" style="position:absolute; bottom:24px; right:20px; z-index:450; width:44px; height:44px; border-radius:22px; border:none; background:#FFFFFF; box-shadow:0 4px 12px rgba(0,0,0,0.14); display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+                ${getSvgIcon('location', 18, '#287D62')}
+              </button>
+
+              <div id="campus-map"></div>
+            </div>
+          </div>
+        `;
+      }
 
       return `
         <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -5297,44 +5455,7 @@
             <span style="font-size:17px; font-weight:800; color:#191F28;">주변 번개 ${nearPosts.length}개</span>
             <span style="font-size:13px; color:#6B7684; font-weight:500;">가까운 순</span>
           </div>
-
-          ${nearPosts.length === 0 ? `
-            <div style="background:#F7F9F8; border-radius:16px; padding:22px 16px; text-align:center;">
-              <div style="font-size:14px; font-weight:700; color:#191F28;">선택한 카테고리의 주변 번개가 없어요</div>
-              <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">직접 새 번개를 열어 주변 학우를 불러보세요</div>
-            </div>
-          ` : nearPosts.map(({ post, walkMin }) => {
-            const cBadge = getCatKoreanBadge(post.category, post.title);
-            const apps = (DB.applications || []).filter(a => Number(a.post_id) === Number(post.id) && a.status === "승인됨");
-            const acceptedCnt = apps.length + 1;
-            const maxP = Math.max(2, Number(post.max_participants) || 2);
-            const isMyPost = String(post.author_id) === String(state.user_id);
-            const myApp = (DB.applications || []).find(a => Number(a.post_id) === Number(post.id) && String(a.applicant_id) === String(state.user_id));
-
-            let btnHtml = `<button type="button" onclick="event.stopPropagation(); openQuickApplyModal(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">${acceptedCnt}/${maxP} 신청</button>`;
-            if (isMyPost) {
-              btnHtml = `<button type="button" onclick="event.stopPropagation(); openDetailModal(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:1px solid #C5E6D6; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">${acceptedCnt}/${maxP} 관리</button>`;
-            } else if (myApp && myApp.status === "승인됨") {
-              btnHtml = `<button type="button" onclick="event.stopPropagation(); switchTab('대화'); openChatRoom(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#191F28; color:#FFFFFF; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">대화방 ›</button>`;
-            } else if (myApp && myApp.status === "대기중") {
-              btnHtml = `<span style="height:28px; padding:0 11px; border-radius:14px; background:#FFF4E5; color:#C26A00; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; flex-shrink:0;">수락 대기</span>`;
-            }
-
-            return `
-              <div onclick="openDetailModal(${post.id})" style="background:#F7F9F8; border-radius:16px; padding:12px; margin-bottom:8px; display:flex; align-items:center; gap:12px; cursor:pointer;">
-                <div style="width:44px; height:44px; border-radius:12px; background:${cBadge.bg}; color:${cBadge.color}; font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                  ${cBadge.char}
-                </div>
-                <div style="flex:1; min-width:0;">
-                  <div style="font-size:15px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</div>
-                  <div style="font-size:12px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    ${state.gps_consent ? `도보 ${walkMin}분 · ` : ""}${escHtml(post.location)} · ${escHtml(post.meet_time)}
-                  </div>
-                </div>
-                ${btnHtml}
-              </div>
-            `;
-          }).join("")}
+          ${renderNearPostCards(false)}
         </div>
       `;
     }
@@ -5409,10 +5530,13 @@
         const currentCnt = apps.length + 1;
         const shortCat = String(p.category || "모임").replace(/^[^\w가-힣]+/, "").trim() || "모임";
         const cBadge = getCatKoreanBadge(p.category, p.title);
+        const isSel = Number(state.selected_map_post_id) === Number(p.id);
+        const pillBg = isSel ? cBadge.border : "#FFFFFF";
+        const pillColor = isSel ? "#FFFFFF" : "#191F28";
 
         const pinHtml = `
-          <div onclick="openDetailModal(${p.id})" style="display:inline-flex; flex-direction:column; align-items:center; cursor:pointer;">
-            <div style="background:#FFFFFF; border:2.5px solid ${cBadge.border}; border-radius:15px; padding:3px 10px; box-shadow:0 3px 10px rgba(0,0,0,0.16); font-size:12px; font-weight:800; color:#191F28; white-space:nowrap;">
+          <div onclick="openDetailModal(${p.id})" style="display:inline-flex; flex-direction:column; align-items:center; cursor:pointer; transform:${isSel ? 'scale(1.06)' : 'scale(1)'}; transition:transform 0.16s;">
+            <div style="background:${pillBg}; border:2.5px solid ${cBadge.border}; border-radius:15px; padding:3px 10px; box-shadow:0 3px 10px rgba(0,0,0,0.18); font-size:12px; font-weight:800; color:${pillColor}; white-space:nowrap;">
               ${escHtml(shortCat)} ${currentCnt}/${p.max_participants}명
             </div>
             <div style="width:10px; height:10px; border-radius:50%; background:${cBadge.border}; border:2px solid #FFFFFF; margin-top:-3px; box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
@@ -5730,9 +5854,14 @@
         state.chat_list_mode = true;
       }
 
+      if (isPC() && activeChats.length > 0 && !state.active_chat_post_id) {
+        state.active_chat_post_id = Number(activeChats[0].post.id);
+        state.chat_list_mode = false;
+      }
+
       const showRoomList = Boolean(state.chat_list_mode) || !state.active_chat_post_id;
-      const activeRoom = !showRoomList && activeChats.length > 0
-        ? (activeChats.find(c => Number(c.post.id) === Number(state.active_chat_post_id)) || null)
+      const activeRoom = (!showRoomList || isPC()) && activeChats.length > 0
+        ? (activeChats.find(c => Number(c.post.id) === Number(state.active_chat_post_id)) || activeChats[0] || null)
         : null;
 
       const pendingHtml = pendingHost.length > 0 ? `
@@ -5808,72 +5937,73 @@
         : partnerId;
       const evalTargetUser = DB.users[evalTargetId] || partner;
       const alreadyPraisedTarget = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId && String(r.to_id) === String(evalTargetId));
+      const timePassed = isPostTimePassed(post);
+      const hasReviewed = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId);
+      const defaultIcebreaker = post.title && post.title.includes("러닝")
+        ? '"러닝은 얼마나 자주 하세요?" 로 가볍게 시작해 보세요'
+        : post.category && post.category.includes("밥")
+        ? '"오늘 어떤 메뉴 가장 땡기세요?" 로 가볍게 시작해 보세요'
+        : post.category && post.category.includes("카")
+        ? '"어느 좌석 쪽에 계신가요? 도착하면 말씀해 주세요!"'
+        : '"안녕하세요! 오늘 몇 시쯤 도착하실 예정인가요?" 로 시작해 보세요';
+      const defaultQuickText = post.title && post.title.includes("러닝")
+        ? "러닝은 얼마나 자주 하세요?"
+        : post.category && post.category.includes("밥")
+        ? "오늘 어떤 메뉴 가장 땡기세요?"
+        : post.category && post.category.includes("카")
+        ? "어느 좌석 쪽에 계신가요? 도착하면 말씀해 주세요!"
+        : "안녕하세요! 오늘 몇 시쯤 도착하실 예정인가요?";
 
       return `
         <div class="tk-room-container">
-          <!-- 상단 헤더 (모바일: ← + 닉네임 + 나가기 / PC: 아바타 + 닉네임·모임 + 닫기 + 나가기) -->
-          <div class="tk-room-header">
-            <button type="button" class="tk-room-back press-flat" onclick="backToChatList()" title="목록으로">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
-            </button>
-            ${(() => {
-              const pRawTemp = (DB.users[partnerId] && DB.users[partnerId].manner_temp !== undefined) ? resolveUserTempForTier(partnerId) : partner.manner_temp;
-              const pTier = getTierByTemp(pRawTemp);
-              return `
-                <span class="tk-room-avatar tier-avatar-frame" data-tier="${pTier.tier}">${partner.avatar.split(" ")[0]}</span>
-                <div style="min-width:0; flex:1;">
-                  <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
-                    <span style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
-                    <span class="temp-chip" data-tier="${pTier.tier}">${pTier.displayTemp}°C${pTier.roleLabel ? ` · ${escHtml(pTier.roleLabel)}` : ''}</span>
-                  </div>
-                  <div class="tk-room-sub">${escHtml(post.title)} · ${escHtml(post.location)}</div>
+          <!-- 상단 고정 헤더: 번개 제목 + 시간·장소·인원 + 우측 번개 상세 / 더보기 -->
+          <div class="tk-room-header" style="justify-content:space-between; border-bottom:1px solid #E5E8EB;">
+            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+              <button type="button" class="tk-room-back press-flat" onclick="backToChatList()" title="목록으로">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+              </button>
+              <div style="min-width:0; flex:1;">
+                <div style="font-size:18px; font-weight:800; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</div>
+                <div style="font-size:12.5px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  ${escHtml(post.meet_time || '오늘')} · ${escHtml(post.location)} · 참여 ${totalMembers}명
                 </div>
-              `;
-            })()}
-            <button type="button" class="tk-room-top-btn" style="color:#287D62; border-color:#C5E6D6; background:#EEF8F3; font-weight:700;" onclick="triggerAiIcebreaker(${post.id})" title="AI 대화 주제 추천">대화 주제 추천</button>
-            <button type="button" class="tk-room-top-btn" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">평가·신고</button>
-            <button type="button" class="tk-room-top-btn only-pc" onclick="backToChatList()">닫기</button>
-            <button type="button" class="tk-room-top-btn" style="font-size:16px; font-weight:700; padding:0 10px;" onclick="state['chat_more_open_${post.id}']=!state['chat_more_open_${post.id}']; render();" title="더보기">⋯</button>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              ${timePassed ? `
+                <button type="button" onclick="state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();" style="height:34px; padding:0 12px; border-radius:17px; border:1.5px solid #287D62; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; cursor:pointer;">
+                  후기 · 신고
+                </button>
+              ` : ""}
+              <button type="button" onclick="openDetailModal(${post.id})" style="height:36px; padding:0 14px; border-radius:18px; border:1.5px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:12.5px; font-weight:700; cursor:pointer;">
+                번개 상세
+              </button>
+              <button type="button" class="tk-room-top-btn" style="font-size:16px; font-weight:700; padding:0 8px;" onclick="state['chat_more_open_${post.id}']=!state['chat_more_open_${post.id}']; render();" title="더보기">⋯</button>
+            </div>
           </div>
           ${state['chat_more_open_' + post.id] ? `
-            <div style="background:#FFFFFF; border-bottom:1px solid #EEF0EF; padding:8px 16px; display:flex; justify-content:flex-end; gap:8px; animation:slideDown 0.15s ease;">
+            <div style="background:#FFFFFF; border-bottom:1px solid #EEF0EF; padding:8px 16px; display:flex; justify-content:flex-end; gap:8px;">
+              <button type="button" class="btn" style="height:32px; font-size:12px; font-weight:700; color:#287D62; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:8px; padding:0 12px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; state['chat_action_open_${post.id}']=!state['chat_action_open_${post.id}']; render();">
+                후기 · 신고 열기
+              </button>
               <button type="button" class="btn" style="height:32px; font-size:12px; font-weight:700; color:#E53E3E; background:#FFF5F5; border:1px solid #FFD2D2; border-radius:8px; padding:0 12px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; leaveChatRoom(${post.id});">
-                🚪 대화방 나가기
+                대화방 나가기
               </button>
             </div>
           ` : ""}
 
-          <!-- 모바일 1줄 모임 요약 바 -->
-          <div class="tk-room-notice only-mobile" onclick="openDetailModal(${post.id})">
-            <span style="font-weight:600; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</span>
-            <span style="color:#8B95A1; flex-shrink:0; margin-left:8px;">${escHtml(post.location)}</span>
+          <!-- 상단 고정 안심 안내 띠 (피그마 ③ 대화 개선안) -->
+          <div style="background:#EEF8F3; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #DDF2E7;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+              <span style="font-size:12px; font-weight:700; color:#287D62;">만남이 끝나면 후기와 노쇼 신고가 열려요. 연락처는 공개되지 않아요.</span>
+            </div>
+            ${timePassed && !hasReviewed ? `
+              <button type="button" onclick="state['chat_action_open_${post.id}']=true; render();" style="border:none; background:#287D62; color:#FFFFFF; height:26px; padding:0 10px; border-radius:13px; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0;">
+                후기 남기기 ›
+              </button>
+            ` : ""}
           </div>
-
-          <!-- 모임 시간이 지난 방: 후기 남기기 배너 또는 종료 안내 -->
-          ${(() => {
-            const hasReviewed = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId);
-            if (isPostTimePassed(post) && !hasReviewed) {
-              return `
-                <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:10px 14px; margin:10px 16px 0; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="state['chat_action_open_${post.id}']=true; render();">
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    
-                    <div>
-                      <div style="font-size:13px; font-weight:700; color:#287D62;">오늘 어땠어요? 매너 후기 남기기</div>
-                      <div style="font-size:11.5px; color:#6B7684;">서로의 매너온도를 올려보세요</div>
-                    </div>
-                  </div>
-                  <button type="button" class="btn btn-primary" style="min-height:28px; height:28px; padding:0 10px; font-size:11.5px; border-radius:8px;">후기 남기기 ›</button>
-                </div>
-              `;
-            } else if (isPostTimePassed(post) && hasReviewed) {
-              return `
-                <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:10px; padding:7px 12px; margin:8px 16px 0; font-size:11.5px; color:#6B7684; display:flex; align-items:center; justify-content:space-between;">
-                  <span>🏁 모임이 완료되었어요 · 분실물·정산 문의를 위해 24시간 뒤 자동 정리돼요</span>
-                </div>
-              `;
-            }
-            return "";
-          })()}
 
           ${isActionOpen ? (() => {
             const selKw = state['review_kw_' + post.id] || '시간 약속을 잘 지켜요';
@@ -5910,7 +6040,6 @@
                   ✅ 이미 이 학우와의 후기를 작성했어요
                 </div>
               ` : `
-                <!-- 칭찬 키워드 + 후기 없음 선택 칩 -->
                 <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
                   ${kwList.map(([kwVal, kwLabel]) => {
                     const active = (selKw === kwVal);
@@ -5920,7 +6049,6 @@
                   }).join("")}
                 </div>
 
-                <!-- 디테일한 후기 작성 칸 (후기 없음이 아닐 때 표시) -->
                 ${isNoneSel ? `
                   <div style="background:#FFFFFF; border:1px solid #E5EAE7; border-radius:10px; padding:10px 12px; font-size:12px; color:#6B7684; margin-bottom:10px;">
                     상대방에게 별도 알림이나 후기 글을 남기지 않고 조용히 모임을 완료해요.
@@ -5947,34 +6075,31 @@
             ${renderChatMessagesInner(post.id)}
           </div>
 
-          <!-- 하단 퀵 칩 + 메시지 입력 바 -->
-          <div class="tk-room-footer">
-            ${state['ai_hint_' + post.id] ? `
-              <div class="ai-secret-hint-card" style="margin-bottom:10px; padding:12px 14px; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:14px; box-shadow:0 2px 8px rgba(40,125,98,0.08);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                  <span style="font-size:12px; font-weight:800; color:#287D62; display:flex; align-items:center; gap:5px;">
-                    대화 팁
-                  </span>
-                  <button type="button" style="border:none; background:none; font-size:16px; color:#8B95A1; cursor:pointer; padding:0 4px; line-height:1;" onclick="dismissAiHint(${post.id})" title="닫기">✕</button>
-                </div>
-                <div style="font-size:13.5px; color:#191F28; line-height:1.5; font-weight:500;">${state['ai_hint_' + post.id]}</div>
-                <div style="margin-top:8px; display:flex; justify-content:flex-end; gap:6px;">
-                  <button type="button" class="btn" style="min-height:30px; padding:0 12px; font-size:12px; font-weight:700; background:#FFFFFF; border:1px solid #C5E6D6; color:#287D62; border-radius:8px; cursor:pointer;" onclick="applyAiHintToInput(${post.id})">
-                    📝 이 문구 입력창에 복사
-                  </button>
+          <!-- 하단 AI 첫 인사 제안 박스 + 메시지 입력 바 -->
+          <div class="tk-room-footer" style="border-top:none;">
+            <div style="margin-bottom:10px; padding:10px 14px; background:#EEF8F3; border:1.5px solid #287D62; border-radius:16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <div style="min-width:0; flex:1;">
+                <div style="font-size:11px; font-weight:700; color:#287D62;">AI 첫 인사 제안</div>
+                <div style="font-size:12.5px; font-weight:700; color:#191F28; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  ${state['ai_hint_' + post.id] ? escHtml(state['ai_hint_' + post.id]) : escHtml(defaultIcebreaker)}
                 </div>
               </div>
-            ` : ""}
-            <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 6px;">
+              <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                <button type="button" onclick="triggerAiIcebreaker(${post.id})" title="다른 대화 주제 추천" style="height:28px; padding:0 9px; border-radius:14px; border:1px solid #C5E6D6; background:#FFFFFF; color:#287D62; font-size:11px; font-weight:700; cursor:pointer;">새 제안</button>
+                <button type="button" onclick="const inp=document.getElementById('chat_in_${post.id}'); if(inp){ inp.value='${escHtml(state['ai_hint_' + post.id] || defaultQuickText)}'; inp.focus(); }" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700; cursor:pointer;">입력창에 넣기</button>
+              </div>
+            </div>
+
+            <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 4px;">
               ${getQuickChatPhrasesForCurrentUser().map(phrase => `
-                <button type="button" class="cat-btn" style="height:34px; font-size:13px; padding:0 13px; flex-shrink:0; white-space:nowrap;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
+                <button type="button" class="cat-btn" style="height:32px; font-size:12.5px; padding:0 12px; flex-shrink:0; white-space:nowrap;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
               `).join("")}
             </div>
-            <div style="display:flex; gap:8px; align-items:flex-end;">
-              <textarea id="chat_in_${post.id}" class="tk-chat-input" rows="1" autocomplete="off" placeholder="메시지 보내기 (Shift+Enter 줄바꿈)" onkeydown="handleChatInputKeydown(event, ${post.id})" oninput="autoResizeChatInput(this)"></textarea>
-              <button type="button" class="tk-chat-send-btn press-flat" style="margin-bottom:0;" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendChatMessage(${post.id})">
-                <span class="only-pc" style="font-size:14px; font-weight:700; color:#FFFFFF;">전송</span>
-                <svg class="only-mobile" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+
+            <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; border-radius:26px; padding:4px 8px 4px 16px; min-height:52px;">
+              <textarea id="chat_in_${post.id}" class="tk-chat-input" style="background:transparent; padding:10px 4px; border-radius:0;" rows="1" autocomplete="off" placeholder="메시지를 입력하세요" onkeydown="handleChatInputKeydown(event, ${post.id})" oninput="autoResizeChatInput(this)"></textarea>
+              <button type="button" onclick="sendChatMessage(${post.id})" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" style="width:36px; height:36px; border-radius:18px; border:none; background:#287D62; color:#FFFFFF; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               </button>
             </div>
           </div>
@@ -6131,13 +6256,17 @@
             </div>
           `;
         } else {
+          const sRawTemp = (DB.users[m.sender_id] && DB.users[m.sender_id].manner_temp !== undefined) ? resolveUserTempForTier(m.sender_id) : (senderUser.manner_temp || 36.5);
+          const sTier = getTierByTemp(sRawTemp);
+          const isHostSender = String(m.sender_id) === String(post.author_id);
+          const blindSenderLabel = `${sTier.name}${isHostSender ? ' · 방장' : ''}`;
           return `
             <div class="chat-msg-row other ${isSameAsPrev ? 'grouped' : ''}">
               ${!isSameAsPrev
                 ? `<div class="chat-avatar-mini">${(senderUser.avatar || "🐶").split(" ")[0]}</div>`
                 : `<div class="chat-avatar-spacer"></div>`}
               <div class="chat-bubble-col other">
-                ${!isSameAsPrev ? `<div class="chat-sender-name">${escHtml(senderUser.nickname || m.sender_id)}</div>` : ""}
+                ${!isSameAsPrev ? `<div class="chat-sender-name" style="color:#98A2B3; font-size:11.5px; font-weight:600;">${escHtml(blindSenderLabel)}</div>` : ""}
                 <div class="chat-bubble-wrap other">
                   <div class="chat-bubble-other" title="클릭하여 공감(❤️·👍·🙌) 남기기" onclick="toggleMsgReactionPicker(${m.id}, ${postId})">${escHtml(m.text)}</div>
                   <div class="chat-meta other">
@@ -6522,7 +6651,7 @@
         : "최고 등급 달성 👑";
 
       return `
-        <div style="max-width:560px;">
+        <div style="max-width:720px;">
           <h1 class="tk-page-title" style="margin-bottom:14px;">내 정보</h1>
 
           <!-- 상단 그린 매너온도 히어로 카드 -->
@@ -6566,58 +6695,58 @@
 
           <!-- 3칸 활동 요약 그리드 (받은 후기 / 신청한 번개 / 만든 번개) -->
           <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:12px;">
-            <button type="button" onclick="toggleProfileSection('reviews')" style="background:${sec === 'reviews' ? '#EEF8F3' : '#F7F9F8'}; border:${sec === 'reviews' ? '1.5px solid #287D62' : '1.5px solid transparent'}; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer;">
-              <div style="font-size:20px; font-weight:800; color:#191F28;">${myStats.totalPraiseCnt}</div>
+            <button type="button" onclick="toggleProfileSection('reviews')" style="background:${sec === 'reviews' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'reviews' ? '#287D62' : '#E5E8EB'}; border-radius:16px; padding:14px 8px; text-align:center; cursor:pointer;">
+              <div style="font-size:22px; font-weight:800; color:#191F28;">${myStats.totalPraiseCnt}</div>
               <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">받은 후기</div>
             </button>
-            <button type="button" onclick="toggleProfileSection('myapps')" style="background:${sec === 'myapps' ? '#EEF8F3' : '#F7F9F8'}; border:${sec === 'myapps' ? '1.5px solid #287D62' : '1.5px solid transparent'}; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer;">
-              <div style="font-size:20px; font-weight:800; color:#191F28;">${myAppliedList.length}</div>
+            <button type="button" onclick="toggleProfileSection('myapps')" style="background:${sec === 'myapps' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'myapps' ? '#287D62' : '#E5E8EB'}; border-radius:16px; padding:14px 8px; text-align:center; cursor:pointer;">
+              <div style="font-size:22px; font-weight:800; color:#191F28;">${myAppliedList.length}</div>
               <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">신청한 번개</div>
             </button>
-            <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#F7F9F8'}; border:${sec === 'myposts' ? '1.5px solid #287D62' : '1.5px solid transparent'}; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer;">
-              <div style="font-size:20px; font-weight:800; color:#191F28;">${myPosts.length}</div>
+            <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'myposts' ? '#287D62' : '#E5E8EB'}; border-radius:16px; padding:14px 8px; text-align:center; cursor:pointer;">
+              <div style="font-size:22px; font-weight:800; color:#191F28;">${myPosts.length}</div>
               <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">만든 번개</div>
             </button>
           </div>
 
           ${sec === 'reviews' ? `
-            <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:12px;">
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
               <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">받은 매너 후기</div>
               ${myReviews.length === 0
                 ? renderEmptyStateBox('check', '아직 받은 후기가 없어요', '번개 모임 후 학우들과 따뜻한 후기를 나눠보세요')
                 : myReviews.map(r => `
                   <div style="padding:10px 0; border-bottom:1px solid #EEF0EF;">
                     <div style="font-size:13.5px; font-weight:700; color:#191F28;">${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
-                    ${r.detail ? `<div style="font-size:12.5px; color:#4E5968; margin-top:4px; background:#FFFFFF; padding:8px 10px; border-radius:8px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
+                    ${r.detail ? `<div style="font-size:12.5px; color:#4E5968; margin-top:4px; background:#F7F9F8; padding:8px 10px; border-radius:8px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
                   </div>
                 `).join("")}
             </div>
           ` : ''}
 
           <!-- 인증 뱃지 4종 박스 -->
-          <button type="button" onclick="toggleProfileSection('badges')" style="width:100%; height:56px; background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:${sec === 'badges' ? '8px' : '18px'}; cursor:pointer;">
+          <button type="button" onclick="toggleProfileSection('badges')" style="width:100%; height:56px; background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:${sec === 'badges' ? '8px' : '16px'}; cursor:pointer;">
             <span style="font-size:15px; font-weight:700; color:#191F28;">인증 뱃지</span>
-            <span style="display:inline-flex; align-items:center; gap:8px;">
+            <span style="display:inline-flex; align-items:center; gap:10px;">
               <span style="display:inline-flex; align-items:center; gap:6px;">
                 ${myStats.badgeCatalog.map(b => `
-                  <span style="width:20px; height:20px; border-radius:10px; background:${b.earned ? '#287D62' : '#EEF8F3'}; border:1.5px solid #287D62; display:inline-block;"></span>
+                  <span style="width:20px; height:20px; border-radius:10px; background:${b.earned ? '#287D62' : '#FFFFFF'}; border:1.5px solid ${b.earned ? '#287D62' : '#D0D5DD'}; display:inline-block;"></span>
                 `).join("")}
               </span>
               <span style="font-size:13px; color:#287D62; font-weight:700;">${myStats.badges.length}/4 ${sec === 'badges' ? '▾' : '›'}</span>
             </span>
           </button>
           ${sec === 'badges' ? `
-            <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:16px;">
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:16px;">
               <div style="font-size:12.5px; color:#8B95A1; margin-bottom:12px;">40.0°C 달성 또는 좋은 평가 15회 이상이면 받을 수 있어요</div>
               <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
                 ${myStats.badgeCatalog.map(b => `
-                  <div style="background:#FFFFFF; border-radius:12px; padding:12px;">
+                  <div style="background:#F7F9F8; border-radius:12px; padding:12px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                       <span style="font-size:13.5px; font-weight:700; color:${b.earned ? '#287D62' : '#191F28'};">${escHtml(b.label)}</span>
                       <span style="font-size:12px; font-weight:700; color:${b.earned ? '#287D62' : '#8B95A1'};">${b.earned ? '인증 완료' : b.progressText}</span>
                     </div>
                     <div style="font-size:12px; color:#8B95A1; margin-bottom:6px;">${escHtml(b.condText)}</div>
-                    <div style="height:5px; background:#F2F4F3; border-radius:999px; overflow:hidden;">
+                    <div style="height:5px; background:#E5E8EB; border-radius:999px; overflow:hidden;">
                       <div style="width:${b.progressPct}%; height:100%; background:#287D62; border-radius:999px;"></div>
                     </div>
                   </div>
@@ -6626,132 +6755,151 @@
             </div>
           ` : ''}
 
-          <!-- 활동 섹션 메뉴 -->
-          <div style="font-size:13px; font-weight:700; color:#98A2B3; margin-bottom:4px;">활동</div>
-          <div>
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('myapps')">
-              <span>내가 신청한 번개</span>
-              <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:13.5px; color:#8B95A1;">${myAppliedList.length}건</span>
-                <span class="tk-menu-arrow">${sec === 'myapps' ? '▾' : '›'}</span>
-              </span>
-            </button>
-            ${sec === 'myapps' ? `
-              <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
-                ${myAppliedList.length === 0
-                  ? renderEmptyStateBox('compass', '아직 신청한 번개가 없어요', '오늘 공강에 같이할 학우를 찾아봐요', '번개 보러 가기', "switchTab('홈')")
-                  : myAppliedList.map(item => `
-                    <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${item.post.id})">
-                      <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(item.post.title)}</span>
-                      <span style="font-size:12px; color:#287D62; font-weight:700;">${escHtml(item.app.status)} ›</span>
-                    </div>
-                  `).join("")}
-              </div>
-            ` : ''}
-
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('myposts')">
-              <span>내가 만든 번개</span>
-              <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:13.5px; color:#8B95A1;">${myPosts.length}건</span>
-                <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
-              </span>
-            </button>
-            ${sec === 'myposts' ? `
-              <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
-                ${myPosts.length === 0
-                  ? renderEmptyStateBox('plus', '아직 열린 번개가 없어요', '첫 번개를 열어볼까요?', '번개 열기', "state.active_modal='create'; render();")
-                  : myPosts.map(p => `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
-                      <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(p.title)}</span>
-                      <span style="font-size:12px; color:#287D62; font-weight:700;">${escHtml(p.status)} ›</span>
-                    </div>
-                  `).join("")}
-                ${myPastPosts.length > 0 ? `
-                  <details style="margin-top:10px; padding-top:10px; border-top:1px solid #E5EAE7;">
-                    <summary style="font-size:12.5px; font-weight:700; color:#6B7684; cursor:pointer;">지난 번개 ${myPastPosts.length}건 보기</summary>
-                    <div style="margin-top:6px;">
-                      ${myPastPosts.map(p => `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
-                          <span style="font-size:13px; color:#6B7684;">${escHtml(p.title)}</span>
-                          <span style="font-size:11.5px; color:#8B95A1;">종료 ›</span>
-                        </div>
-                      `).join("")}
-                    </div>
-                  </details>
-                ` : ""}
-              </div>
-            ` : ''}
-
-            <button type="button" class="tk-menu-row" onclick="openTimetableModal()">
-              <span>내 시간표 · 공강 메이트</span>
-              <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:13px; color:${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '#287D62' : '#8B95A1'}; font-weight:700;">${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '등록됨' : '미등록'}</span>
-                <span class="tk-menu-arrow">›</span>
-              </span>
-            </button>
-
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('challenge')">
-              <span>월간 커피 쿠폰 챌린지</span>
-              <span class="tk-menu-arrow">${sec === 'challenge' ? '▾' : '›'}</span>
-            </button>
-            ${sec === 'challenge' ? `<div style="margin-bottom:8px;">${renderChallengeAndRewardCard()}</div>` : ''}
-
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('edit')">
-              <span>프로필 · 관심 카테고리 수정</span>
-              <span class="tk-menu-arrow">${sec === 'edit' ? '▾' : '›'}</span>
-            </button>
-            ${sec === 'edit' ? `
-              <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
-                <label class="label">닉네임</label>
-                <input id="edit_nick" class="input" value="${escHtml(user.nickname)}" />
-                <label class="label">학과</label>
-                <input id="edit_dept" class="input" value="${escHtml(user.department)}" />
-                <div class="row-2">
-                  <div>
-                    <label class="label">프로필 아이콘</label>
-                    <select id="edit_avatar" class="select">
-                      ${AVATARS.map(a => `<option value="${a}" ${user.avatar.split(" ")[0] === a ? "selected" : ""}>${a}</option>`).join("")}
-                    </select>
-                  </div>
-                  <div>
-                    <label class="label">MBTI</label>
-                    <select id="edit_mbti" class="select">
-                      ${MBTIS.map(m => `<option value="${m}" ${user.mbti === m ? "selected" : ""}>${m}</option>`).join("")}
-                    </select>
-                  </div>
-                </div>
-                <label class="label">한줄 자기소개</label>
-                <textarea id="edit_bio" class="textarea" rows="2">${escHtml(user.bio || "")}</textarea>
-                <button class="btn btn-primary" style="margin-bottom:14px;" onclick="saveProfileEdit()">변경사항 저장하기</button>
-                <div id="fav-wrap">${renderFavSection(user)}</div>
-              </div>
-            ` : ''}
-
-            ${!isCurrentUserAdmin() ? `
-              <button type="button" class="tk-menu-row" onclick="toggleProfileSection('pw')">
-                <span>비밀번호 변경</span>
+          <!-- 활동 / 설정 2열 카드 (PC에서 좌우 2열, 모바일에서 상하) -->
+          <div class="pc-profile-2col">
+            <!-- 좌측: 활동 카드 -->
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px 18px; margin-bottom:12px;">
+              <div style="font-size:12px; font-weight:700; color:#98A2B3; margin-bottom:6px;">활동</div>
+              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('myapps')">
+                <span style="font-size:14.5px; font-weight:700;">내가 신청한 번개</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
-                  <span style="font-size:13px; color:${user.pw_hash ? '#287D62' : '#8B95A1'};">${user.pw_hash ? '설정됨' : '미설정'}</span>
-                  <span class="tk-menu-arrow">${sec === 'pw' ? '▾' : '›'}</span>
+                  <span style="font-size:13px; color:#8B95A1;">${myAppliedList.length}건</span>
+                  <span class="tk-menu-arrow">${sec === 'myapps' ? '▾' : '›'}</span>
                 </span>
               </button>
-              ${sec === 'pw' ? `
-                <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
-                  <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                    <input id="edit_user_pw" type="password" class="input" style="margin-bottom:0;" placeholder="${user.pw_hash ? '새 비밀번호 입력 (4자리 이상)' : '사용할 비밀번호 입력 (4자리 이상)'}" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('edit_user_pw')" />
-                    <button type="button" class="btn btn-primary" style="width:auto; padding:0 16px; min-height:44px;" onclick="saveUserPasswordFromProfile('edit_user_pw')">저장</button>
-                  </div>
-                </div>
-              ` : ''}
-            ` : ''}
+              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('myposts')">
+                <span style="font-size:14.5px; font-weight:700;">내가 만든 번개</span>
+                <span style="display:inline-flex; align-items:center; gap:8px;">
+                  <span style="font-size:13px; color:#8B95A1;">${myPosts.length}건</span>
+                  <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
+                </span>
+              </button>
+              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="openTimetableModal()">
+                <span style="font-size:14.5px; font-weight:700;">내 시간표 · 공강 메이트</span>
+                <span style="display:inline-flex; align-items:center; gap:8px;">
+                  <span style="font-size:12.5px; color:${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '#287D62' : '#8B95A1'}; font-weight:700;">${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '등록됨' : '미등록'}</span>
+                  <span class="tk-menu-arrow">›</span>
+                </span>
+              </button>
+              <button type="button" class="tk-menu-row" style="padding:12px 4px 4px; margin:0; border-radius:0;" onclick="toggleProfileSection('challenge')">
+                <span style="font-size:14.5px; font-weight:700;">월간 커피 쿠폰 챌린지</span>
+                <span class="tk-menu-arrow">${sec === 'challenge' ? '▾' : '›'}</span>
+              </button>
+            </div>
 
-            <!-- 하단 분리된 중앙 로그아웃 버튼 -->
-            <div style="margin-top:16px; padding-top:8px; text-align:center;">
-              <button type="button" onclick="clearLogin()" style="background:none; border:none; color:#98A2B3; font-size:14px; font-weight:600; padding:10px 20px; cursor:pointer;">
-                로그아웃
+            <!-- 우측: 설정 카드 -->
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:16px 18px; margin-bottom:12px;">
+              <div style="font-size:12px; font-weight:700; color:#98A2B3; margin-bottom:6px;">설정</div>
+              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('edit')">
+                <span style="font-size:14.5px; font-weight:700;">프로필 정보 수정</span>
+                <span class="tk-menu-arrow">${sec === 'edit' ? '▾' : '›'}</span>
+              </button>
+              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('fav')">
+                <span style="font-size:14.5px; font-weight:700;">관심 카테고리 · 알림</span>
+                <span class="tk-menu-arrow">${sec === 'fav' ? '▾' : '›'}</span>
+              </button>
+              ${!isCurrentUserAdmin() ? `
+                <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('pw')">
+                  <span style="font-size:14.5px; font-weight:700;">비밀번호 변경</span>
+                  <span style="display:inline-flex; align-items:center; gap:8px;">
+                    <span style="font-size:12.5px; color:${user.pw_hash ? '#287D62' : '#8B95A1'};">${user.pw_hash ? '설정됨' : '미설정'}</span>
+                    <span class="tk-menu-arrow">${sec === 'pw' ? '▾' : '›'}</span>
+                  </span>
+                </button>
+              ` : ""}
+              <button type="button" class="tk-menu-row" style="padding:12px 4px 4px; margin:0; border-radius:0; color:#98A2B3;" onclick="clearLogin()">
+                <span style="font-size:14.5px; font-weight:600; color:#98A2B3;">로그아웃</span>
+                <span class="tk-menu-arrow">›</span>
               </button>
             </div>
           </div>
+
+          <!-- 펼쳐진 상세 패널 영역 -->
+          ${sec === 'myapps' ? `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
+              <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">내가 신청한 번개</div>
+              ${myAppliedList.length === 0
+                ? renderEmptyStateBox('compass', '아직 신청한 번개가 없어요', '오늘 공강에 같이할 학우를 찾아봐요', '번개 보러 가기', "switchTab('홈')")
+                : myAppliedList.map(item => `
+                  <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${item.post.id})">
+                    <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(item.post.title)}</span>
+                    <span style="font-size:12px; color:#287D62; font-weight:700;">${escHtml(item.app.status)} ›</span>
+                  </div>
+                `).join("")}
+            </div>
+          ` : ''}
+
+          ${sec === 'myposts' ? `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
+              <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">내가 만든 번개</div>
+              ${myPosts.length === 0
+                ? renderEmptyStateBox('plus', '아직 열린 번개가 없어요', '첫 번개를 열어볼까요?', '번개 열기', "state.active_modal='create'; render();")
+                : myPosts.map(p => `
+                  <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
+                    <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(p.title)}</span>
+                    <span style="font-size:12px; color:#287D62; font-weight:700;">${escHtml(p.status)} ›</span>
+                  </div>
+                `).join("")}
+              ${myPastPosts.length > 0 ? `
+                <details style="margin-top:10px; padding-top:10px; border-top:1px solid #E5EAE7;">
+                  <summary style="font-size:12.5px; font-weight:700; color:#6B7684; cursor:pointer;">지난 번개 ${myPastPosts.length}건 보기</summary>
+                  <div style="margin-top:6px;">
+                    ${myPastPosts.map(p => `
+                      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
+                        <span style="font-size:13px; color:#6B7684;">${escHtml(p.title)}</span>
+                        <span style="font-size:11.5px; color:#8B95A1;">종료 ›</span>
+                      </div>
+                    `).join("")}
+                  </div>
+                </details>
+              ` : ""}
+            </div>
+          ` : ''}
+
+          ${sec === 'challenge' ? `<div style="margin-bottom:12px;">${renderChallengeAndRewardCard()}</div>` : ''}
+
+          ${sec === 'edit' ? `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
+              <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:10px;">프로필 정보 수정</div>
+              <label class="label">닉네임</label>
+              <input id="edit_nick" class="input" value="${escHtml(user.nickname)}" />
+              <label class="label">학과</label>
+              <input id="edit_dept" class="input" value="${escHtml(user.department)}" />
+              <div class="row-2">
+                <div>
+                  <label class="label">프로필 아이콘</label>
+                  <select id="edit_avatar" class="select">
+                    ${AVATARS.map(a => `<option value="${a}" ${user.avatar.split(" ")[0] === a ? "selected" : ""}>${a}</option>`).join("")}
+                  </select>
+                </div>
+                <div>
+                  <label class="label">MBTI</label>
+                  <select id="edit_mbti" class="select">
+                    ${MBTIS.map(m => `<option value="${m}" ${user.mbti === m ? "selected" : ""}>${m}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+              <label class="label">한줄 자기소개</label>
+              <textarea id="edit_bio" class="textarea" rows="2">${escHtml(user.bio || "")}</textarea>
+              <button class="btn btn-primary" onclick="saveProfileEdit()">변경사항 저장하기</button>
+            </div>
+          ` : ''}
+
+          ${sec === 'fav' ? `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
+              <div id="fav-wrap">${renderFavSection(user)}</div>
+            </div>
+          ` : ''}
+
+          ${sec === 'pw' && !isCurrentUserAdmin() ? `
+            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
+              <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:10px;">비밀번호 변경</div>
+              <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+                <input id="edit_user_pw" type="password" class="input" style="margin-bottom:0;" placeholder="${user.pw_hash ? '새 비밀번호 입력 (4자리 이상)' : '사용할 비밀번호 입력 (4자리 이상)'}" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('edit_user_pw')" />
+                <button type="button" class="btn btn-primary" style="width:auto; padding:0 16px; min-height:44px;" onclick="saveUserPasswordFromProfile('edit_user_pw')">저장</button>
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
     }
