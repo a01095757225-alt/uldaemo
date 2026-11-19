@@ -1877,22 +1877,54 @@
       return dowFound !== -1 ? dowFound : 0;
     }
 
-    function openMeetupFromCafeteria(mealName, dishPreview) {
+    function normalizeCafeteriaDate(dateStr) {
+      const m = String(dateStr || "").match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+      if (!m) return "";
+      return `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+    }
+
+    function getCafeteriaMealStatus(dayDateStr, mealKey, menuList) {
+      if (!Array.isArray(menuList) || menuList.length === 0) {
+        return { disabled: true, reason: "미운영 시간이에요" };
+      }
+      const normDate = normalizeCafeteriaDate(dayDateStr);
+      const todayStr = getTodayStr();
+      if (normDate && normDate < todayStr) {
+        return { disabled: true, reason: "이미 지난 날짜의 식단이에요" };
+      }
+      if (normDate && normDate === todayStr) {
+        const now = new Date();
+        const curMin = now.getHours() * 60 + now.getMinutes();
+        const endMinMap = { breakfast: 9 * 60 + 30, lunch: 13 * 60 + 30, dinner: 19 * 60 };
+        const endMin = endMinMap[mealKey] || (23 * 60 + 59);
+        if (curMin > endMin) {
+          return { disabled: true, reason: "오늘 운영 시간이 지났어요" };
+        }
+      }
+      return { disabled: false, normDate: normDate || todayStr };
+    }
+
+    function openMeetupFromCafeteria(mealName, dishPreview, dayDateStr, mealKey) {
+      const normDate = normalizeCafeteriaDate(dayDateStr);
+      const todayStr = getTodayStr();
+      if (normDate && normDate < todayStr) {
+        return showToast("이미 지난 날짜의 학식으로는 밥약을 열 수 없어요.");
+      }
+      if (normDate && normDate === todayStr && mealKey) {
+        const now = new Date();
+        const curMin = now.getHours() * 60 + now.getMinutes();
+        const endMinMap = { breakfast: 9 * 60 + 30, lunch: 13 * 60 + 30, dinner: 19 * 60 };
+        if (curMin > (endMinMap[mealKey] || 1440)) {
+          return showToast("이미 지난 식사 시간으로는 밥약을 열 수 없어요.");
+        }
+      }
+      const defaultTimeMap = { breakfast: "08:00", lunch: "12:00", dinner: "17:30" };
+      state.prefill_title = `[학식 밥약] ${mealName} 같이 먹을 사람! (${dishPreview || '학식'})`;
+      state.prefill_cat = "🍚 밥약";
+      state.prefill_loc = "25호관 청운학사 무거관";
+      state.prefill_date = normDate || todayStr;
+      state.prefill_time = defaultTimeMap[mealKey] || "12:00";
       state.active_modal = "create";
-      setTimeout(() => {
-        const titleEl = document.getElementById("new_title");
-        const locEl = document.getElementById("new_location");
-        const catEl = document.getElementById("new_category");
-        if (titleEl) {
-          titleEl.value = `[학식 밥약] 오늘 ${mealName} 같이 먹을 사람! (${dishPreview || '학식'})`;
-        }
-        if (locEl) {
-          locEl.value = "기숙사식당(무거관)";
-        }
-        if (catEl) {
-          catEl.value = "🍚 밥약";
-        }
-      }, 50);
       render();
     }
 
@@ -2018,9 +2050,13 @@
               </div>
 
               <!-- 번개 열기 바로가기 버튼 -->
-              <button class="btn btn-primary" style="width:100%; min-height:34px; margin-top:8px; font-size:12px; font-weight:800; padding:6px 10px;" onclick="event.stopPropagation(); openMeetupFromCafeteria('${curMealName}', '${escHtml(previewText)}')">
-                ⚡ 이 메뉴로 밥약 번개 열기 ›
-              </button>
+              ${(() => {
+                const mealStatus = getCafeteriaMealStatus(dayData.date, meal, mealList);
+                if (mealStatus.disabled) {
+                  return `<button type="button" disabled style="width:100%; min-height:34px; margin-top:8px; font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:10px; border:none; background:#F2F4F3; color:#98A2B3; cursor:not-allowed;">${escHtml(mealStatus.reason)}</button>`;
+                }
+                return `<button class="btn btn-primary" style="width:100%; min-height:34px; margin-top:8px; font-size:12px; font-weight:800; padding:6px 10px;" onclick="event.stopPropagation(); openMeetupFromCafeteria('${escHtml(dayData.day)} ${curMealName.split(' ')[0]}', '${escHtml(previewText)}', '${escHtml(dayData.date)}', '${meal}')">⚡ 이 메뉴로 밥약 번개 열기 ›</button>`;
+              })()}
             </div>
           ` : ''}
         </div>
@@ -2095,9 +2131,17 @@
                       }).join("") : '<span style="color:#98A2B3;">운영 정보가 없어요</span>'}
                     </div>
                   </div>
-                  <button type="button" onclick="openMeetupFromCafeteria('${escHtml(curDay.day)} ${mc.mealName}', '${escHtml(previewMain)}')" style="width:100%; height:42px; border-radius:21px; border:none; background:${mc.highlight ? '#287D62' : '#F7F9F8'}; color:${mc.highlight ? '#FFFFFF' : '#287D62'}; font-size:13.5px; font-weight:700; cursor:pointer;">
-                    이 메뉴로 밥약 열기
-                  </button>
+                  ${(() => {
+                    const mealStatus = getCafeteriaMealStatus(curDay.date, mc.key, mc.list);
+                    if (mealStatus.disabled) {
+                      return `<button type="button" disabled style="width:100%; height:42px; border-radius:21px; border:none; background:#F2F4F3; color:#98A2B3; font-size:13px; font-weight:700; cursor:not-allowed;">${escHtml(mealStatus.reason)}</button>`;
+                    }
+                    return `
+                      <button type="button" onclick="openMeetupFromCafeteria('${escHtml(curDay.day)} ${mc.mealName}', '${escHtml(previewMain)}', '${escHtml(curDay.date)}', '${mc.key}')" style="width:100%; height:42px; border-radius:21px; border:none; background:${mc.highlight ? '#287D62' : '#F7F9F8'}; color:${mc.highlight ? '#FFFFFF' : '#287D62'}; font-size:13.5px; font-weight:700; cursor:pointer;">
+                        이 메뉴로 밥약 열기
+                      </button>
+                    `;
+                  })()}
                 </div>
               `;
             }).join("")}
