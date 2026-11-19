@@ -1854,17 +1854,21 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
   gap: 0;
 }
 .dock-btn {
-  color: #B0B8C1;
+  color: #98A2B3;
   border-radius: 12px;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11.5px;
   justify-content: center;
 }
 .dock-btn.active {
   background: transparent;
-  color: #191F28;
+  color: #287D62;
+  font-weight: 700;
   box-shadow: none;
   transform: none;
+}
+.dock-btn.active .dock-icon svg {
+  stroke: #287D62 !important;
 }
 .dock-unread-pill {
   position: absolute;
