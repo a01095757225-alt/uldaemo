@@ -2372,14 +2372,14 @@
             ${sidebarHtml}
             <main class="main-col">
               ${(state.nav_tab === "홈" && !state.active_modal) ? `
-                <div class="app-header">
-                  <button type="button" class="press-flat" style="display:inline-flex; align-items:center; gap:4px; font-size:20px; font-weight:800; color:#191F28; background:none; border:none; cursor:pointer;" onclick="switchTab('지도')">
-                    <span>울산대</span>
-                    <span style="font-size:14px; color:#8B95A1;">▾</span>
-                  </button>
-                  <button type="button" class="press-flat" style="position:relative; padding:4px; background:none; border:none; cursor:pointer;" onclick="toggleNotificationsModal()" aria-label="알림">
+                <div class="app-header" style="align-items:flex-end; padding-top:14px; padding-bottom:10px;">
+                  <div>
+                    <div style="font-size:13.5px; font-weight:500; color:#6B7684; margin-bottom:2px;">안녕하세요, ${escHtml(currentUser.nickname)}님</div>
+                    <div style="font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.03em; line-height:1.25;">오늘, 같이 할래요?</div>
+                  </div>
+                  <button type="button" class="press-flat" style="position:relative; padding:6px; background:none; border:none; cursor:pointer;" onclick="toggleNotificationsModal()" aria-label="알림">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0"/></svg>
-                    ${badgeCnt > 0 ? `<span style="position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:#287D62; border:1.5px solid #FFFFFF;"></span>` : ''}
+                    ${badgeCnt > 0 ? `<span style="position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:#287D62; border:1.5px solid #FFFFFF;"></span>` : ''}
                   </button>
                 </div>
               ` : ''}
@@ -3183,54 +3183,95 @@
       return "";
     }
 
+    function getCatKoreanBadge(category, title) {
+      const s = `${category || ""} ${title || ""}`;
+      if (/운동|러닝|헬스|산책|배드민턴|풋살|농구/.test(s)) return { char: "운", bg: "#FFF1E6", color: "#FF8A3D", border: "#FF8A3D" };
+      if (/밥|학식|점심|저녁|식사|맛집|국밥|파스타|돈까스/.test(s)) return { char: "밥", bg: "#FDECEF", color: "#E85D75", border: "#E85D75" };
+      if (/카공|카페|커피|도서관|스터디|과제/.test(s)) return { char: "카", bg: "#EAF1F9", color: "#3B6EA8", border: "#3B6EA8" };
+      if (/게임|PC|롤|배그|보드게임/.test(s)) return { char: "게", bg: "#F3E8FF", color: "#7C3AED", border: "#7C3AED" };
+      if (/술|맥주|이자카야|회식|한잔/.test(s)) return { char: "술", bg: "#FEF3C7", color: "#D97706", border: "#D97706" };
+      return { char: "모", bg: "#EEF8F3", color: "#287D62", border: "#287D62" };
+    }
+
     function renderMeetupCard(post) {
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5 };
       const apps = DB.applications.filter(a => a.post_id === post.id);
       const acceptedCnt = apps.filter(a => a.status === "승인됨").length + 1;
+      const maxP = Math.max(2, Number(post.max_participants || 2));
       const isOfficial = Boolean(post.is_official);
       const isAuthor = String(post.author_id) === String(state.user_id);
       const myApp = apps.find(a => String(a.applicant_id) === String(state.user_id));
-      const isFull = acceptedCnt >= (post.max_participants || 2) || post.status !== "모집중";
+      const isFull = acceptedCnt >= maxP || post.status !== "모집중";
       const authorRawTemp = (DB.users[post.author_id] && DB.users[post.author_id].manner_temp !== undefined) ? resolveUserTempForTier(post.author_id) : author.manner_temp;
       const authorTier = getTierByTemp(authorRawTemp);
-      const emoji = getCatEmoji(post.category, post.title);
+      const cBadge = getCatKoreanBadge(post.category, post.title);
 
       const coords = getBuildingCoords(post.location);
       const distM = calcDistanceMeters(state.my_lat, state.my_lng, coords[0], coords[1]);
       const walkMin = Math.max(1, Math.round(distM / 67));
       const distText = state.gps_consent ? ` · 도보 ${walkMin}분` : "";
 
+      let topRightBadgeHtml = "";
+      if (isAuthor) {
+        topRightBadgeHtml = `<span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; flex-shrink:0;">내 번개</span>`;
+      } else if (isOfficial) {
+        topRightBadgeHtml = `<span class="tk-official-badge">공식</span>`;
+      } else if (post.is_boosted) {
+        topRightBadgeHtml = `<span class="tk-boost-badge">⚡ 부스트</span>`;
+      } else if (typeof isPostMatchingMyFreeTime === "function" && isPostMatchingMyFreeTime(post)) {
+        topRightBadgeHtml = `<span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:12px; flex-shrink:0;">⚡ 내 공강</span>`;
+      } else {
+        topRightBadgeHtml = getPostTimeChip(post);
+      }
+
       let actionBtnHtml = "";
       if (isAuthor) {
         const waitCnt = apps.filter(a => a.status === "대기중").length;
-        actionBtnHtml = `<button type="button" class="btn" style="width:auto; min-height:32px; height:32px; padding:0 11px; font-size:12px; font-weight:700; border-radius:999px; background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; flex-shrink:0;" onclick="event.stopPropagation(); openDetailModal(${post.id});">${waitCnt > 0 ? `신청 ${waitCnt}건` : '내 번개'}</button>`;
+        actionBtnHtml = `<button type="button" onclick="event.stopPropagation(); openDetailModal(${post.id});" style="min-width:86px; height:34px; padding:0 14px; font-size:13px; font-weight:700; border-radius:17px; background:#FFFFFF; color:#287D62; border:2px solid #287D62; cursor:pointer; flex-shrink:0;">${waitCnt > 0 ? `관리 (${waitCnt})` : '관리'}</button>`;
       } else if (myApp && myApp.status === "승인됨") {
-        actionBtnHtml = `<button type="button" class="btn btn-primary" style="width:auto; min-height:32px; height:32px; padding:0 11px; font-size:12px; font-weight:700; border-radius:999px; flex-shrink:0;" onclick="event.stopPropagation(); state.active_modal=null; state.nav_tab='채팅'; openChatRoom(${post.id});">대화방 ›</button>`;
+        actionBtnHtml = `<button type="button" onclick="event.stopPropagation(); state.active_modal=null; state.nav_tab='채팅'; openChatRoom(${post.id});" style="min-width:86px; height:34px; padding:0 14px; font-size:13px; font-weight:700; border-radius:17px; background:#EEF8F3; color:#287D62; border:none; cursor:pointer; flex-shrink:0;">대화방 ›</button>`;
       } else if (myApp && myApp.status === "대기중") {
-        actionBtnHtml = `<span style="font-size:11.5px; font-weight:700; color:#6B7684; background:#F2F4F3; padding:5px 10px; border-radius:999px; flex-shrink:0;">대기중</span>`;
+        actionBtnHtml = `<span style="display:inline-flex; align-items:center; justify-content:center; min-width:86px; height:34px; padding:0 14px; font-size:12.5px; font-weight:700; color:#C26A00; background:#FFF4E5; border-radius:17px; flex-shrink:0;">수락 대기</span>`;
       } else if (!isFull) {
-        actionBtnHtml = `<button type="button" class="btn btn-primary" style="width:auto; min-height:32px; height:32px; padding:0 12px; font-size:12px; font-weight:700; border-radius:999px; flex-shrink:0;" onclick="event.stopPropagation(); applyToPost(${post.id});">참여</button>`;
+        actionBtnHtml = `<button type="button" onclick="event.stopPropagation(); applyToPost(${post.id});" style="min-width:86px; height:34px; padding:0 14px; font-size:13px; font-weight:700; border-radius:17px; background:#287D62; color:#FFFFFF; border:none; cursor:pointer; flex-shrink:0;">참여 신청</button>`;
+      } else {
+        actionBtnHtml = `<span style="display:inline-flex; align-items:center; justify-content:center; min-width:74px; height:32px; padding:0 12px; font-size:12px; font-weight:700; color:#98A2B3; background:#F2F4F3; border-radius:16px; flex-shrink:0;">마감</span>`;
       }
+
+      const dotTotal = Math.min(6, maxP);
+      const dotsHtml = Array.from({ length: dotTotal }, (_, idx) => {
+        const filled = idx < acceptedCnt;
+        return `<span style="width:10px; height:10px; border-radius:50%; background:${filled ? '#287D62' : '#D0D5DD'}; display:inline-block;"></span>`;
+      }).join("");
 
       const isNewCard = (window._justCreatedPostId === post.id);
       return `
-        <div class="tk-feed-item ${isNewCard ? 'card-pop-new' : ''}" onclick="openDetailModal(${post.id})">
-          <div class="tk-feed-thumb">${emoji}</div>
-          <div class="tk-feed-body">
-            <div class="tk-feed-title-row">
-              ${isOfficial ? `<span class="tk-official-badge">공식</span>` : ''}
-              ${post.is_boosted ? `<span class="tk-boost-badge">⚡ 부스트</span>` : ''}
-              ${(typeof isPostMatchingMyFreeTime === "function" && isPostMatchingMyFreeTime(post)) ? `<span style="font-size:10.5px; font-weight:800; color:#287D62; background:#EEF8F3; border:1px solid #C5E6D6; padding:1.5px 6px; border-radius:6px; flex-shrink:0;">⚡ 내 공강</span>` : ''}
-              ${getPostTimeChip(post)}
-              <span class="tk-feed-title">${escHtml(post.title)}</span>
+        <div class="${isNewCard ? 'card-pop-new' : ''}" onclick="openDetailModal(${post.id})" style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:13px 14px; cursor:pointer; transition:border-color 0.15s, transform 0.12s;">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <div style="width:48px; height:48px; border-radius:14px; background:${cBadge.bg}; color:${cBadge.color}; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; flex-shrink:0;">
+              ${cBadge.char}
             </div>
-            <div class="tk-feed-meta">${escHtml(post.location)} · ${escHtml(post.meet_time || '오늘')}${distText}</div>
-            <div class="tk-feed-stats">
-              <span class="tk-feed-cnt">${acceptedCnt}/${post.max_participants}명</span>
-              <span class="temp-chip" data-tier="${authorTier.tier}">${authorTier.tier === 5 ? '👑 ' : ''}${authorTier.displayTemp}°C${authorTier.roleLabel ? ` · ${authorTier.roleLabel}` : ''}</span>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</span>
+                ${topRightBadgeHtml}
+              </div>
+              <div style="font-size:13px; color:#6B7684; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${escHtml(post.location)} · ${escHtml(post.meet_time || '오늘')}${distText}
+              </div>
+              <div style="display:flex; align-items:center; gap:6px; margin-top:5px;">
+                <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
+                <span style="font-size:12px; font-weight:600; color:#287D62;">${authorTier.tier === 5 ? '👑 ' : ''}${escHtml(authorTier.name)} · ${authorTier.displayTemp}°C</span>
+              </div>
             </div>
           </div>
-          ${actionBtnHtml}
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:11px; padding-top:2px;">
+            <div style="display:flex; align-items:center; gap:5px;">
+              <div style="display:inline-flex; align-items:center; gap:4px; margin-right:4px;">${dotsHtml}</div>
+              <span style="font-size:13px; font-weight:700; color:#191F28;">${acceptedCnt}/${maxP}명</span>
+            </div>
+            ${actionBtnHtml}
+          </div>
         </div>
       `;
     }
@@ -3307,7 +3348,13 @@
           "state.active_modal='create'; render();"
         );
       }
-      return `<div class="tk-feed-grid">${list.map(renderMeetupCard).join("")}</div>`;
+      return `
+        <div style="display:flex; align-items:baseline; gap:8px; margin: 4px 0 10px;">
+          <span style="font-size:17px; font-weight:800; color:#191F28;">모집 중인 번개</span>
+          <span style="font-size:13px; color:#6B7684; font-weight:500;">${list.length}개 열려 있어요</span>
+        </div>
+        <div class="tk-feed-grid">${list.map(renderMeetupCard).join("")}</div>
+      `;
     }
 
     let _searchDebounceTimer = null;
@@ -3465,18 +3512,21 @@
     }
 
     function renderMugeoFoodMapSection() {
+      const spotCnt = (typeof getFilteredFoodSpots === "function" ? getFilteredFoodSpots().length : MUGEO_FOOD_SPOTS.length) || MUGEO_FOOD_SPOTS.length;
       return `
-        <div id="home-mugeo-map-wrap" onclick="openFoodMapModal()" style="position:relative; border-radius:18px; overflow:hidden; border:1px solid #E5EAE7; margin: 6px 0 18px; box-shadow:0 2px 10px rgba(0,0,0,0.04); background:#F2F4F3; cursor:pointer;">
-          <div id="home-mugeo-map" style="width:100%; height:190px; pointer-events:none; background:repeating-linear-gradient(45deg, #EEF2F0 0px, #EEF2F0 14px, #F6F8F7 14px, #F6F8F7 28px);"></div>
-
-          <!-- 우측 상단 플로팅 알약 버튼 (첨부 사진과 동일한 '🍴 내 주변 맛집 ⤢' 스타일) -->
-          <button type="button" onclick="event.stopPropagation(); openFoodMapModal();" style="position:absolute; top:14px; right:14px; z-index:450; background:#FFFFFF; border:1px solid rgba(0,0,0,0.06); border-radius:999px; padding:8px 15px; font-size:13px; font-weight:800; color:#191F28; box-shadow:0 4px 14px rgba(0,0,0,0.12); display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-            <span style="font-size:14px;">🍴</span>
-            <span>내 주변 맛집</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="margin-left:1px;">
-              <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
-            </svg>
-          </button>
+        <div id="home-mugeo-map-wrap" onclick="openFoodMapModal()" style="display:flex; align-items:center; justify-content:space-between; gap:12px; height:64px; padding:0 16px; border-radius:16px; background:#EEF8F3; margin: 4px 0 14px; cursor:pointer;">
+          <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+            <div style="width:36px; height:36px; border-radius:18px; background:#FFFFFF; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>
+              </svg>
+            </div>
+            <div style="min-width:0;">
+              <div style="font-size:15px; font-weight:800; color:#191F28; line-height:1.25;">내 주변 맛집 ${spotCnt}곳</div>
+              <div style="font-size:12px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">가무댕댕 ★4.8 · 기린카페 ★4.8</div>
+            </div>
+          </div>
+          <span style="font-size:13px; font-weight:800; color:#287D62; flex-shrink:0;">지도 보기 ›</span>
         </div>
       `;
     }
@@ -3698,14 +3748,26 @@
           <h1 class="tk-page-title">오늘, 같이 할래요?</h1>
           <div class="tk-search-box">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B0B8C1" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-            <input id="home-search-input" type="text" placeholder="번개 검색" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
+            <input id="home-search-input" type="text" placeholder="번개 검색 · 학식, 카공, 러닝" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
           </div>
         </div>
 
-        ${renderHomeTierCard()}
+        <!-- 모바일 전용 통합 검색바 (피그마 ① 홈 개선안) -->
+        <div class="only-mobile" style="margin: 2px 0 12px;">
+          <div style="display:flex; align-items:center; gap:10px; height:44px; padding:0 14px; border-radius:14px; background:#F7F9F8;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#98A2B3" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+            <input id="home-search-input-m" type="text" placeholder="번개 검색 · 학식, 카공, 러닝" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" style="flex:1; border:none; background:transparent; font-size:14px; color:#191F28; outline:none;" />
+          </div>
+        </div>
 
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
+        </div>
+
+        <!-- 항상 보여주는 사생활 안심 안내 (피그마 ① 홈 개선안) -->
+        <div style="display:flex; align-items:center; gap:6px; margin: 2px 0 10px;">
+          <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
+          <span style="font-size:12px; font-weight:600; color:#287D62;">수락 전까지 내 이름·학과는 숨겨져요</span>
         </div>
 
         ${renderMugeoFoodMapSection()}
@@ -5002,48 +5064,39 @@
         : allPolls.filter(p => (p.tag || "").includes(curPollCat));
       const talks = DB.plaza_talks || [];
       const showAll = Boolean(state.polls_show_all);
-      const visiblePolls = showAll ? polls : polls.slice(0, 2);
+      const visiblePolls = showAll ? polls : polls.slice(0, 1);
       const hiddenCount = Math.max(0, polls.length - visiblePolls.length);
 
       return `
         <div class="tk-plaza-wrap">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px;">
             <h1 class="tk-page-title" style="margin:0;">광장</h1>
-            ${state.plaza_view === 'balance' ? `
-              <button type="button" class="cat-btn ${state.show_poll_form ? 'active' : ''}" style="height:36px; font-size:13px;" onclick="state.show_poll_form=!state.show_poll_form; render();">
-                ${state.show_poll_form ? "닫기" : "+ 투표 만들기"}
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" onclick="handleDailyCheckin()" style="height:34px; padding:0 12px; border-radius:17px; border:none; background:#EEF8F3; color:#287D62; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+                <span>${st.streakDays}일째 출석</span>
               </button>
-            ` : ""}
+              ${state.plaza_view === 'balance' ? `
+                <button type="button" onclick="state.show_poll_form=!state.show_poll_form; render();" title="새 밸런스 투표 만들기" style="width:34px; height:34px; border-radius:17px; border:none; background:${state.show_poll_form ? '#191F28' : '#F7F9F8'}; color:${state.show_poll_form ? '#FFFFFF' : '#191F28'}; font-size:18px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+                  ${state.show_poll_form ? '✕' : '+'}
+                </button>
+              ` : ""}
+            </div>
           </div>
 
           <!-- 세그먼트 서브 탭: 밸런스 게임 vs 룰렛 · 메뉴추천 -->
-          <div style="display:inline-flex; width:100%; max-width:340px; background:#F2F4F3; padding:4px; border-radius:12px; gap:4px; margin-bottom:20px;">
-            <button type="button" onclick="state.plaza_view='balance'; render();" style="flex:1; border:none; padding:9px 12px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; transition:all 0.18s cubic-bezier(0.16, 1, 0.3, 1); ${state.plaza_view==='balance' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 1px 4px rgba(0,0,0,0.08);' : 'background:transparent; color:#8B95A1;'}">
-              ⚖️ 밸런스 게임
+          <div style="display:flex; width:100%; background:#F7F9F8; height:44px; padding:4px; border-radius:14px; gap:4px; margin-bottom:16px;">
+            <button type="button" onclick="state.plaza_view='balance'; render();" style="flex:1; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.18s; ${state.plaza_view==='balance' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 2px 6px rgba(0,0,0,0.08);' : 'background:transparent; color:#6B7684;'}">
+              밸런스 게임
             </button>
-            <button type="button" onclick="state.plaza_view='roulette'; render();" style="flex:1; border:none; padding:9px 12px; border-radius:9px; font-size:13.5px; font-weight:700; cursor:pointer; transition:all 0.18s cubic-bezier(0.16, 1, 0.3, 1); ${state.plaza_view==='roulette' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 1px 4px rgba(0,0,0,0.08);' : 'background:transparent; color:#8B95A1;'}">
-              🎯 룰렛 · 메뉴추천
+            <button type="button" onclick="state.plaza_view='roulette'; render();" style="flex:1; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.18s; ${state.plaza_view==='roulette' ? 'background:#FFFFFF; color:#191F28; box-shadow:0 2px 6px rgba(0,0,0,0.08);' : 'background:transparent; color:#6B7684;'}">
+              룰렛 · 메뉴추천
             </button>
           </div>
 
           ${state.plaza_view === 'roulette' ? renderStampAndRouletteCard() : `
-            <!-- 모바일 1줄 출석체크 (토스 혜택 탭 스타일) -->
-            <div class="only-mobile" style="margin-bottom:8px;">
-              <button type="button" class="press-row" style="width:100%; display:flex; align-items:center; gap:12px; padding:12px 0; background:none; border:none; cursor:pointer; text-align:left;" onclick="handleDailyCheckin()">
-                <span style="width:40px; height:40px; border-radius:50%; background:${st.checkedInToday ? '#287D62' : '#F2F4F3'}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${st.checkedInToday ? '#FFFFFF' : '#B0B8C1'}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-                </span>
-                <span style="flex:1;">
-                  <span style="display:block; font-size:16px; font-weight:700; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</span>
-                  <span style="display:block; font-size:13px; color:#8B95A1;">연속 ${st.streakDays}일째</span>
-                </span>
-                <span style="color:#B0B8C1; font-size:18px;">›</span>
-              </button>
-              <div class="tk-gap8"></div>
-            </div>
-
             ${state.show_poll_form ? `
-              <div style="background:#F7F9F8; border-radius:18px; padding:18px; margin-bottom:20px;">
+              <div style="background:#F7F9F8; border-radius:18px; padding:18px; margin-bottom:16px;">
                 <div style="font-size:15px; font-weight:800; margin-bottom:10px; color:#191F28;">새로운 밸런스 투표 만들기</div>
                 <select id="plaza_poll_tag" class="select">
                   <option value="음식">음식</option>
@@ -5053,17 +5106,12 @@
                 </select>
                 <input id="plaza_poll_q" class="input" placeholder="질문 입력 (예: 점심 학식 vs 배달)" />
                 <div class="row-2">
-                  <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 🍚 학식)" />
-                  <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 🛵 배달)" />
+                  <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 학식)" />
+                  <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 배달)" />
                 </div>
                 <button class="btn btn-primary" onclick="createNewBalancePoll()">등록하기</button>
               </div>
             ` : ""}
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <span style="font-size:13px; font-weight:700; color:#287D62;">오늘의 밸런스</span>
-              <button type="button" style="font-size:12px; font-weight:600; color:#8B95A1; background:none; border:none; cursor:pointer;" onclick="drawRandomViralPoll()">다른 질문 불러오기 ›</button>
-            </div>
 
             ${visiblePolls.map(p => {
               const va = (p.votes_a || []).length;
@@ -5073,58 +5121,64 @@
               const pctA = total === 0 ? 50 : Math.round((va / total) * 100);
               const pctB = total === 0 ? 50 : (100 - pctA);
               const cleanQ = String(p.question || "").replace(/^⚖️\s*/, "").trim();
+              const progressPct = total >= 5 ? pctA : Math.min(100, Math.round((total / 5) * 100));
 
               return `
-                <div style="margin-bottom:26px;">
-                  <div style="font-size:20px; font-weight:800; color:#191F28; margin:4px 0 14px; line-height:1.35; letter-spacing:-0.02em;">${escHtml(cleanQ)}</div>
-                  ${[['A', p.opt_a, pctA], ['B', p.opt_b, pctB]].map(([k, label, pct]) => {
-                    const picked = (myPick === k);
-                    const fillW = (myPick && total >= 5) ? pct : (picked ? 100 : 0);
-                    let statusLabel = `<span style="font-size:13px; color:#8B95A1; font-weight:600;">선택</span>`;
-                    if (myPick) {
-                      if (total >= 5) {
-                        statusLabel = `<span>${pct}%</span>`;
-                      } else {
-                        statusLabel = `<span style="font-size:12px; font-weight:700; color:${picked ? '#287D62' : '#8B95A1'};">${picked ? '내 선택 ✓' : ''}</span>`;
-                      }
-                    }
-                    return `
-                      <button type="button" class="tk-balance-opt ${picked ? 'is-picked' : ''}" onclick="voteBalancePoll(${p.id}, '${k}')">
-                        <div class="tk-balance-fill ${picked ? 'is-picked' : ''}" style="width:${fillW}%;"></div>
-                        <div class="tk-balance-label">
-                          <span>${escHtml(label)}</span>
-                          ${statusLabel}
-                        </div>
-                      </button>
-                    `;
-                  }).join("")}
-                  ${myPick && total < 5 ? `
-                    <div style="font-size:12px; color:#287D62; font-weight:600; margin-top:6px; display:flex; align-items:center; gap:4px;">
-                      <span>📊</span>
-                      <span>${total === 1 ? '첫 번째 투표자예요! (5명이 모이면 비율이 공개돼요)' : `${total}명이 투표했어요 (5명이 모이면 비율이 공개돼요)`}</span>
+                <div style="margin-bottom:22px;">
+                  <div style="font-size:12px; font-weight:700; color:#287D62; margin-bottom:4px;">오늘의 밸런스</div>
+                  <div style="font-size:19px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:12px;">${escHtml(cleanQ)}</div>
+
+                  <!-- 2열 큰 A / B 카드 -->
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                    ${[['A', p.opt_a, pctA], ['B', p.opt_b, pctB]].map(([k, label, pct]) => {
+                      const picked = (myPick === k);
+                      const cleanOpt = String(label || "").replace(/^[^\w가-힣]+\s*/, "").trim() || label;
+                      return `
+                        <button type="button" onclick="voteBalancePoll(${p.id}, '${k}')" style="min-height:160px; border-radius:20px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; text-align:left; cursor:pointer; transition:all 0.16s ease; background:${picked ? '#EEF8F3' : '#F7F9F8'}; border:${picked ? '2.5px solid #287D62' : '2px solid transparent'};">
+                          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                            <span style="width:32px; height:32px; border-radius:16px; background:${picked ? '#287D62' : '#E5E8EB'}; color:${picked ? '#FFFFFF' : '#6B7684'}; font-size:14px; font-weight:800; display:inline-flex; align-items:center; justify-content:center;">${k}</span>
+                            ${myPick && total >= 5 ? `<span style="font-size:14px; font-weight:800; color:${picked ? '#287D62' : '#6B7684'};">${pct}%</span>` : ""}
+                          </div>
+                          <div style="font-size:15px; font-weight:700; color:#191F28; line-height:1.35; margin:10px 0; word-break:keep-all;">
+                            ${escHtml(cleanOpt)}
+                          </div>
+                          <div>
+                            ${picked ? `
+                              <span style="display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:11px; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700;">내 선택</span>
+                            ` : `
+                              <span style="font-size:12px; font-weight:600; color:#98A2B3;">선택하기</span>
+                            `}
+                          </div>
+                        </button>
+                      `;
+                    }).join("")}
+                  </div>
+
+                  <!-- 하단 게이지 & 다른 질문 -->
+                  <div style="height:8px; border-radius:4px; background:#E5E8EB; overflow:hidden; margin-bottom:6px;">
+                    <div style="width:${progressPct}%; height:100%; background:#287D62; border-radius:4px; transition:width 0.3s ease;"></div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <span style="font-size:12px; color:#6B7684; font-weight:500;">
+                      ${total < 5 ? `${Math.max(1, 5 - total)}명 더 투표하면 결과가 공개돼요` : `총 ${total}명 참여 · A ${pctA}% vs B ${pctB}%`}
+                    </span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      ${renderReplyButton('p', p)}
+                      <button type="button" style="font-size:13px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="drawRandomViralPoll()">다른 질문 ›</button>
                     </div>
-                  ` : ""}
-                  <div style="display:flex; justify-content:flex-end; margin-top:2px;">${renderReplyButton('p', p)}</div>
+                  </div>
                   ${renderReplyThread('p', p)}
                 </div>
               `;
             }).join("")}
 
-            ${polls.length > 2 ? `
-              <button type="button" style="width:100%; height:42px; border:none; border-radius:12px; background:#F2F4F3; color:#4E5968; font-size:13.5px; font-weight:600; cursor:pointer; margin-bottom:12px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
-                ${showAll ? '투표 접기' : `밸런스 투표 ${hiddenCount}개 더보기`}
+            ${polls.length > 1 ? `
+              <button type="button" style="width:100%; height:40px; border:none; border-radius:12px; background:#F7F9F8; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
+                ${showAll ? '투표 접기' : `다른 밸런스 투표 ${hiddenCount}개 더보기`}
               </button>
             ` : ""}
 
-            <div style="height:1px; background:#F2F4F3; margin:28px 0 24px;"></div>
-
-            <div style="font-size:17px; font-weight:700; color:#191F28; margin-bottom:12px;">한줄 이야기</div>
-
-            <div style="display:flex; gap:8px; margin-bottom:16px;">
-              <select id="plaza_talk_cat" style="display:none;"><option value="수다/질문" selected>수다/질문</option></select>
-              <input id="plaza_talk_in" type="text" style="flex:1; height:44px; border-radius:12px; border:none; background:#F2F4F3; padding:0 14px; font-size:14px; color:#191F28;" placeholder="캠퍼스 한줄 이야기를 남겨보세요" onkeydown="if(event.key==='Enter') submitPlazaTalk()" />
-              <button type="button" class="btn btn-primary" style="width:auto; min-height:44px; height:44px; padding:0 18px; border-radius:12px; font-size:14px;" onclick="submitPlazaTalk()">등록</button>
-            </div>
+            <div style="font-size:17px; font-weight:800; color:#191F28; margin:16px 0 10px;">한줄 이야기</div>
 
             <div>
               ${[...talks].sort((a, b) => {
@@ -5132,25 +5186,38 @@
                 const tb = getTierByTemp(resolveUserTempForTier(b.author_id)).tier >= 4 ? 1 : 0;
                 return (tb - ta) || ((b.id || 0) - (a.id || 0));
               }).map(t => {
-                const u = DB.users[t.author_id] || { nickname: "학우", avatar: "🐰" };
                 const tTier = getTierByTemp(resolveUserTempForTier(t.author_id));
                 const likes = t.likes || [];
                 const liked = likes.includes(state.user_id);
+                const replyCnt = (t.replies || []).filter(r => !r.deleted).length;
                 return `
-                  <div style="border-bottom:1px solid #F7F9F8;">
-                  <div style="padding:12px 0; display:flex; align-items:center; gap:12px;">
-                    <span class="tier-avatar-frame" data-tier="${tTier.tier}" style="width:36px; height:36px; border-radius:50%; background:var(--tier-soft); display:inline-flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">${u.avatar.split(" ")[0]}</span>
-                    <span style="font-size:15px; color:#191F28; flex:1; min-width:0; line-height:1.4;">
+                  <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:13px 14px; margin-bottom:10px;">
+                    <div style="font-size:15px; font-weight:500; color:#191F28; line-height:1.45;">
                       ${tTier.tier >= 4 ? `<span class="tier-badge-pill" data-tier="${tTier.tier}" style="margin-right:6px; font-size:10.5px; padding:1px 7px;">${tTier.tier === 5 ? '👑 울대 레전드' : '⚡ 인싸 학우'}</span>` : ''}${escHtml(t.text)}
-                    </span>
-                    <button type="button" style="border:none; background:${liked ? '#EEF8F3' : '#F2F4F3'}; color:${liked ? '#287D62' : '#6B7684'}; font-size:12px; font-weight:600; padding:4px 9px; border-radius:999px; cursor:pointer; flex-shrink:0;" onclick="toggleTalkLike(${t.id})">❤️ ${likes.length}</button>
-                    ${renderReplyButton('t', t)}
-                    <span style="font-size:12px; color:#B0B8C1; flex-shrink:0;">${escHtml(t.created_at || "방금 전")}</span>
-                  </div>
-                  ${renderReplyThread('t', t)}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                      <span style="font-size:12px; color:#98A2B3;">블라인드 학우 · ${escHtml(t.created_at || "방금")}</span>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <button type="button" style="border:none; background:none; color:${liked ? '#E85D75' : '#6B7684'}; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer; padding:2px 4px;" onclick="toggleTalkLike(${t.id})">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="${liked ? '#E85D75' : 'none'}" stroke="${liked ? '#E85D75' : '#6B7684'}" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>
+                          <span>${likes.length}</span>
+                        </button>
+                        <button type="button" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer; padding:2px 4px;" onclick="toggleReplyBox('t', ${t.id})">답글 ${replyCnt}</button>
+                      </div>
+                    </div>
+                    ${renderReplyThread('t', t)}
                   </div>
                 `;
               }).join("")}
+            </div>
+
+            <!-- 하단 캡슐 한줄 남기기 입력 바 -->
+            <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; height:48px; border-radius:24px; padding:0 8px 0 18px; margin-top:12px;">
+              <select id="plaza_talk_cat" style="display:none;"><option value="수다/질문" selected>수다/질문</option></select>
+              <input id="plaza_talk_in" type="text" style="flex:1; height:40px; border:none; background:transparent; font-size:14px; color:#191F28; outline:none;" placeholder="한줄 남기기" onkeydown="if(event.key==='Enter') submitPlazaTalk()" />
+              <button type="button" onclick="submitPlazaTalk()" title="등록" style="width:32px; height:32px; border-radius:16px; border:none; background:#287D62; color:#FFFFFF; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              </button>
             </div>
           `}
         </div>
@@ -5184,39 +5251,99 @@
     // =========================================================
     function renderMapTab() {
       const buildingList = Object.keys(ULSAN_CAMPUS_COORDS);
+      let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p));
+      if (state.map_cat && state.map_cat !== "전체") {
+        activePosts = activePosts.filter(p => (p.category || "").includes(state.map_cat));
+      }
+      const nearPosts = activePosts.map(p => {
+        const c = getBuildingCoords(p.location);
+        const distM = calcDistanceM(state.my_lat, state.my_lng, c[0], c[1]);
+        const walkMin = Math.max(1, Math.round(distM / 67));
+        return { post: p, distM, walkMin };
+      }).sort((a, b) => a.distM - b.distM);
+
       return `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; padding-top:4px;">
-          <div>
-            <h1 class="tk-page-title">지도</h1>
+        <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h1 class="tk-page-title" style="margin:0;">지도</h1>
+          ${state.gps_consent ? `
+            <select class="select" style="width:auto; min-width:170px; margin-bottom:0; height:34px; padding:0 10px; font-size:12px; border-radius:10px;" onchange="changeMyBuilding(this.value)">
+              ${buildingList.map(b => `<option value="${b}" ${state.my_building === b ? "selected" : ""}>기준 호관 · ${b}</option>`).join("")}
+            </select>
+          ` : ""}
+        </div>
+
+        <!-- 풀-블리드 지도 컨테이너 + 플로팅 컨트롤 -->
+        <div style="position:relative; border-radius:24px; overflow:hidden; border:1px solid #E5E8EB;">
+          <!-- 상단 플로팅 안심 위치 알약 바 -->
+          <div style="position:absolute; top:12px; left:12px; right:12px; z-index:450; height:44px; border-radius:22px; background:#FFFFFF; box-shadow:0 4px 12px rgba(0,0,0,0.14); display:flex; align-items:center; justify-content:space-between; padding:0 14px; gap:8px;">
+            <div style="display:flex; align-items:center; gap:7px; min-width:0;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z"/></svg>
+              <span style="font-size:12.5px; font-weight:700; color:#191F28; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">울산대 · 내 위치는 건물 단위로만 써요</span>
+            </div>
+            <button type="button" onclick="state.gps_consent=!state.gps_consent; render();" title="건물 단위 위치 사용 토글" style="width:36px; height:20px; border-radius:10px; border:none; background:${state.gps_consent ? '#287D62' : '#D0D5DD'}; position:relative; cursor:pointer; flex-shrink:0; transition:background 0.18s;">
+              <span style="position:absolute; top:3px; left:${state.gps_consent ? '19px' : '3px'}; width:14px; height:14px; border-radius:7px; background:#FFFFFF; transition:left 0.18s;"></span>
+            </button>
           </div>
-          <button class="btn" style="width:auto; min-height:40px; padding:0 14px; border-radius:12px; font-size:12.5px; font-weight:700; color:#287D62; border-color:#C5E6D6; background:#EEF8F3; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;" onclick="requestRealGps()">
-            ${getSvgIcon('location', 14, '#287D62')}
-            <span>GPS 현위치 갱신</span>
+
+          <!-- 상단 플로팅 카테고리 칩 -->
+          <div style="position:absolute; top:64px; left:12px; right:12px; z-index:450;">
+            ${renderCategoryChips("map_cat")}
+          </div>
+
+          <!-- 우측 하단 현위치 버튼 -->
+          <button type="button" onclick="requestRealGps()" title="현위치로 이동" style="position:absolute; bottom:28px; right:14px; z-index:450; width:44px; height:44px; border-radius:22px; border:none; background:#FFFFFF; box-shadow:0 4px 10px rgba(0,0,0,0.14); display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+            ${getSvgIcon('location', 18, '#287D62')}
           </button>
+
+          <div id="campus-map" style="height:410px; width:100%;"></div>
         </div>
 
-        <div class="category-sticky-wrap">
-          ${renderCategoryChips("map_cat")}
-        </div>
-
-        <div class="uldaemo-card" style="padding:14px 16px; margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#191F28; cursor:pointer;">
-              <input type="checkbox" ${state.gps_consent ? "checked" : ""} onchange="state.gps_consent=this.checked; if(this.checked){ showToast('내 위치는 나만 봐요. 번개까지 거리를 계산할 때만 써요.'); } render();" style="accent-color:#287D62;" />
-              <span>거리 계산에 내 위치 쓰기</span>
-            </label>
-            ${state.gps_consent ? `
-              <select class="select" style="width:auto; min-width:200px; margin-bottom:0; height:36px; padding:0 12px; font-size:12.5px;" onchange="changeMyBuilding(this.value)">
-                ${buildingList.map(b => `<option value="${b}" ${state.my_building === b ? "selected" : ""}>기준 호관 · ${b}</option>`).join("")}
-              </select>
-            ` : ""}
+        <!-- 지도 하단 바텀시트: 주변 번개 목록 -->
+        <div style="margin-top:-18px; position:relative; z-index:440; background:#FFFFFF; border-radius:28px; padding:12px 18px 20px; box-shadow:0 -4px 12px rgba(0,0,0,0.08); border:1px solid #E5E8EB;">
+          <div style="width:40px; height:5px; border-radius:3px; background:#E5E8EB; margin:0 auto 12px;"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-size:17px; font-weight:800; color:#191F28;">주변 번개 ${nearPosts.length}개</span>
+            <span style="font-size:13px; color:#6B7684; font-weight:500;">가까운 순</span>
           </div>
-          <div style="font-size:12px; color:#287D62; font-weight:600; margin-top:6px;">
-            🔒 내 위치는 나만 봐요. 번개까지 거리를 계산할 때만 써요.
-          </div>
-        </div>
 
-        <div id="campus-map" style="border-radius:18px; overflow:hidden;"></div>
+          ${nearPosts.length === 0 ? `
+            <div style="background:#F7F9F8; border-radius:16px; padding:22px 16px; text-align:center;">
+              <div style="font-size:14px; font-weight:700; color:#191F28;">선택한 카테고리의 주변 번개가 없어요</div>
+              <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">직접 새 번개를 열어 주변 학우를 불러보세요</div>
+            </div>
+          ` : nearPosts.map(({ post, walkMin }) => {
+            const cBadge = getCatKoreanBadge(post.category, post.title);
+            const apps = (DB.applications || []).filter(a => Number(a.post_id) === Number(post.id) && a.status === "승인됨");
+            const acceptedCnt = apps.length + 1;
+            const maxP = Math.max(2, Number(post.max_participants) || 2);
+            const isMyPost = String(post.author_id) === String(state.user_id);
+            const myApp = (DB.applications || []).find(a => Number(a.post_id) === Number(post.id) && String(a.applicant_id) === String(state.user_id));
+
+            let btnHtml = `<button type="button" onclick="event.stopPropagation(); openQuickApplyModal(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">${acceptedCnt}/${maxP} 신청</button>`;
+            if (isMyPost) {
+              btnHtml = `<button type="button" onclick="event.stopPropagation(); openDetailModal(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:1px solid #C5E6D6; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">${acceptedCnt}/${maxP} 관리</button>`;
+            } else if (myApp && myApp.status === "승인됨") {
+              btnHtml = `<button type="button" onclick="event.stopPropagation(); switchTab('대화'); openChatRoom(${post.id});" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#191F28; color:#FFFFFF; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">대화방 ›</button>`;
+            } else if (myApp && myApp.status === "대기중") {
+              btnHtml = `<span style="height:28px; padding:0 11px; border-radius:14px; background:#FFF4E5; color:#C26A00; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; flex-shrink:0;">수락 대기</span>`;
+            }
+
+            return `
+              <div onclick="openDetailModal(${post.id})" style="background:#F7F9F8; border-radius:16px; padding:12px; margin-bottom:8px; display:flex; align-items:center; gap:12px; cursor:pointer;">
+                <div style="width:44px; height:44px; border-radius:12px; background:${cBadge.bg}; color:${cBadge.color}; font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  ${cBadge.char}
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:15px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</div>
+                  <div style="font-size:12px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    ${state.gps_consent ? `도보 ${walkMin}분 · ` : ""}${escHtml(post.location)} · ${escHtml(post.meet_time)}
+                  </div>
+                </div>
+                ${btnHtml}
+              </div>
+            `;
+          }).join("")}
+        </div>
       `;
     }
 
@@ -5250,6 +5377,7 @@
         minZoom: 15,
         maxZoom: 19,
         scrollWheelZoom: false,
+        zoomControl: false,
         maxBounds: campusBounds,
         maxBoundsViscosity: 1.0
       }).setView([state.my_lat, state.my_lng], 16);
@@ -5273,7 +5401,7 @@
           iconAnchor: [7, 7]
         });
         const myMarker = L.marker([state.my_lat, state.my_lng], { icon: myIcon, draggable: true }).addTo(map)
-          .bindPopup("<div style='font-size:12px; font-weight:600; color:#191F28;'><b>내 현위치</b><br><span style='color:#6B7684;'>핀을 드래그하여 위치를 조정할 수 있습니다.</span></div>").openPopup();
+          .bindPopup("<div style='font-size:12px; font-weight:600; color:#191F28;'><b>내 기준 위치 (건물 단위)</b><br><span style='color:#6B7684;'>핀을 드래그하여 기준 위치를 옮길 수 있어요.</span></div>");
         myMarker.on("dragend", function(e) {
           const pos = e.target.getLatLng();
           state.my_lat = pos.lat;
@@ -5288,18 +5416,21 @@
         const apps = DB.applications.filter(a => a.post_id === p.id && a.status === "승인됨");
         const currentCnt = apps.length + 1;
         const shortCat = String(p.category || "모임").replace(/^[^\w가-힣]+/, "").trim() || "모임";
+        const cBadge = getCatKoreanBadge(p.category, p.title);
 
         const pinHtml = `
-          <div class="bubble-pin" onclick="openDetailModal(${p.id})">
-            <span style="color:#191F28; font-weight:700;">${shortCat}</span>
-            <span style="color:#287D62; font-weight:800;">${currentCnt}/${p.max_participants}명</span>
+          <div onclick="openDetailModal(${p.id})" style="display:inline-flex; flex-direction:column; align-items:center; cursor:pointer;">
+            <div style="background:#FFFFFF; border:2.5px solid ${cBadge.border}; border-radius:15px; padding:3px 10px; box-shadow:0 3px 10px rgba(0,0,0,0.16); font-size:12px; font-weight:800; color:#191F28; white-space:nowrap;">
+              ${escHtml(shortCat)} ${currentCnt}/${p.max_participants}명
+            </div>
+            <div style="width:10px; height:10px; border-radius:50%; background:${cBadge.border}; border:2px solid #FFFFFF; margin-top:-3px; box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
           </div>
         `;
         const bubbleIcon = L.divIcon({
           html: pinHtml,
           className: "custom-bubble-pin-wrapper",
-          iconSize: [86, 32],
-          iconAnchor: [43, 32]
+          iconSize: [100, 38],
+          iconAnchor: [50, 36]
         });
         L.marker([c[0], c[1]], { icon: bubbleIcon }).addTo(map)
           .bindPopup(`<div style="font-size:12.5px; line-height:1.5; color:#191F28;"><b>${escHtml(p.title)}</b><br><span style="color:#6B7684;">${escHtml(p.location)} · ${escHtml(p.meet_time)}</span><br><button class="btn btn-primary" style="margin-top:8px; min-height:32px; padding:4px 10px; font-size:12px;" onclick="openDetailModal(${p.id})">상세 보기</button></div>`);
@@ -5447,43 +5578,156 @@
     }
 
     function renderChatRoomListItemsHtml(activeChats, selectedPostId) {
-      if (activeChats.length === 0) {
-        return renderEmptyStateBox('chat', '아직 대화가 없어요', '번개에 참여하면 안심 채팅이 열려요');
+      const myId = String(state.user_id || "");
+      const myPendingApps = (DB.applications || []).filter(a => String(a.applicant_id) === myId && a.status === "대기중").map(a => {
+        const post = (DB.posts || []).find(p => Number(p.id) === Number(a.post_id));
+        if (!post || post.status === "취소됨" || isPostExpired(post)) return null;
+        return { app: a, post };
+      }).filter(Boolean);
+
+      if (activeChats.length === 0 && myPendingApps.length === 0) {
+        return `
+          <div style="padding:18px 8px 16px; text-align:center;">
+            <div style="width:88px; height:88px; border-radius:44px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg>
+            </div>
+            <div style="font-size:20px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">아직 대화가 없어요</div>
+            <div style="font-size:14px; color:#6B7684; margin-top:4px; margin-bottom:18px;">번개에 참여하면 안심 채팅방이 열려요</div>
+
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px; text-align:left;">
+              <div style="background:#F7F9F8; border-radius:16px; padding:12px 14px; display:flex; align-items:center; gap:14px;">
+                <span style="width:32px; height:32px; border-radius:16px; background:#EEF8F3; color:#287D62; font-size:14px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">1</span>
+                <div>
+                  <div style="font-size:14px; font-weight:700; color:#191F28;">참여 신청</div>
+                  <div style="font-size:12px; color:#6B7684; margin-top:1px;">한마디와 함께 신청해요</div>
+                </div>
+              </div>
+              <div style="background:#F7F9F8; border-radius:16px; padding:12px 14px; display:flex; align-items:center; gap:14px;">
+                <span style="width:32px; height:32px; border-radius:16px; background:#EEF8F3; color:#287D62; font-size:14px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">2</span>
+                <div>
+                  <div style="font-size:14px; font-weight:700; color:#191F28;">방장이 수락</div>
+                  <div style="font-size:12px; color:#6B7684; margin-top:1px;">수락 전까지 내 정보는 숨겨져요</div>
+                </div>
+              </div>
+              <div style="background:#F7F9F8; border-radius:16px; padding:12px 14px; display:flex; align-items:center; gap:14px;">
+                <span style="width:32px; height:32px; border-radius:16px; background:#287D62; color:#FFFFFF; font-size:14px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">3</span>
+                <div>
+                  <div style="font-size:14px; font-weight:700; color:#191F28;">안심 채팅방</div>
+                  <div style="font-size:12px; color:#6B7684; margin-top:1px;">연락처 없이 대화하고 만나요</div>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" onclick="switchTab('홈')" style="width:100%; height:52px; border-radius:26px; border:none; background:#287D62; color:#FFFFFF; font-size:16px; font-weight:700; cursor:pointer;">
+              번개 둘러보기
+            </button>
+            <div style="font-size:12px; color:#98A2B3; margin-top:12px;">
+              후기와 노쇼 신고는 만남이 끝난 뒤에만 열려요
+            </div>
+          </div>
+        `;
       }
-      return activeChats.map(room => {
+
+      const curFilter = state.chat_filter || "전체";
+      const filterChips = ["전체", "진행 중", "후기 쓰기"].map(f => {
+        const isActive = (curFilter === f);
+        return `
+          <button type="button" onclick="state.chat_filter='${f}'; render();" style="height:34px; padding:0 14px; border-radius:17px; border:none; background:${isActive ? '#191F28' : '#F7F9F8'}; color:${isActive ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:${isActive ? '700' : '600'}; cursor:pointer; flex-shrink:0;">
+            ${f}
+          </button>
+        `;
+      }).join("");
+
+      const roomCards = [];
+
+      // 1) 진행 중 또는 후기 작성 대상 대화방
+      activeChats.forEach(room => {
         const { post, partnerId, otherIds, totalMembers, unreadInRoom, lastMsg } = room;
         const partner = DB.users[partnerId] || { avatar: "🐶", nickname: "학우", department: "울산대", manner_temp: 36.5 };
         const partnerRawTemp = (DB.users[partnerId] && DB.users[partnerId].manner_temp !== undefined) ? resolveUserTempForTier(partnerId) : partner.manner_temp;
         const partnerTier = getTierByTemp(partnerRawTemp);
-        const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : "학우").join(", ");
-        const previewText = lastMsg
-          ? (lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : lastMsg.text)
-          : `${otherNames || partner.nickname}님과 첫 인사를 나눠보세요`;
-        const previewTime = lastMsg
-          ? (lastMsg.created_at || formatMsgTime(lastMsg.id))
-          : `${post.meet_time || ""}`;
-        const isSelected = Number(selectedPostId) === Number(post.id);
+        const hasReviewed = (DB.reviews || []).some(r => Number(r.post_id) === Number(post.id) && String(r.from_id) === myId);
+        const needReview = isPostTimePassed(post) && !hasReviewed;
 
-        return `
-          <div class="chat-room-item ${isSelected ? 'is-selected' : ''} ${unreadInRoom > 0 ? 'has-unread' : ''}" onclick="openChatRoom(${post.id})">
-            <div style="position:relative; width:48px; height:48px; border-radius:50%; background:${isSelected ? '#FFFFFF' : '#F2F4F3'}; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">
-              ${partner.avatar.split(" ")[0]}
-              ${totalMembers > 2 ? `<span style="position:absolute; bottom:-2px; right:-2px; background:#191F28; color:#FFFFFF; font-size:11px; font-weight:700; min-width:20px; height:20px; padding:0 4px; border-radius:999px; border:2px solid #FFFFFF; display:inline-flex; align-items:center; justify-content:center;">${totalMembers}</span>` : ""}
+        if (curFilter === "진행 중" && needReview) return;
+        if (curFilter === "후기 쓰기" && !needReview) return;
+
+        const isSelected = Number(selectedPostId) === Number(post.id);
+        const statusPill = needReview
+          ? `<span style="background:#FDECEF; color:#C73A52; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; flex-shrink:0;">후기 쓰기</span>`
+          : `<span style="background:#EEF8F3; color:#287D62; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; flex-shrink:0;">${escHtml(post.meet_time || "오늘")} · 진행 중</span>`;
+
+        const previewText = needReview
+          ? "만남이 끝났어요 · 후기를 남겨보세요"
+          : (lastMsg
+              ? (lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : lastMsg.text)
+              : `"${escHtml(post.location)}"에서 만나기로 했어요`);
+
+        roomCards.push(`
+          <div onclick="openChatRoom(${post.id})" style="background:${isSelected ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${isSelected ? '#287D62' : '#E5E8EB'}; border-radius:18px; padding:13px 14px; margin-bottom:10px; display:flex; align-items:flex-start; gap:12px; cursor:pointer; transition:border-color 0.16s;">
+            <div style="position:relative; width:48px; height:48px; border-radius:24px; background:#EEF8F3; color:#287D62; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.2"/><path d="M6 19c1.5-2.8 4-4 6-4s4.5 1.2 6 4"/></svg>
+              ${totalMembers > 2 ? `<span style="position:absolute; bottom:-2px; right:-2px; background:#191F28; color:#FFFFFF; font-size:10.5px; font-weight:700; min-width:19px; height:19px; padding:0 4px; border-radius:999px; border:2px solid #FFFFFF; display:inline-flex; align-items:center; justify-content:center;">${totalMembers}</span>` : ""}
             </div>
             <div style="min-width:0; flex:1;">
-              <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
-                <span style="font-weight:700; font-size:15px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(otherNames || partner.nickname)}</span>
-                <span class="temp-chip" data-tier="${partnerTier.tier}">${partnerTier.displayTemp}°C${partnerTier.roleLabel ? ` · ${escHtml(partnerTier.roleLabel)}` : ''}</span>
-                <span style="font-size:12px; color:#8B95A1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(post.location)} · ${escHtml(previewTime)}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <span style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</span>
+                ${statusPill}
               </div>
-              <div style="font-size:14px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '600' : '400'}; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <div style="font-size:13px; color:${unreadInRoom > 0 ? '#191F28' : '#6B7684'}; font-weight:${unreadInRoom > 0 ? '600' : '400'}; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 ${escHtml(previewText)}
               </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:12px; color:#287D62; font-weight:600;">${escHtml(partnerTier.name)} · ${partnerTier.displayTemp}°C</span>
+                ${unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; min-width:22px; height:22px; padding:0 6px; border-radius:11px; display:inline-flex; align-items:center; justify-content:center;">${unreadInRoom}</span>` : ""}
+              </div>
             </div>
-            ${unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:12px; font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${unreadInRoom}</span>` : ""}
           </div>
-        `;
-      }).join("");
+        `);
+      });
+
+      // 2) 내가 신청하고 방장 수락을 기다리는 번개 카드 (전체 탭일 때 표시)
+      if (curFilter === "전체") {
+        myPendingApps.forEach(({ post }) => {
+          const hostRawTemp = (DB.users[post.author_id] && DB.users[post.author_id].manner_temp !== undefined) ? resolveUserTempForTier(post.author_id) : 36.5;
+          const hostTier = getTierByTemp(hostRawTemp);
+          roomCards.push(`
+            <div onclick="openDetailModal(${post.id})" style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:13px 14px; margin-bottom:10px; display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+              <div style="width:48px; height:48px; border-radius:24px; background:#EEF8F3; color:#287D62; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.2"/><path d="M6 19c1.5-2.8 4-4 6-4s4.5 1.2 6 4"/></svg>
+              </div>
+              <div style="min-width:0; flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                  <span style="font-size:16px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</span>
+                  <span style="background:#FFF4E5; color:#C26A00; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; flex-shrink:0;">수락 대기</span>
+                </div>
+                <div style="font-size:13px; color:#6B7684; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  방장이 신청을 확인하고 있어요
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                  <span style="font-size:12px; color:#287D62; font-weight:600;">${escHtml(hostTier.name)} · ${hostTier.displayTemp}°C</span>
+                </div>
+              </div>
+            </div>
+          `);
+        });
+      }
+
+      return `
+        <div style="display:flex; gap:8px; margin-bottom:14px; overflow-x:auto;">
+          ${filterChips}
+        </div>
+        ${roomCards.length > 0 ? roomCards.join("") : `
+          <div style="background:#F7F9F8; border-radius:16px; padding:24px 16px; text-align:center; margin-bottom:12px;">
+            <div style="font-size:14px; font-weight:700; color:#191F28;">해당 상태의 대화방이 없어요</div>
+            <div style="font-size:12.5px; color:#6B7684; margin-top:4px;">전체 탭에서 모든 대화를 확인할 수 있어요</div>
+          </div>
+        `}
+        <div style="background:#F7F9F8; border-radius:16px; padding:14px 16px; font-size:12px; color:#6B7684; line-height:1.5; margin-top:6px;">
+          상대는 블라인드 닉네임과 매너온도만 보여요.<br/>
+          후기를 남기면 매너온도에 반영돼요.
+        </div>
+      `;
     }
 
     function renderChatTab() {
@@ -6280,94 +6524,123 @@
         return p && p.status !== "취소됨" ? { app: a, post: p } : null;
       }).filter(Boolean);
       const myReviews = (DB.reviews || []).filter(r => String(r.to_id) === String(state.user_id) && !r.is_none);
+      const firstChar = String(user.nickname || "학").trim().charAt(0) || "학";
+      const nextStepCopy = myTier.nextTierName
+        ? `${myTier.nextTierName}까지 ${myTier.remainTemp}°C`
+        : "최고 등급 달성 👑";
 
       return `
         <div style="max-width:560px;">
-          <h1 class="tk-page-title" style="margin-bottom:22px;">내 정보</h1>
+          <h1 class="tk-page-title" style="margin-bottom:14px;">내 정보</h1>
 
-          <div style="display:flex; align-items:center; gap:14px;">
-            <span class="tier-avatar-frame is-self" data-tier="${myTier.tier}" style="width:60px; height:60px; border-radius:50%; background:var(--tier-soft); display:inline-flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0;">
-              ${user.avatar.split(" ")[0]}
-            </span>
-            <div>
-              <div style="font-size:19px; font-weight:700; color:#191F28; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span>${escHtml(user.nickname)}</span>
-                <span class="tier-badge-pill is-self" data-tier="${myTier.tier}">${myTier.tier === 5 ? '👑 ' : ''}${escHtml(myTier.name)}${myTier.roleLabel ? ` · ${escHtml(myTier.roleLabel)}` : ''}</span>
-                ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:#EEF8F3; color:#287D62; font-weight:700; padding:2px 7px; border-radius:6px;">운영진</span>` : ""}
+          <!-- 상단 그린 매너온도 히어로 카드 -->
+          <div style="background:#287D62; border-radius:24px; padding:18px 20px; color:#FFFFFF; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+              <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                <span style="width:52px; height:52px; border-radius:26px; background:#FFFFFF; color:#287D62; font-size:20px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  ${escHtml(firstChar)}
+                </span>
+                <div style="min-width:0;">
+                  <div style="font-size:18px; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span>${escHtml(user.nickname)}</span>
+                    ${isCurrentUserAdmin() ? `<span style="font-size:11px; background:rgba(255,255,255,0.22); color:#FFFFFF; font-weight:700; padding:2px 8px; border-radius:10px;">운영진</span>` : ""}
+                  </div>
+                  <div style="font-size:12px; color:#CFEADF; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    ${escHtml(user.department)} · 인증 뱃지 ${myStats.badges.length}개
+                  </div>
+                </div>
               </div>
-              <div style="font-size:13.5px; color:#8B95A1; margin-top:3px;">${escHtml(user.department)} · 인증 뱃지 ${myStats.badges.length}개</div>
-              <div style="font-size:12px; color:var(--tier-text); font-weight:600; margin-top:3px;">혜택: ${escHtml(myTier.benefitSummary)}</div>
+              <span style="background:rgba(255,255,255,0.2); color:#FFFFFF; padding:4px 12px; border-radius:12px; font-size:11.5px; font-weight:700; flex-shrink:0;">
+                ${escHtml(myTier.name)}
+              </span>
+            </div>
+
+            <div style="margin-top:18px; display:flex; justify-content:space-between; align-items:flex-end; gap:8px;">
+              <div>
+                <div style="font-size:12px; color:#CFEADF; font-weight:600;">매너온도</div>
+                <div style="font-size:38px; font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em; margin-top:2px;">
+                  ${myTier.displayTemp}°C
+                </div>
+              </div>
+              <div style="font-size:12px; color:#FFFFFF; font-weight:600; padding-bottom:4px;">
+                ${escHtml(nextStepCopy)}
+              </div>
+            </div>
+
+            <div style="height:8px; border-radius:4px; background:rgba(255,255,255,0.3); margin-top:12px; overflow:hidden;">
+              <div style="width:${myTier.gaugePct}%; height:100%; background:#FFFFFF; border-radius:4px; transition:width 0.5s ease;"></div>
             </div>
           </div>
 
-          <div style="margin-top:26px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-            <span style="font-size:13px; font-weight:600; color:#8B95A1;">매너온도</span>
-            ${myTier.tier === 5 ? `<span style="font-size:12px; font-weight:800; color:#6B4E00; background:#FFFDF5; border:1px solid #C9A227; padding:2px 8px; border-radius:999px;">👑 전용 칭호: 울대 레전드</span>` : ""}
+          <!-- 3칸 활동 요약 그리드 (받은 후기 / 신청한 번개 / 만든 번개) -->
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:12px;">
+            <button type="button" onclick="toggleProfileSection('reviews')" style="background:${sec === 'reviews' ? '#EEF8F3' : '#F7F9F8'}; border:${sec === 'reviews' ? '1.5px solid #287D62' : '1.5px solid transparent'}; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer;">
+              <div style="font-size:20px; font-weight:800; color:#191F28;">${myStats.totalPraiseCnt}</div>
+              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">받은 후기</div>
+            </button>
+            <button type="button" onclick="toggleProfileSection('myapps')" style="background:${sec === 'myapps' ? '#EEF8F3' : '#F7F9F8'}; border:${sec === 'myapps' ? '1.5px solid #287D62' : '1.5px solid transparent'}; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer;">
+              <div style="font-size:20px; font-weight:800; color:#191F28;">${myAppliedList.length}</div>
+              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">신청한 번개</div>
+            </button>
+            <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#F7F9F8'}; border:${sec === 'myposts' ? '1.5px solid #287D62' : '1.5px solid transparent'}; border-radius:16px; padding:12px 8px; text-align:center; cursor:pointer;">
+              <div style="font-size:20px; font-weight:800; color:#191F28;">${myPosts.length}</div>
+              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">만든 번개</div>
+            </button>
           </div>
-          <div style="display:flex; align-items:flex-end; gap:2px; margin-top:4px;">
-            <span style="font-size:48px; font-weight:800; color:${myTier.tier === 1 ? 'var(--tier-text)' : 'var(--tier-accent)'}; line-height:1; letter-spacing:-0.03em;">${myTier.displayTemp}</span>
-            <span style="font-size:21px; font-weight:700; color:${myTier.tier === 1 ? 'var(--tier-text)' : 'var(--tier-accent)'}; margin-bottom:4px;">°C</span>
-          </div>
-          <div style="height:8px; border-radius:999px; background:#F2F4F3; margin-top:12px; overflow:hidden;">
-            <div style="width:${myTier.gaugePct}%; height:100%; background:${myTier.tier === 5 ? 'linear-gradient(90deg, #1E6B52 0%, #C9A227 100%)' : 'var(--tier-accent)'}; border-radius:999px; transition:width 0.6s cubic-bezier(.2,.8,.2,1);"></div>
-          </div>
-          <div style="margin-top:8px; font-size:12.5px; font-weight:600; color:var(--tier-text); line-height:1.4;">${escHtml(myTier.nextCopy)}</div>
 
-          <div class="tk-gap8" style="margin:26px -20px 10px;"></div>
+          ${sec === 'reviews' ? `
+            <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:12px;">
+              <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">받은 매너 후기</div>
+              ${myReviews.length === 0
+                ? renderEmptyStateBox('check', '아직 받은 후기가 없어요', '번개 모임 후 학우들과 따뜻한 후기를 나눠보세요')
+                : myReviews.map(r => `
+                  <div style="padding:10px 0; border-bottom:1px solid #EEF0EF;">
+                    <div style="font-size:13.5px; font-weight:700; color:#191F28;">${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
+                    ${r.detail ? `<div style="font-size:12.5px; color:#4E5968; margin-top:4px; background:#FFFFFF; padding:8px 10px; border-radius:8px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
+                  </div>
+                `).join("")}
+            </div>
+          ` : ''}
 
-          <!-- 토스 스타일 › 리스트 메뉴 -->
+          <!-- 인증 뱃지 4종 박스 -->
+          <button type="button" onclick="toggleProfileSection('badges')" style="width:100%; height:56px; background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:${sec === 'badges' ? '8px' : '18px'}; cursor:pointer;">
+            <span style="font-size:15px; font-weight:700; color:#191F28;">인증 뱃지</span>
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+              <span style="display:inline-flex; align-items:center; gap:6px;">
+                ${myStats.badgeCatalog.map(b => `
+                  <span style="width:20px; height:20px; border-radius:10px; background:${b.earned ? '#287D62' : '#EEF8F3'}; border:1.5px solid #287D62; display:inline-block;"></span>
+                `).join("")}
+              </span>
+              <span style="font-size:13px; color:#287D62; font-weight:700;">${myStats.badges.length}/4 ${sec === 'badges' ? '▾' : '›'}</span>
+            </span>
+          </button>
+          ${sec === 'badges' ? `
+            <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:16px;">
+              <div style="font-size:12.5px; color:#8B95A1; margin-bottom:12px;">40.0°C 달성 또는 좋은 평가 15회 이상이면 받을 수 있어요</div>
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
+                ${myStats.badgeCatalog.map(b => `
+                  <div style="background:#FFFFFF; border-radius:12px; padding:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                      <span style="font-size:13.5px; font-weight:700; color:${b.earned ? '#287D62' : '#191F28'};">${escHtml(b.label)}</span>
+                      <span style="font-size:12px; font-weight:700; color:${b.earned ? '#287D62' : '#8B95A1'};">${b.earned ? '인증 완료' : b.progressText}</span>
+                    </div>
+                    <div style="font-size:12px; color:#8B95A1; margin-bottom:6px;">${escHtml(b.condText)}</div>
+                    <div style="height:5px; background:#F2F4F3; border-radius:999px; overflow:hidden;">
+                      <div style="width:${b.progressPct}%; height:100%; background:#287D62; border-radius:999px;"></div>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 활동 섹션 메뉴 -->
+          <div style="font-size:13px; font-weight:700; color:#98A2B3; margin-bottom:4px;">활동</div>
           <div>
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('badges')">
-              <span>인증 뱃지</span>
-              <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:14px; color:#287D62; font-weight:600;">${myStats.badges.length}/4</span>
-                <span class="tk-menu-arrow">${sec === 'badges' ? '▾' : '›'}</span>
-              </span>
-            </button>
-            ${sec === 'badges' ? `
-              <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
-                <div style="font-size:12.5px; color:#8B95A1; margin-bottom:12px;">40.0°C 달성 또는 좋은 평가 15회 이상이면 받을 수 있어요</div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
-                  ${myStats.badgeCatalog.map(b => `
-                    <div style="background:#FFFFFF; border-radius:12px; padding:12px;">
-                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <span style="font-size:13.5px; font-weight:700; color:${b.earned ? '#287D62' : '#191F28'};">${escHtml(b.label)}</span>
-                        <span style="font-size:12px; font-weight:700; color:${b.earned ? '#287D62' : '#8B95A1'};">${b.earned ? '인증 완료' : b.progressText}</span>
-                      </div>
-                      <div style="font-size:12px; color:#8B95A1; margin-bottom:6px;">${escHtml(b.condText)}</div>
-                      <div style="height:5px; background:#F2F4F3; border-radius:999px; overflow:hidden;">
-                        <div style="width:${b.progressPct}%; height:100%; background:#287D62; border-radius:999px;"></div>
-                      </div>
-                    </div>
-                  `).join("")}
-                </div>
-              </div>
-            ` : ''}
-
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('reviews')">
-              <span>받은 후기</span>
-              <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:14px; color:#8B95A1;">${myStats.totalPraiseCnt}회</span>
-                <span class="tk-menu-arrow">${sec === 'reviews' ? '▾' : '›'}</span>
-              </span>
-            </button>
-            ${sec === 'reviews' ? `
-              <div style="background:#F7F9F8; border-radius:16px; padding:16px; margin-bottom:8px;">
-                ${myReviews.length === 0
-                  ? renderEmptyStateBox('check', '아직 받은 후기가 없어요', '번개 모임 후 학우들과 따뜻한 후기를 나눠보세요')
-                  : myReviews.map(r => `
-                    <div style="padding:10px 0; border-bottom:1px solid #EEF0EF;">
-                      <div style="font-size:13.5px; font-weight:700; color:#191F28;">${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
-                      ${r.detail ? `<div style="font-size:12.5px; color:#4E5968; margin-top:4px; background:#FFFFFF; padding:8px 10px; border-radius:8px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
-                    </div>
-                  `).join("")}
-              </div>
-            ` : ''}
-
             <button type="button" class="tk-menu-row" onclick="toggleProfileSection('myapps')">
               <span>내가 신청한 번개</span>
               <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:14px; color:#8B95A1;">${myAppliedList.length}건</span>
+                <span style="font-size:13.5px; color:#8B95A1;">${myAppliedList.length}건</span>
                 <span class="tk-menu-arrow">${sec === 'myapps' ? '▾' : '›'}</span>
               </span>
             </button>
@@ -6387,7 +6660,7 @@
             <button type="button" class="tk-menu-row" onclick="toggleProfileSection('myposts')">
               <span>내가 만든 번개</span>
               <span style="display:inline-flex; align-items:center; gap:8px;">
-                <span style="font-size:14px; color:#8B95A1;">${myPosts.length}건</span>
+                <span style="font-size:13.5px; color:#8B95A1;">${myPosts.length}건</span>
                 <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
               </span>
             </button>
@@ -6418,15 +6691,21 @@
             ` : ''}
 
             <button type="button" class="tk-menu-row" onclick="openTimetableModal()">
-              <span>🗓️ 내 시간표 · 공강 메이트</span>
+              <span>내 시간표 · 공강 메이트</span>
               <span style="display:inline-flex; align-items:center; gap:8px;">
                 <span style="font-size:13px; color:${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '#287D62' : '#8B95A1'}; font-weight:700;">${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '등록됨' : '미등록'}</span>
                 <span class="tk-menu-arrow">›</span>
               </span>
             </button>
 
+            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('challenge')">
+              <span>월간 커피 쿠폰 챌린지</span>
+              <span class="tk-menu-arrow">${sec === 'challenge' ? '▾' : '›'}</span>
+            </button>
+            ${sec === 'challenge' ? `<div style="margin-bottom:8px;">${renderChallengeAndRewardCard()}</div>` : ''}
+
             <button type="button" class="tk-menu-row" onclick="toggleProfileSection('edit')">
-              <span>프로필 정보 · 관심 카테고리 수정</span>
+              <span>프로필 · 관심 카테고리 수정</span>
               <span class="tk-menu-arrow">${sec === 'edit' ? '▾' : '›'}</span>
             </button>
             ${sec === 'edit' ? `
@@ -6474,16 +6753,12 @@
               ` : ''}
             ` : ''}
 
-            <button type="button" class="tk-menu-row" onclick="toggleProfileSection('challenge')">
-              <span>월간 커피 쿠폰 챌린지</span>
-              <span class="tk-menu-arrow">${sec === 'challenge' ? '▾' : '›'}</span>
-            </button>
-            ${sec === 'challenge' ? `<div style="margin-bottom:8px;">${renderChallengeAndRewardCard()}</div>` : ''}
-
-            <button type="button" class="tk-menu-row" style="color:#8B95A1;" onclick="clearLogin()">
-              <span>로그아웃</span>
-              <span class="tk-menu-arrow">›</span>
-            </button>
+            <!-- 하단 분리된 중앙 로그아웃 버튼 -->
+            <div style="margin-top:16px; padding-top:8px; text-align:center;">
+              <button type="button" onclick="clearLogin()" style="background:none; border:none; color:#98A2B3; font-size:14px; font-weight:600; padding:10px 20px; cursor:pointer;">
+                로그아웃
+              </button>
+            </div>
           </div>
         </div>
       `;
