@@ -3712,27 +3712,17 @@
 
         ${(() => {
           const hasTT = typeof hasUserTimetable === "function" && hasUserTimetable(state.user_id);
-          const mateCnt = (hasTT && typeof getGonggangMates === "function") ? getGonggangMates().length : 0;
+          if (!hasTT) return "";
+          const mateCnt = (typeof getGonggangMates === "function") ? getGonggangMates().length : 0;
           return `
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 14px; margin:0 0 12px; border-radius:14px; background:#EEF8F3; border:1px solid #C5E6D6;">
-              <button type="button" onclick="openTimetableModal()" style="display:flex; align-items:center; gap:8px; background:none; border:none; padding:0; cursor:pointer; text-align:left; min-width:0; flex:1;">
-                <span style="font-size:17px; flex-shrink:0;">🗓️</span>
-                <span style="min-width:0;">
-                  <span style="display:block; font-size:13px; font-weight:800; color:#1E6B52; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    ${hasTT ? `내 공강에 맞는 메이트 ${mateCnt}명` : `내 시간표 등록하고 공강 메이트 찾기`}
-                  </span>
-                  <span style="display:block; font-size:11px; color:#287D62; font-weight:600;">
-                    ${hasTT ? `터치하여 겹치는 공강 메이트 & 시간표 보기 ›` : `10초 입력으로 공강이 겹치는 학우 자동 매칭 ›`}
-                  </span>
-                </span>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 12px;">
+              <button type="button" onclick="state.home_free_only=!state.home_free_only; render();" style="border:1px solid ${state.home_free_only ? '#287D62' : '#C5E6D6'}; background:${state.home_free_only ? '#287D62' : '#EEF8F3'}; color:${state.home_free_only ? '#FFFFFF' : '#287D62'}; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                <span>⚡ 내 공강만 보기</span>
+                ${state.home_free_only ? '<span>✓</span>' : ''}
               </button>
-              ${hasTT ? `
-                <button type="button" onclick="state.home_free_only=!state.home_free_only; render();" style="flex-shrink:0; border:1px solid ${state.home_free_only ? '#287D62' : '#C5E6D6'}; background:${state.home_free_only ? '#287D62' : '#FFFFFF'}; color:${state.home_free_only ? '#FFFFFF' : '#287D62'}; border-radius:999px; padding:6px 11px; font-size:11.5px; font-weight:800; cursor:pointer;">
-                  ${state.home_free_only ? '⚡ 내 공강만 ✓' : '⚡ 내 공강만'}
-                </button>
-              ` : `
-                <button type="button" onclick="openTimetableModal('edit')" style="flex-shrink:0; border:none; background:#287D62; color:#FFFFFF; border-radius:999px; padding:6px 12px; font-size:11.5px; font-weight:800; cursor:pointer;">입력하기</button>
-              `}
+              <button type="button" onclick="openTimetableModal('mates')" style="border:none; background:none; padding:4px 2px; font-size:12px; font-weight:700; color:#287D62; cursor:pointer;">
+                공강 메이트 ${mateCnt}명 ›
+              </button>
             </div>
           `;
         })()}
@@ -6700,8 +6690,51 @@
     }
 
     render();
-    pullFromCloud(true);
-    scheduleNextCloudPull(4000);
+    const _urlParams = new URLSearchParams(window.location.search || "");
+    const _previewTt = _urlParams.get("preview_tt");
+    if (!_previewTt) {
+      pullFromCloud(true);
+      scheduleNextCloudPull(4000);
+    } else {
+      // 미리보기 전용(저장 안 됨): 2·3·4번 공강 매칭 화면 시연
+      try {
+        const demoMe = {
+          student_id: "demo_me", nickname: "울산대 학우", department: "컴퓨터공학과", mbti: "ENFP", avatar: "🐶", manner_temp: 38.2,
+          timetable_saved: true,
+          timetable: { "월": [1, 2, 7], "화": [1, 2, 6, 7], "수": [2, 3, 8], "목": [1, 2, 7, 8], "금": [3, 4] }
+        };
+        const demoMate1 = {
+          student_id: "demo_m1", nickname: "공강메이트_민수", department: "기계자동차공학부", mbti: "INTP", avatar: "🦊", manner_temp: 41.5,
+          timetable_saved: true,
+          timetable: { "월": [1, 2, 6], "화": [1, 3, 7], "수": [1, 2, 8], "목": [1, 2, 6, 7], "금": [3, 4, 5] }
+        };
+        const demoMate2 = {
+          student_id: "demo_m2", nickname: "카공메이트_지은", department: "경영학과", mbti: "ESFJ", avatar: "🐱", manner_temp: 39.8,
+          timetable_saved: true,
+          timetable: { "월": [2, 3, 4], "화": [1, 2, 3], "수": [3, 4, 5], "목": [2, 3, 8], "금": [1, 2] }
+        };
+        DB.users["demo_me"] = demoMe;
+        DB.users["demo_m1"] = demoMate1;
+        DB.users["demo_m2"] = demoMate2;
+        const todayStr = getTodayStr();
+        DB.posts = [
+          { id: 99001, author_id: "demo_m1", title: "공강에 학생회관 제육 같이 먹어요!", category: "🍚 밥약", meet_date: todayStr, meet_time: "13:00", location: "22호관 학생회관", max_participants: 3, meeting_style: "가볍게 밥만!", status: "모집중" },
+          { id: 99002, author_id: "demo_m2", title: "아산도서관 1층 카페 카공 메이트", category: "☕ 카공", meet_date: todayStr, meet_time: "14:00", location: "16호관 아산도서관", max_participants: 2, meeting_style: "조용히 각자 공부", status: "모집중" },
+          { id: 99003, author_id: "demo_m1", title: "저녁 바보사거리 돌돌파스타", category: "🍚 밥약", meet_date: todayStr, meet_time: "18:30", location: "울산대학교 정문 (바보사거리)", max_participants: 4, meeting_style: "수다 환영", status: "모집중" }
+        ];
+        state.user_id = "demo_me";
+        if (_previewTt === "mates") {
+          state.timetable_tab = "mates";
+          state.active_modal = "timetable";
+        } else if (_previewTt === "create") {
+          state.active_modal = "create";
+        } else {
+          state.active_modal = null;
+          state.nav_tab = "홈";
+        }
+        render();
+      } catch (e) {}
+    }
 
     try {
       if (window.location.search && window.location.search.includes("preview_match=1")) {
