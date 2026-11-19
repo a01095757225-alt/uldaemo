@@ -5491,13 +5491,13 @@
         maxZoom: 19,
         scrollWheelZoom: false,
         zoomControl: false,
+        attributionControl: false,
         maxBounds: campusBounds,
         maxBoundsViscosity: 1.0
       }).setView([state.my_lat, state.my_lng], 16);
       window._leafletMap = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "© OpenStreetMap · 울대모"
+        maxZoom: 19
       }).addTo(map);
 
       if (state.gps_consent) {
