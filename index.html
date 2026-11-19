@@ -499,8 +499,8 @@
     function getDbStateSignature() {
       try {
         return JSON.stringify({
-          u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, v.coffee_tickets, v.streak_days]),
-          p: (DB.posts || []).map(p => [p.id, p.status, p.title]),
+          u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, v.coffee_tickets, v.streak_days, v.boost_coupons, v.extra_post_coupons]),
+          p: (DB.posts || []).map(p => [p.id, p.status, p.title, p.is_boosted, p.boosted_at]),
           a: (DB.applications || []).map(a => [a.id, a.status]),
           m: (DB.messages || []).map(m => [m.id, m.is_read, m.text, m.reactions]),
           n: (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => [n.id, n.is_read]),
@@ -906,9 +906,11 @@
       notif_tab: "mine",
       selected_post_id: null,
       home_cat: "전체",
+      home_time_filter: "전체",
+      home_visible_cnt: 8,
       map_cat: "전체",
       search_q: "",
-      sort_opt: "마감 임박순",
+      sort_opt: "추천·공강순",
       gps_consent: false,
       confirm_dialog: null,
       my_building: "26호관 행정본관",
@@ -3215,7 +3217,7 @@
             ${allCats.map(c => {
               const isActive = (cur === c);
               return `
-                <button class="cat-btn ${isActive ? 'active' : ''}" onclick="state['${targetKey}']='${escHtml(c)}'; render();">
+                <button class="cat-btn ${isActive ? 'active' : ''}" onclick="state['${targetKey}']='${escHtml(c)}'; state.home_visible_cnt=8; render();">
                   <span>${escHtml(c)}</span>
                 </button>
               `;
@@ -3291,7 +3293,7 @@
         topRightBadgeHtml = `<span style="background:#EEF8F3; color:#287D62; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; flex-shrink:0;">내 번개</span>`;
       } else if (isOfficial) {
         topRightBadgeHtml = `<span class="tk-official-badge">공식</span>`;
-      } else if (post.is_boosted) {
+      } else if (isBoostActive(post)) {
         topRightBadgeHtml = `<span class="tk-boost-badge">⚡ 부스트</span>`;
       } else if (typeof isPostMatchingMyFreeTime === "function" && isPostMatchingMyFreeTime(post)) {
         topRightBadgeHtml = `<span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:12px; flex-shrink:0;">⚡ 내 공강</span>`;
@@ -3348,6 +3350,47 @@
       `;
     }
 
+    function isBoostActive(post) {
+      if (!post || !post.is_boosted || post.status !== "모집중") return false;
+      const cnt = (DB.applications || []).filter(a => a.post_id === post.id && a.status === "승인됨").length + 1;
+      if (cnt >= (post.max_participants || 2)) return false;
+      const boostedTs = Number(post.boosted_at) || Number(post.id) || 0;
+      // 부스트 유효 시간: 사용 시점으로부터 3시간
+      if (boostedTs > 0 && (Date.now() - boostedTs) > 3 * 60 * 60 * 1000) return false;
+      return true;
+    }
+
+    function activatePostBoost(postId) {
+      const post = (DB.posts || []).find(p => p.id === postId);
+      const meUser = DB.users[state.user_id];
+      if (!post || !meUser) return;
+      if (String(post.author_id) !== String(state.user_id)) return;
+      const coupons = Number(meUser.boost_coupons || 0);
+      if (coupons <= 0) return showToast("보유한 상단 부스트권이 없어요. 광장 룰렛에서 획득할 수 있어요!");
+      if (isBoostActive(post)) return showToast("이미 상단 부스트가 적용 중인 번개예요.");
+      meUser.boost_coupons = Math.max(0, coupons - 1);
+      meUser.updated_at = Date.now();
+      post.is_boosted = true;
+      post.boosted_at = Date.now();
+      post.updated_at = Date.now();
+      saveDB(true);
+      fireConfetti();
+      showToast("⚡ 상단 부스트권 적용! 3시간 동안 홈 상단 부스트 슬롯에 우선 노출됩니다.");
+      render();
+    }
+
+    function setHomeTimeFilter(val) {
+      state.home_time_filter = val;
+      state.home_visible_cnt = 8;
+      render();
+    }
+
+    function setHomeSortOpt(val) {
+      state.sort_opt = val;
+      state.home_visible_cnt = 8;
+      render();
+    }
+
     function getFilteredHomePosts() {
       // 시작 시각이 1시간 이상 지난 번개는 홈 피드에서 정리 (내 모임/참여 목록에서는 유지)
       let list = (DB.posts || []).filter(p => p && p.status === "모집중" && !isPostExpired(p));
@@ -3356,15 +3399,6 @@
       }
       if (state.home_cat !== "전체") {
         list = list.filter(p => p.category && p.category.includes(state.home_cat));
-      }
-      if (state.search_q.trim()) {
-        const q = state.search_q.trim().toLowerCase();
-        list = list.filter(p =>
-          (p.title && p.title.toLowerCase().includes(q)) ||
-          (p.location && p.location.toLowerCase().includes(q)) ||
-          (p.category && p.category.toLowerCase().includes(q)) ||
-          (p.meeting_style && p.meeting_style.toLowerCase().includes(q))
-        );
       }
 
       // 모임 시작 일시 타임스탬프 계산
@@ -3375,35 +3409,112 @@
         return isNaN(dt.getTime()) ? Infinity : dt.getTime();
       };
 
-      const isPostFull = (p) => {
-        const cnt = (DB.applications || []).filter(a => a.post_id === p.id && a.status === "승인됨").length + 1;
-        return cnt >= (p.max_participants || 2);
+      const getMeetHour = (p) => {
+        const parts = String(p.meet_time || "12:00").split(":");
+        const h = parseInt(parts[0], 10);
+        return isNaN(h) ? 12 : h;
       };
 
-      if (state.sort_opt.includes("가까운 순")) {
-        list.sort((a, b) => {
-          const ca = getBuildingCoords(a.location);
-          const cb = getBuildingCoords(b.location);
-          return calcDistanceMeters(state.my_lat, state.my_lng, ca[0], ca[1]) - calcDistanceMeters(state.my_lat, state.my_lng, cb[0], cb[1]);
+      const todayStr = getTodayStr();
+      const nowTs = Date.now();
+      const timeFilter = state.home_time_filter || "전체";
+      if (timeFilter === "지금·점심") {
+        list = list.filter(p => {
+          const ts = getStartTs(p);
+          const within2h = ts >= (nowTs - 60 * 60 * 1000) && ts <= (nowTs + 2 * 60 * 60 * 1000);
+          return within2h || (p.meet_date === todayStr && getMeetHour(p) < 17);
         });
-      } else if (state.sort_opt.includes("매너온도")) {
-        list.sort((a, b) => ((DB.users[b.author_id]?.manner_temp || 36.5) - (DB.users[a.author_id]?.manner_temp || 36.5)));
-      } else {
-        // 기본: '곧 시작' 순 정렬 (시작 시간이 가까운 순서)
-        const nowTs = Date.now();
-        list.sort((a, b) => {
-          const diffA = Math.abs(getStartTs(a) - nowTs);
-          const diffB = Math.abs(getStartTs(b) - nowTs);
-          return diffA - diffB;
-        });
+      } else if (timeFilter === "오늘 저녁") {
+        list = list.filter(p => p.meet_date === todayStr && getMeetHour(p) >= 17);
+      } else if (timeFilter === "내일 이후") {
+        list = list.filter(p => p.meet_date && p.meet_date > todayStr);
       }
 
-      // 인원이 꽉 찬 마감 번개는 피드 맨 아래로 내리기
-      list.sort((a, b) => (isPostFull(a) ? 1 : 0) - (isPostFull(b) ? 1 : 0));
-      // 부스트 번개 및 공식 번개는 모집 중일 때 상단 우선권 부여
-      list.sort((a, b) => ((b.is_boosted && !isPostFull(b)) ? 1 : 0) - ((a.is_boosted && !isPostFull(a)) ? 1 : 0));
-      list.sort((a, b) => (b.is_official && !isPostFull(b) ? 1 : 0) - (a.is_official && !isPostFull(a) ? 1 : 0));
-      return list;
+      if (state.search_q.trim()) {
+        const q = state.search_q.trim().toLowerCase();
+        list = list.filter(p =>
+          (p.title && p.title.toLowerCase().includes(q)) ||
+          (p.location && p.location.toLowerCase().includes(q)) ||
+          (p.category && p.category.toLowerCase().includes(q)) ||
+          (p.meeting_style && p.meeting_style.toLowerCase().includes(q))
+        );
+      }
+
+      const getAcceptedCnt = (p) => (DB.applications || []).filter(a => a.post_id === p.id && a.status === "승인됨").length + 1;
+      const isPostFull = (p) => getAcceptedCnt(p) >= (p.max_participants || 2);
+
+      // 1) 추천·공강순 종합 점수 계산 (내 공강 일치 + 마감 임박 + 시작 임박 + 방장 매너온도 + 초과 부스트 가산점)
+      const getPostRecommendScore = (p) => {
+        let score = 0;
+        if (typeof isPostMatchingMyFreeTime === "function" && isPostMatchingMyFreeTime(p)) {
+          score += 40;
+        }
+        const maxP = Math.max(2, Number(p.max_participants) || 2);
+        const remSpots = maxP - getAcceptedCnt(p);
+        if (remSpots === 1) score += 22;
+        else if (remSpots === 2) score += 14;
+
+        const diffMs = getStartTs(p) - nowTs;
+        if (diffMs >= -30 * 60 * 1000 && diffMs <= 3 * 60 * 60 * 1000) {
+          score += 25;
+        } else if (p.meet_date === todayStr) {
+          score += 12;
+        }
+
+        const hostTemp = typeof resolveUserTempForTier === "function"
+          ? resolveUserTempForTier(p.author_id)
+          : (DB.users[p.author_id]?.manner_temp || 36.5);
+        score += Math.max(0, Math.min(20, (hostTemp - 36.5) * 1.5));
+
+        if (isBoostActive(p)) {
+          score += 15;
+        }
+        return score;
+      };
+
+      const sortMode = state.sort_opt || "추천·공강순";
+      const compareBySelectedSort = (a, b) => {
+        if (sortMode.includes("가까운")) {
+          const ca = getBuildingCoords(a.location);
+          const cb = getBuildingCoords(b.location);
+          const distDiff = calcDistanceMeters(state.my_lat, state.my_lng, ca[0], ca[1]) - calcDistanceMeters(state.my_lat, state.my_lng, cb[0], cb[1]);
+          if (distDiff !== 0) return distDiff;
+        } else if (sortMode.includes("매너온도")) {
+          const tempA = typeof resolveUserTempForTier === "function" ? resolveUserTempForTier(a.author_id) : (DB.users[a.author_id]?.manner_temp || 36.5);
+          const tempB = typeof resolveUserTempForTier === "function" ? resolveUserTempForTier(b.author_id) : (DB.users[b.author_id]?.manner_temp || 36.5);
+          if (tempB !== tempA) return tempB - tempA;
+        } else if (!sortMode.includes("곧 시작") && !sortMode.includes("마감 임박")) {
+          // 기본: 추천·공강순
+          const scoreDiff = getPostRecommendScore(b) - getPostRecommendScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
+        }
+        // 동점 또는 '곧 시작순'일 때: 현재 시각과 가장 가까운 모임 우선
+        return Math.abs(getStartTs(a) - nowTs) - Math.abs(getStartTs(b) - nowTs);
+      };
+
+      // 2) 모집 중 vs 인원 마감 분리 (마감된 번개는 항상 최하단)
+      const openPosts = list.filter(p => !isPostFull(p));
+      const fullPosts = list.filter(p => isPostFull(p)).sort(compareBySelectedSort);
+
+      // 3) 공식 번개 & 활성 부스트 번개 분리
+      // - 부스트권 사용자 간 정렬 기준: 가장 최근에 부스트를 켠 순서 (boosted_at 최신순) -> 동점 시 곧 시작순
+      // - 상단 부스트 슬롯 최대 2개 제한: 상위 2개만 최상단 부스트 슬롯에 고정하고, 3번째 이후 부스트 번개는 일반 피드에 자연스럽게 섞어 일반 번개가 밀리지 않도록 보호
+      const officialPosts = openPosts.filter(p => p.is_official).sort(compareBySelectedSort);
+      const activeBoostPosts = openPosts
+        .filter(p => !p.is_official && isBoostActive(p))
+        .sort((a, b) => {
+          const tA = Number(a.boosted_at) || Number(a.id) || 0;
+          const tB = Number(b.boosted_at) || Number(b.id) || 0;
+          if (tB !== tA) return tB - tA;
+          return Math.abs(getStartTs(a) - nowTs) - Math.abs(getStartTs(b) - nowTs);
+        });
+
+      const topPinnedBoosts = activeBoostPosts.slice(0, 2);
+      const overflowBoosts = activeBoostPosts.slice(2);
+      const normalOpenPosts = openPosts.filter(p => !p.is_official && !isBoostActive(p));
+      const mergedNormalFeed = [...normalOpenPosts, ...overflowBoosts].sort(compareBySelectedSort);
+
+      return [...officialPosts, ...topPinnedBoosts, ...mergedNormalFeed, ...fullPosts];
     }
 
     function renderHomeFeedListHtml() {
@@ -3411,27 +3522,81 @@
         return `<div class="tk-feed-grid">${renderSkeletonList('feed', 3)}</div>`;
       }
       const list = getFilteredHomePosts();
+      const curTimeFilter = state.home_time_filter || "전체";
+      const curSort = state.sort_opt || "추천·공강순";
+      const timeChips = [
+        { key: "전체", label: "전체" },
+        { key: "지금·점심", label: "지금·점심" },
+        { key: "오늘 저녁", label: "오늘 저녁" },
+        { key: "내일 이후", label: "내일 이후" }
+      ];
+      const sortOpts = [
+        { key: "추천·공강순", label: "⚡ 추천·공강순" },
+        { key: "곧 시작순", label: "⏰ 곧 시작순" },
+        { key: "가까운순", label: "📍 가까운순" },
+        { key: "매너온도순", label: "🌡️ 매너온도순" }
+      ];
+
+      const filterHeaderHtml = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin: 4px 0 10px;">
+          <div style="display:flex; align-items:baseline; gap:8px;">
+            <span style="font-size:17px; font-weight:800; color:#191F28;">모집 중인 번개</span>
+            <span style="font-size:13px; color:#6B7684; font-weight:600;">${list.length}개</span>
+          </div>
+          <select aria-label="번개 정렬 기준" onchange="setHomeSortOpt(this.value)" style="height:32px; padding:0 11px; border-radius:16px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:12px; font-weight:700; cursor:pointer; outline:none;">
+            ${sortOpts.map(o => `<option value="${escHtml(o.key)}" ${curSort.includes(o.key.replace('순','')) ? 'selected' : ''}>${escHtml(o.label)}</option>`).join("")}
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px;">
+          ${timeChips.map(tc => {
+            const active = (curTimeFilter === tc.key);
+            return `
+              <button type="button" onclick="setHomeTimeFilter('${tc.key}')" style="height:30px; padding:0 12px; border-radius:15px; border:${active ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${active ? '#EEF8F3' : '#FFFFFF'}; color:${active ? '#287D62' : '#6B7684'}; font-size:12px; font-weight:${active ? '800' : '600'}; cursor:pointer; flex-shrink:0;">
+                ${escHtml(tc.label)}
+              </button>
+            `;
+          }).join("")}
+        </div>
+      `;
+
       if (list.length === 0) {
-        return renderEmptyStateBox(
+        return filterHeaderHtml + renderEmptyStateBox(
           'sparkle',
-          '아직 열린 번개가 없어요',
-          '첫 번개를 열어볼까요?',
-          '번개 열기',
-          "state.active_modal='create'; render();"
+          curTimeFilter !== "전체" ? `'${curTimeFilter}' 시간대에 열린 번개가 없어요` : '아직 열린 번개가 없어요',
+          curTimeFilter !== "전체" ? '전체 시간대로 보거나 직접 첫 번개를 열어볼까요?' : '첫 번개를 열어볼까요?',
+          curTimeFilter !== "전체" ? '전체 번개 보기' : '번개 열기',
+          curTimeFilter !== "전체" ? "setHomeTimeFilter('전체');" : "state.active_modal='create'; render();"
         );
       }
+
+      const visibleCnt = Math.max(8, Number(state.home_visible_cnt) || 8);
+      const visibleList = list.slice(0, visibleCnt);
+      const remainCnt = Math.max(0, list.length - visibleList.length);
+
       return `
-        <div style="display:flex; align-items:baseline; gap:8px; margin: 4px 0 10px;">
-          <span style="font-size:17px; font-weight:800; color:#191F28;">모집 중인 번개</span>
-          <span style="font-size:13px; color:#6B7684; font-weight:500;">${list.length}개 열려 있어요</span>
-        </div>
-        <div class="tk-feed-grid">${list.map(renderMeetupCard).join("")}</div>
+        ${filterHeaderHtml}
+        <div class="tk-feed-grid">${visibleList.map(renderMeetupCard).join("")}</div>
+        ${(remainCnt > 0 || (visibleCnt > 8 && list.length > 8)) ? `
+          <div style="display:flex; justify-content:center; gap:8px; margin-top:14px;">
+            ${remainCnt > 0 ? `
+              <button type="button" onclick="state.home_visible_cnt=(Number(state.home_visible_cnt)||8)+8; render();" style="height:40px; padding:0 20px; border-radius:20px; border:1.5px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:13px; font-weight:800; cursor:pointer;">
+                번개 ${remainCnt}개 더보기 ▾
+              </button>
+            ` : ''}
+            ${(visibleCnt > 8 && list.length > 8) ? `
+              <button type="button" onclick="state.home_visible_cnt=8; render(); scrollToHomeFeedList();" style="height:40px; padding:0 16px; border-radius:20px; border:none; background:#F7F9F8; color:#6B7684; font-size:12.5px; font-weight:700; cursor:pointer;">
+                처음 8개만 보기 ▴
+              </button>
+            ` : ''}
+          </div>
+        ` : ''}
       `;
     }
 
     let _searchDebounceTimer = null;
     function handleHomeSearchInput(val) {
       state.search_q = val;
+      state.home_visible_cnt = 8;
       clearTimeout(_searchDebounceTimer);
       _searchDebounceTimer = setTimeout(() => {
         const wrap = document.getElementById("home-feed-list-wrap");
@@ -4062,8 +4227,20 @@
               </div>
             </div>
 
+            ${boostCnt > 0 ? `
+              <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:14px; padding:12px 14px; margin-top:18px;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; font-weight:700; color:#1E6B52; cursor:pointer;">
+                  <span style="display:flex; align-items:center; gap:8px;">
+                    <input id="c_use_boost" type="checkbox" ${state.prefill_boost ? 'checked' : ''} style="width:16px; height:16px; accent-color:#287D62;" />
+                    <span>⚡ 상단 부스트권 사용하기 (3시간 동안 상단 슬롯 우선 노출)</span>
+                  </span>
+                  <span style="font-size:11.5px; font-weight:800; color:#287D62; background:#FFFFFF; padding:3px 9px; border-radius:999px;">${boostCnt}개 보유</span>
+                </label>
+              </div>
+            ` : ''}
+
             ${isCurrentUserAdmin() ? `
-              <div style="background:#FFFDF5; border:1px solid #F59E0B; border-radius:14px; padding:12px 14px; margin-top:18px;">
+              <div style="background:#FFFDF5; border:1px solid #F59E0B; border-radius:14px; padding:12px 14px; margin-top:12px;">
                 <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#7A4B00; cursor:pointer;">
                   <input id="c_official" type="checkbox" style="width:16px; height:16px; accent-color:#F59E0B;" />
                   운영진 공식 번개로 등록 (피드 최상단 강조)
@@ -4105,7 +4282,9 @@
         meUser.extra_post_coupons = Math.max(0, extraCoupons - 1);
       }
       let useBoost = false;
-      if (state.prefill_boost && meUser && Number(meUser.boost_coupons || 0) > 0) {
+      const boostCheckbox = document.getElementById("c_use_boost");
+      const wantBoost = Boolean(state.prefill_boost || (boostCheckbox && boostCheckbox.checked));
+      if (wantBoost && meUser && Number(meUser.boost_coupons || 0) > 0) {
         meUser.boost_coupons = Math.max(0, Number(meUser.boost_coupons || 0) - 1);
         useBoost = true;
         state.prefill_boost = false;
@@ -4124,6 +4303,7 @@
         meeting_style: style,
         is_official: is_official,
         is_boosted: useBoost,
+        boosted_at: useBoost ? newId : null,
         status: "모집중"
       });
       const createdPost = DB.posts[0];
@@ -4301,6 +4481,11 @@
                       </div>
                     `;
                   }).join(""))}
+                  ${(!isFull && !isBoostActive(post) && Number(DB.users[state.user_id]?.boost_coupons || 0) > 0) ? `
+                    <button type="button" class="btn" style="width:100%; margin-top:12px; border-radius:14px; background:#EEF8F3; border:1px solid #C5E6D6; color:#287D62; font-weight:800;" onclick="activatePostBoost(${post.id})">
+                      ⚡ 상단 부스트권 사용 (${Number(DB.users[state.user_id]?.boost_coupons || 0)}개 보유 · 3시간 상단 노출)
+                    </button>
+                  ` : ''}
                   <div class="row-2" style="margin-top:12px;">
                     <button type="button" class="btn" style="border-radius:14px; background:#F7F9F8; border:none; color:#4E5968;" onclick="closePostEarly(${post.id})">모집 마감</button>
                     <button type="button" class="btn" style="border-radius:14px; background:#FFF5F5; border:none; color:#E02020;" onclick="confirmDeletePost(${post.id})">모임 취소</button>
