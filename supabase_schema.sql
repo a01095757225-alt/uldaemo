@@ -5,6 +5,8 @@
 -- 1. 학우(회원) 전용 테이블: Table Editor에서 엑셀처럼 한눈에 조회 및 직접 수정 가능
 CREATE TABLE IF NOT EXISTS public.uldaemo_users (
     student_id TEXT PRIMARY KEY,                      -- 학번 (예: 20261275)
+    email TEXT DEFAULT '',                            -- 가입 인증 이메일
+    joined_at TEXT DEFAULT '',                        -- 가입 일시 (YYYY-MM-DD HH:MM)
     nickname TEXT DEFAULT '',                         -- 닉네임
     department TEXT DEFAULT '울산대',                  -- 단과대 / 학과
     mbti TEXT DEFAULT '',                             -- MBTI
@@ -65,3 +67,7 @@ CREATE POLICY "uldaemo_posts_api_policy" ON public.uldaemo_posts
 DROP POLICY IF EXISTS "uldaemo_state_api_policy" ON public.uldaemo_state;
 CREATE POLICY "uldaemo_state_api_policy" ON public.uldaemo_state
     FOR ALL USING (true) WITH CHECK (true);
+
+-- 기존 테이블에 가입 이메일·가입 일시 컬럼 추가용 마이그레이션
+ALTER TABLE public.uldaemo_users ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
+ALTER TABLE public.uldaemo_users ADD COLUMN IF NOT EXISTS joined_at TEXT DEFAULT '';
