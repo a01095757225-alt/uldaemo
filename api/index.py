@@ -7,6 +7,7 @@ import html
 import time
 import random
 import urllib.request
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -463,10 +464,16 @@ def _supabase_load_db():
                 "plaza_talks": [],
             }
 
-        # uldaemo_users 테이블의 행(Row) 데이터를 병합 (Table Editor에서 직접 수정한 값 즉시 반영)
+        # uldaemo_users 테이블의 행(Row) 데이터를 병합 (Table Editor에서 직접 수정·삭제한 값 즉시 반영)
         if isinstance(user_rows, list) and len(user_rows) > 0:
             users_map = db_obj.setdefault("users", {})
+            deleted_users_map = db_obj.setdefault("deleted_users_map", {})
             now_ms = int(time.time() * 1000)
+            table_sids = {str(r.get("student_id") or "").strip() for r in user_rows if isinstance(r, dict)}
+            for existing_sid in list(users_map.keys()):
+                if existing_sid not in table_sids and str(existing_sid) != "20261275":
+                    users_map.pop(existing_sid, None)
+                    deleted_users_map[str(existing_sid)] = now_ms
             for row in user_rows:
                 if not isinstance(row, dict):
                     continue
@@ -715,13 +722,22 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         "reviews": [],
     }
     if isinstance(client_db, dict):
-        # 1. Users 병합 (최신 updated_at 우선 반영하여 다른 기기의 관심 카테고리/프로필 보호)
+        # 1. Users 병합 (최신 updated_at 우선 반영하여 다른 기기의 관심 카테고리/프로필 보호 + 탈퇴 계정 부활 방지)
+        deleted_users_map = current.setdefault("deleted_users_map", {})
         c_users = client_db.get("users") or {}
         if isinstance(c_users, dict):
             s_users = current.setdefault("users", {})
             for uid, c_u in c_users.items():
                 if not isinstance(c_u, dict):
                     continue
+                del_ts = int(deleted_users_map.get(str(uid)) or 0)
+                if del_ts > 0 and str(uid) != "20261275":
+                    c_created = int(c_u.get("created_at") or 0)
+                    if c_created <= del_ts:
+                        s_users.pop(uid, None)
+                        continue
+                    else:
+                        deleted_users_map.pop(str(uid), None)
                 s_u = s_users.get(uid)
                 if not isinstance(s_u, dict):
                     merged_u = dict(c_u)
@@ -887,6 +903,61 @@ class handler(BaseHTTPRequestHandler):
                 "storage": "supabase" if _has_supabase() else "github_fallback",
                 "db": merged,
             })
+            return
+
+        if action == "delete_account":
+            sid = str(data.get("student_id") or "").strip()
+            if not sid or sid == "20261275":
+                self._send_json(400, {"ok": False, "message": "삭제할 수 없는 계정입니다."})
+                return
+            current = load_cloud_db(force=True) or {}
+            now_ms = int(time.time() * 1000)
+            if isinstance(current, dict):
+                users_map = current.setdefault("users", {})
+                users_map.pop(sid, None)
+                del_map = current.setdefault("deleted_users_map", {})
+                del_map[sid] = now_ms
+                user_post_ids = [
+                    p.get("id") for p in (current.get("posts") or [])
+                    if isinstance(p, dict) and str(p.get("author_id")) == sid and p.get("id")
+                ]
+                current["posts"] = [
+                    p for p in (current.get("posts") or [])
+                    if isinstance(p, dict) and str(p.get("author_id")) != sid
+                ]
+                current["applications"] = [
+                    a for a in (current.get("applications") or [])
+                    if isinstance(a, dict) and str(a.get("applicant_id")) != sid and a.get("post_id") not in user_post_ids
+                ]
+                current["messages"] = [
+                    m for m in (current.get("messages") or [])
+                    if isinstance(m, dict) and str(m.get("sender_id")) != sid and m.get("post_id") not in user_post_ids
+                ]
+                current["notifications"] = [
+                    n for n in (current.get("notifications") or [])
+                    if isinstance(n, dict) and str(n.get("user_id")) != sid
+                ]
+                current["plaza_talks"] = [
+                    t for t in (current.get("plaza_talks") or [])
+                    if isinstance(t, dict) and str(t.get("author_id")) != sid
+                ]
+                if _has_supabase():
+                    try:
+                        req_del_u = urllib.request.Request(
+                            f"{SUPABASE_URL}/rest/v1/uldaemo_users?student_id=eq.{urllib.parse.quote(sid)}",
+                            headers=_supabase_headers("return=minimal"),
+                            method="DELETE",
+                        )
+                        with urllib.request.urlopen(req_del_u, timeout=5):
+                            pass
+                    except Exception:
+                        pass
+                    _supabase_save_db(current, user_post_ids)
+                else:
+                    _github_save_db(current)
+                _DB_MEM_CACHE["db"] = current
+                _DB_MEM_CACHE["ts"] = time.time()
+            self._send_json(200, {"ok": True, "deleted_student_id": sid})
             return
 
         if action == "ulsan_notices":
