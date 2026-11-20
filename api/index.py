@@ -479,6 +479,8 @@ def _supabase_load_db():
 
                 # 관리자가 Supabase Table Editor에서 컬럼 값을 직접 수정했는지 감지
                 col_checks = [
+                    ("email", str, ""),
+                    ("joined_at", str, ""),
                     ("nickname", str, ""),
                     ("department", str, "울산대"),
                     ("mbti", str, ""),
@@ -540,6 +542,8 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
                     continue
                 user_rows.append({
                     "student_id": str(sid),
+                    "email": str(u.get("email") or ""),
+                    "joined_at": str(u.get("joined_at") or ""),
                     "nickname": str(u.get("nickname") or ""),
                     "department": str(u.get("department") or "울산대"),
                     "mbti": str(u.get("mbti") or ""),
@@ -554,14 +558,26 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
                     "updated_at": int(u.get("updated_at") or now_ms),
                 })
             if user_rows:
-                req_users = urllib.request.Request(
-                    f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
-                    data=json.dumps(user_rows, ensure_ascii=False).encode("utf-8"),
-                    headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
-                    method="POST",
-                )
-                with urllib.request.urlopen(req_users, timeout=6):
-                    pass
+                try:
+                    req_users = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
+                        data=json.dumps(user_rows, ensure_ascii=False).encode("utf-8"),
+                        headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req_users, timeout=6):
+                        pass
+                except Exception:
+                    # DB에 email/joined_at 컬럼이 아직 추가되지 않은 환경에서도 기존 동기화 무중단 유지
+                    fallback_rows = [{k: v for k, v in r.items() if k not in ("email", "joined_at")} for r in user_rows]
+                    req_users_fb = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
+                        data=json.dumps(fallback_rows, ensure_ascii=False).encode("utf-8"),
+                        headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req_users_fb, timeout=6):
+                        pass
     except Exception:
         pass
 
