@@ -355,11 +355,27 @@
       if (!cloudDb || typeof cloudDb !== "object") return false;
       let changed = false;
 
-      // 1. Users 병합 (PC/폰 어느 쪽에서 가입한 학번이든 모두 보존 + 최신 수정본 우선)
+      // 1. Users 병합 (PC/폰 어느 쪽에서 가입한 학번이든 모두 보존 + 최신 수정본 우선 + 탈퇴 계정 정리)
+      if (cloudDb.deleted_users_map && typeof cloudDb.deleted_users_map === "object") {
+        DB.deleted_users_map = Object.assign({}, DB.deleted_users_map || {}, cloudDb.deleted_users_map);
+        for (const [delSid, delTs] of Object.entries(DB.deleted_users_map)) {
+          const localU = DB.users && DB.users[delSid];
+          if (localU && Number(localU.created_at || 0) <= Number(delTs || 0) && String(delSid) !== "20261275") {
+            delete DB.users[delSid];
+            changed = true;
+          }
+        }
+      }
       if (cloudDb.users && typeof cloudDb.users === "object") {
         DB.users = DB.users || {};
+        const delMap = DB.deleted_users_map || {};
         for (const [uid, uObj] of Object.entries(cloudDb.users)) {
           if (uObj && typeof uObj === "object") {
+            const delTs = Number(delMap[uid] || 0);
+            if (delTs > 0 && Number(uObj.created_at || 0) <= delTs && String(uid) !== "20261275") {
+              delete DB.users[uid];
+              continue;
+            }
             const localU = DB.users[uid];
             if (!localU) {
               DB.users[uid] = Object.assign({}, uObj);
@@ -499,7 +515,7 @@
     function getDbStateSignature() {
       try {
         return JSON.stringify({
-          u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, Boolean(v.is_suspended), v.coffee_tickets, v.streak_days, v.boost_coupons, v.extra_post_coupons]),
+          u: Object.entries(DB.users || {}).map(([k, v]) => [k, v.nickname, v.manner_temp, v.report_count, Boolean(v.is_suspended), v.coffee_tickets, v.streak_days, v.boost_coupons, v.extra_post_coupons, (v.blocked_users || []).length]),
           p: (DB.posts || []).map(p => [p.id, p.status, p.title, p.is_boosted, p.boosted_at]),
           a: (DB.applications || []).map(a => [a.id, a.status]),
           m: (DB.messages || []).map(m => [m.id, m.is_read, m.text, m.reactions]),
@@ -978,6 +994,210 @@
           </div>
         </div>
       `;
+    }
+
+    // =========================================================
+    // 개인정보처리방침 · 이용약관 · 학우 차단 · 회원 탈퇴 (스토어 심사 필수 기능)
+    // =========================================================
+    function openPolicyDocModal(docType) {
+      saveSignupDraft();
+      state.policy_doc_modal = docType;
+      render();
+    }
+
+    function closePolicyDocModal() {
+      saveSignupDraft();
+      state.policy_doc_modal = null;
+      render();
+    }
+
+    function renderPolicyModalHtml() {
+      if (!state.policy_doc_modal) return "";
+      const isPrivacy = (state.policy_doc_modal === "privacy");
+      const title = isPrivacy ? "개인정보처리방침 (만 19세 이상 대상)" : "서비스 이용약관 및 비매너 무관용 원칙";
+      const fullUrl = isPrivacy ? "/privacy.html" : "/terms.html";
+      const bodyHtml = isPrivacy ? `
+        <div style="font-size:13px; color:#333D4B; line-height:1.6;">
+          <div style="background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:10px 12px; color:#1E6B52; font-weight:700; margin-bottom:12px;">
+            울대모는 <b>만 19세 이상 울산대학교 재학생</b> 전용 서비스로, 방장 수락 전까지 학과·MBTI를 블라인드 처리하며 이메일·연락처를 타인에게 절대 공개하지 않습니다.
+          </div>
+          <div style="font-weight:800; color:#191F28; margin:10px 0 4px;">1. 수집하는 개인정보 항목 및 목적</div>
+          <div>• <b>필수 항목:</b> 본인 확인 이메일, 학번, 비밀번호(SHA-256 단방향 암호화 해시), 닉네임, 학과, 성별, 만 19세 이상 확인 여부 (회원 식별, 재학생 인증, 블라인드 매칭 및 노쇼·비매너 방지)</div>
+          <div>• <b>선택 항목:</b> MBTI, 자기소개, 관심 카테고리, 강의 시간표 (공강 자동 매칭 및 관심 번개 알림)</div>
+          <div>• <b>기기 위치정보(GPS):</b> 서버에 저장되지 않으며, 기기 내에서 캠퍼스 호관까지의 도보 소요 시간 계산에만 일시 사용됩니다.</div>
+          <div style="font-weight:800; color:#191F28; margin:10px 0 4px;">2. 보유 및 이용 기간 (즉시 파기 원칙)</div>
+          <div>• 회원 탈퇴 시(<code>[내 정보] → [개인정보 · 차단 · 회원 탈퇴]</code>) 계정, 프로필, 개설 번개, 신청 내역, 시간표 데이터는 데이터베이스에서 <b>즉시 영구 파기</b>됩니다.</div>
+          <div style="font-weight:800; color:#191F28; margin:10px 0 4px;">3. 처리 위탁 및 보호책임자</div>
+          <div>• 클라우드 인프라: Supabase Inc.(DB 보관), Vercel Inc.(호스팅), Resend/SMTP(인증번호 발송)</div>
+          <div>• 문의처: <b>uldaemo.official@gmail.com</b></div>
+        </div>
+      ` : `
+        <div style="font-size:13px; color:#333D4B; line-height:1.6;">
+          <div style="background:#FFF8F8; border:1px solid #FECACA; border-radius:12px; padding:10px 12px; color:#B91C1C; font-weight:700; margin-bottom:12px;">
+            [무관용 원칙(Zero Tolerance)] 불쾌감을 주는 불건전 콘텐츠, 욕설·혐오 표현, 외부 연락처 강요, 무단 노쇼 행위는 적발 및 신고 누적 시 관용 없이 즉시 계정이 정지됩니다.
+          </div>
+          <div style="font-weight:800; color:#191F28; margin:10px 0 4px;">제1조 (가입 자격 및 만 19세 이상 확인)</div>
+          <div>본 서비스는 <b>만 19세 이상</b> 울산대학교 학우만 가입 및 이용할 수 있으며, 타인의 학번 도용 시 즉시 이용이 제한됩니다.</div>
+          <div style="font-weight:800; color:#191F28; margin:10px 0 4px;">제2조 (블라인드 매칭 및 사생활 보호)</div>
+          <div>방장이 수락하기 전까지 상세 학과·MBTI는 비공개로 보호되며, 인앱 채팅에서 전화번호·카카오톡·SNS 등 외부 연락처를 요구하는 행위는 자동 차단됩니다.</div>
+          <div style="font-weight:800; color:#191F28; margin:10px 0 4px;">제3조 (차단 및 신고 제재)</div>
+          <div>• 이용자는 불쾌한 학우를 즉시 <b>차단(Block)</b>하여 내 화면(피드·광장·채팅)에서 영구 숨김 처리할 수 있습니다.</div>
+          <div>• 서로 다른 학우 3명 이상에게 신고가 누적되거나 운영진이 약관 위반을 확인한 경우 계정이 즉시 정지됩니다.</div>
+        </div>
+      `;
+      return `
+        <div class="modal-backdrop" style="position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,0.55); backdrop-filter:blur(4px);" onclick="if(event.target===this) closePolicyDocModal();">
+          <div style="background:#FFFFFF; width:100%; max-width:520px; border-radius:24px; padding:22px 20px; box-shadow:0 12px 32px rgba(0,0,0,0.22); max-height:85vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #F2F4F3;">
+              <div style="font-size:17px; font-weight:800; color:#191F28;">${escHtml(title)}</div>
+              <button type="button" onclick="closePolicyDocModal()" style="border:none; background:none; font-size:18px; color:#6B7684; cursor:pointer; padding:2px 6px;">✕</button>
+            </div>
+            <div style="overflow-y:auto; flex:1; padding-right:4px;">
+              ${bodyHtml}
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:16px; padding-top:12px; border-top:1px solid #F2F4F3;">
+              <a href="${fullUrl}" target="_blank" rel="noopener" style="font-size:12.5px; font-weight:700; color:#287D62; text-decoration:none;">새 창에서 전문 보기 ↗</a>
+              <button type="button" class="btn btn-primary" style="width:auto; min-width:110px; height:40px; border-radius:12px; font-size:13.5px; font-weight:800;" onclick="closePolicyDocModal()">확인</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getMyBlockedUsers() {
+      const uid = String(state.user_id || "");
+      if (!uid) return [];
+      const me = (DB.users || {})[uid];
+      const fromDb = (me && Array.isArray(me.blocked_users)) ? me.blocked_users : [];
+      let fromLocal = [];
+      try {
+        fromLocal = JSON.parse(localStorage.getItem("uldaemo_blocked_" + uid) || "[]");
+        if (!Array.isArray(fromLocal)) fromLocal = [];
+      } catch (e) { fromLocal = []; }
+      return Array.from(new Set([...fromDb, ...fromLocal].map(String).filter(x => x && x !== uid)));
+    }
+
+    function isUserBlocked(targetSid) {
+      if (!targetSid || !state.user_id) return false;
+      return getMyBlockedUsers().includes(String(targetSid));
+    }
+
+    function blockUser(targetSid, targetLabel) {
+      const uid = String(state.user_id || "");
+      const tSid = String(targetSid || "").trim();
+      if (!uid || !tSid || uid === tSid) return;
+      if (ADMIN_STUDENT_IDS.includes(tSid)) {
+        return showToast("운영진 계정은 차단할 수 없어요.");
+      }
+      const dispName = targetLabel || ((DB.users && DB.users[tSid] && DB.users[tSid].nickname) ? DB.users[tSid].nickname : "해당 학우");
+      openConfirmSheet({
+        title: `${dispName}님을 차단할까요?`,
+        desc: "차단하면 이 학우가 올린 번개 모임, 광장 게시글·답글이 내 화면에서 즉시 숨겨지며 내가 차단했다는 사실은 상대방에게 알려지지 않아요.",
+        confirmText: "차단하기",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => {
+          const me = (DB.users || {})[uid];
+          const nextList = Array.from(new Set([...getMyBlockedUsers(), tSid]));
+          if (me) {
+            me.blocked_users = nextList;
+            me.updated_at = Date.now();
+          }
+          try { localStorage.setItem("uldaemo_blocked_" + uid, JSON.stringify(nextList)); } catch (e) {}
+          if (state.active_modal === "detail") {
+            const curPost = (DB.posts || []).find(p => Number(p.id) === Number(state.selected_post_id));
+            if (curPost && String(curPost.author_id) === tSid) state.active_modal = null;
+          }
+          saveDB(true);
+          showToast(`🚫 ${dispName}님을 차단했어요. ([내 정보]에서 해제 가능)`);
+          render();
+        }
+      });
+    }
+
+    function unblockUser(targetSid) {
+      const uid = String(state.user_id || "");
+      const tSid = String(targetSid || "").trim();
+      if (!uid || !tSid) return;
+      const nextList = getMyBlockedUsers().filter(x => x !== tSid);
+      const me = (DB.users || {})[uid];
+      if (me) {
+        me.blocked_users = nextList;
+        me.updated_at = Date.now();
+      }
+      try { localStorage.setItem("uldaemo_blocked_" + uid, JSON.stringify(nextList)); } catch (e) {}
+      saveDB(true);
+      showToast("차단을 해제했어요.");
+      render();
+    }
+
+    function resetMyTimetableData() {
+      const uid = String(state.user_id || "");
+      if (!uid) return;
+      openConfirmSheet({
+        title: "등록한 시간표 데이터를 초기화할까요?",
+        desc: "내 공강 시간표 정보가 모두 삭제되며 언제든 다시 등록할 수 있어요.",
+        confirmText: "초기화",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => {
+          const me = (DB.users || {})[uid];
+          if (me) {
+            delete me.timetable;
+            delete me.timetable_saved;
+            me.updated_at = Date.now();
+          }
+          try { localStorage.removeItem("uldaemo_tt_" + uid); } catch (e) {}
+          state.home_free_only = false;
+          saveDB(true);
+          showToast("시간표 데이터가 초기화되었어요.");
+          render();
+        }
+      });
+    }
+
+    function confirmDeleteMyAccount() {
+      const uid = String(state.user_id || "");
+      if (!uid) return;
+      if (isCurrentUserAdmin()) {
+        return showToast("운영진 보호 계정은 탈퇴할 수 없어요.");
+      }
+      openConfirmSheet({
+        title: "정말 울대모를 탈퇴할까요?",
+        desc: "회원 탈퇴 시 학번·이메일·프로필·개설한 번개·신청 내역·시간표·보유 쿠폰이 즉시 영구 삭제되며 복구할 수 없어요.",
+        confirmText: "회원 탈퇴 (영구 삭제)",
+        cancelText: "돌아가기",
+        isDanger: true,
+        onConfirm: () => executeDeleteMyAccount()
+      });
+    }
+
+    async function executeDeleteMyAccount() {
+      const uid = String(state.user_id || "").trim();
+      if (!uid || ADMIN_STUDENT_IDS.includes(uid)) return;
+      const myPostIds = (DB.posts || []).filter(p => p && String(p.author_id) === uid).map(p => p.id);
+      if (DB.users) delete DB.users[uid];
+      DB.deleted_users_map = DB.deleted_users_map || {};
+      DB.deleted_users_map[uid] = Date.now();
+      DB.posts = (DB.posts || []).filter(p => p && String(p.author_id) !== uid);
+      DB.applications = (DB.applications || []).filter(a => a && String(a.applicant_id) !== uid && !myPostIds.includes(a.post_id));
+      DB.messages = (DB.messages || []).filter(m => m && String(m.sender_id) !== uid && !myPostIds.includes(m.post_id));
+      DB.notifications = (DB.notifications || []).filter(n => n && String(n.user_id) !== uid);
+      DB.plaza_talks = (DB.plaza_talks || []).filter(t => t && String(t.author_id) !== uid);
+      try {
+        localStorage.removeItem("uldaemo_tt_" + uid);
+        localStorage.removeItem("uldaemo_blocked_" + uid);
+        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+      } catch (e) {}
+      try {
+        await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "delete_account", student_id: uid })
+        });
+      } catch (e) {}
+      executeLogoutNow();
+      showToast("회원 탈퇴 및 개인정보 파기가 완료되었습니다.");
     }
 
     function executeLogoutNow() {
@@ -2516,6 +2736,7 @@
             ${getSvgIcon('chevron-up', 20, '#287D62', 2.6)}
           </button>
           ${renderConfirmDialogHtml()}
+          ${renderPolicyModalHtml()}
         `;
 
         if (state.active_modal === "detail") {
@@ -2841,10 +3062,70 @@
               </div>
             </div>
 
+            <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:14px; padding:12px 14px; margin:10px 0 12px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:800; color:#191F28; cursor:pointer; padding-bottom:9px; margin-bottom:9px; border-bottom:1px solid #E5EAE7;">
+                <input id="signup_agree_all" type="checkbox" ${state.signup_agree_age19 && state.signup_agree_terms && state.signup_agree_privacy ? 'checked' : ''} onchange="toggleAllSignupConsents(this.checked)" style="width:17px; height:17px; accent-color:#287D62;" />
+                <span>약관 및 만 19세 이상 전체 동의</span>
+              </label>
+              <div style="display:flex; flex-direction:column; gap:7px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer;">
+                  <input id="signup_agree_age19" type="checkbox" ${state.signup_agree_age19 ? 'checked' : ''} onchange="state.signup_agree_age19=this.checked; syncSignupMasterCheckbox();" style="width:15px; height:15px; accent-color:#287D62;" />
+                  <span><b style="color:#287D62;">[필수]</b> 만 19세 이상 성인 학우입니다</span>
+                </label>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                  <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer;">
+                    <input id="signup_agree_terms" type="checkbox" ${state.signup_agree_terms ? 'checked' : ''} onchange="state.signup_agree_terms=this.checked; syncSignupMasterCheckbox();" style="width:15px; height:15px; accent-color:#287D62;" />
+                    <span><b style="color:#287D62;">[필수]</b> 서비스 이용약관 및 비매너 무관용 원칙 동의</span>
+                  </label>
+                  <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:11.5px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0; flex-shrink:0;">보기</button>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                  <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer;">
+                    <input id="signup_agree_privacy" type="checkbox" ${state.signup_agree_privacy ? 'checked' : ''} onchange="state.signup_agree_privacy=this.checked; syncSignupMasterCheckbox();" style="width:15px; height:15px; accent-color:#287D62;" />
+                    <span><b style="color:#287D62;">[필수]</b> 개인정보 수집 및 이용 동의</span>
+                  </label>
+                  <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#6B7684; font-size:11.5px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0; flex-shrink:0;">보기</button>
+                </div>
+              </div>
+            </div>
+
             <button class="btn btn-primary" style="margin-top:6px;" onclick="handleSignupSubmit()">가입 완료 및 울대모 시작하기</button>
           </div>
         `}
+        <div style="text-align:center; margin:14px 0 8px; font-size:12px; color:#8B95A1; display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer; padding:0;">서비스 이용약관</button>
+          <span>·</span>
+          <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#287D62; font-size:12px; font-weight:800; cursor:pointer; padding:0;">개인정보처리방침</button>
+          <span>·</span>
+          <span>만 19세 이상 대학생 전용</span>
+        </div>
+        ${renderConfirmDialogHtml()}
+        ${renderPolicyModalHtml()}
       `;
+    }
+
+    function toggleAllSignupConsents(checked) {
+      const v = Boolean(checked);
+      state.signup_agree_age19 = v;
+      state.signup_agree_terms = v;
+      state.signup_agree_privacy = v;
+      ["signup_agree_age19", "signup_agree_terms", "signup_agree_privacy"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = v;
+      });
+    }
+
+    function syncSignupMasterCheckbox() {
+      const a = document.getElementById("signup_agree_age19");
+      const t = document.getElementById("signup_agree_terms");
+      const p = document.getElementById("signup_agree_privacy");
+      if (a) state.signup_agree_age19 = a.checked;
+      if (t) state.signup_agree_terms = t.checked;
+      if (p) state.signup_agree_privacy = p.checked;
+      const allEl = document.getElementById("signup_agree_all");
+      if (allEl) {
+        allEl.checked = Boolean(state.signup_agree_age19 && state.signup_agree_terms && state.signup_agree_privacy);
+      }
     }
 
     async function handleAdminLogin(sid) {
@@ -3080,10 +3361,16 @@
       const dept = document.getElementById("signup_dept").value.trim();
       const mbti = document.getElementById("signup_mbti").value;
 
+      const agreeAge19 = document.getElementById("signup_agree_age19")?.checked || state.signup_agree_age19;
+      const agreeTerms = document.getElementById("signup_agree_terms")?.checked || state.signup_agree_terms;
+      const agreePrivacy = document.getElementById("signup_agree_privacy")?.checked || state.signup_agree_privacy;
+
       if (!sid) return showToast("학번(필수 항목)을 입력해주세요.");
       if (!pw || pw.length < 4) return showToast("로그인 비밀번호를 4자리 이상 설정해주세요.");
       if (!state.verified_email) return showToast("먼저 Step 1 이메일 본인 인증을 완료해주세요.");
       if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 모두 입력해주세요.");
+      if (!agreeAge19) return showToast("[필수] 만 19세 이상 성인 학우 확인에 동의해주세요.");
+      if (!agreeTerms || !agreePrivacy) return showToast("[필수] 서비스 이용약관 및 개인정보 수집·이용에 동의해주세요.");
       if (ADMIN_STUDENT_IDS.includes(sid) || DEMO_USER_IDS.includes(sid)) {
         return showToast("사용할 수 없는 학번입니다.");
       }
@@ -3094,11 +3381,14 @@
       const pwHash = await hashUserPw(sid, pw);
       const nowDt = new Date();
       const joinedAtStr = `${nowDt.getFullYear()}-${String(nowDt.getMonth() + 1).padStart(2, '0')}-${String(nowDt.getDate()).padStart(2, '0')} ${String(nowDt.getHours()).padStart(2, '0')}:${String(nowDt.getMinutes()).padStart(2, '0')}`;
+      if (DB.deleted_users_map) delete DB.deleted_users_map[sid];
       DB.users[sid] = {
         student_id: sid,
         email: state.verified_email,
         joined_at: joinedAtStr,
         created_at: Date.now(),
+        age_19_verified: true,
+        agreed_terms_at: joinedAtStr,
         pw_hash: pwHash,
         nickname: nick,
         avatar: avatar.split(" ")[0],
@@ -3441,8 +3731,8 @@
     }
 
     function getFilteredHomePosts() {
-      // 시작 시각이 1시간 이상 지난 번개는 홈 피드에서 정리 (내 모임/참여 목록에서는 유지)
-      let list = (DB.posts || []).filter(p => p && p.status === "모집중" && !isPostExpired(p));
+      // 시작 시각이 1시간 이상 지난 번개 및 차단한 학우의 번개는 홈 피드에서 정리
+      let list = (DB.posts || []).filter(p => p && p.status === "모집중" && !isPostExpired(p) && !isUserBlocked(p.author_id));
       if (state.home_free_only && typeof isPostMatchingMyFreeTime === "function") {
         list = list.filter(p => isPostMatchingMyFreeTime(p));
       }
@@ -4567,6 +4857,11 @@
                 ${authorBadgesHtml ? `<div style="margin-bottom:10px; display:flex; gap:6px; flex-wrap:wrap;">${authorBadgesHtml}</div>` : ""}
                 ${renderTempGauge(hostRawTemp, true)}
                 ${!isAccepted ? `<div style="background:#F7F9F8; border-radius:10px; padding:9px 12px; font-size:11.5px; color:#6B7684; margin-top:10px;">상세 학과와 MBTI는 방장이 참여를 수락한 뒤에만 공개돼요.</div>` : ""}
+                ${!isAuthor ? `
+                  <div style="display:flex; justify-content:flex-end; margin-top:10px; padding-top:8px; border-top:1px solid #F2F4F3;">
+                    <button type="button" onclick="blockUser('${escHtml(post.author_id)}', '방장 학우')" style="border:none; background:none; color:#98A2B3; font-size:11.5px; font-weight:600; cursor:pointer; padding:2px 0;">🚫 이 학우 차단하기</button>
+                  </div>
+                ` : ""}
               </div>
             </div>
           </div>
@@ -4785,9 +5080,10 @@
         if (item.author_id && uid === item.author_id) return "익명(글쓴이)";
         return "익명 " + (order.indexOf(uid) + 1);
       };
-      const rows = (item.replies || []).filter(r => r && !r.deleted).map(r => {
+      const rows = (item.replies || []).filter(r => r && !r.deleted && !isUserBlocked(r.author_id)).map(r => {
         const mine = r.author_id === state.user_id;
         const isOwner = item.author_id && r.author_id === item.author_id;
+        const replyBlockLabel = isOwner ? "익명 글쓴이" : label(r.author_id);
         return `
           <div style="display:flex; gap:8px; align-items:flex-start; padding:7px 0;">
             <div style="flex:1; min-width:0;">
@@ -4797,7 +5093,9 @@
               </div>
               <div style="font-size:14px; color:#191F28; line-height:1.45; word-break:break-word;">${escHtml(r.text)}</div>
             </div>
-            ${mine ? `<button type="button" style="border:none; background:none; color:#B0B8C1; font-size:12px; cursor:pointer; flex-shrink:0;" onclick="deleteReply('${kind}', ${item.id}, ${r.id})">삭제</button>` : ""}
+            ${mine
+              ? `<button type="button" style="border:none; background:none; color:#B0B8C1; font-size:12px; cursor:pointer; flex-shrink:0;" onclick="deleteReply('${kind}', ${item.id}, ${r.id})">삭제</button>`
+              : (r.author_id ? `<button type="button" style="border:none; background:none; color:#B0B8C1; font-size:11.5px; cursor:pointer; flex-shrink:0;" onclick="blockUser('${escHtml(r.author_id)}', '${escHtml(replyBlockLabel)}')">차단</button>` : "")}
           </div>
         `;
       }).join("");
@@ -5415,7 +5713,7 @@
       const polls = curPollCat === "전체"
         ? allPolls
         : allPolls.filter(p => (p.tag || "").includes(curPollCat));
-      const talks = DB.plaza_talks || [];
+      const talks = (DB.plaza_talks || []).filter(t => t && !isUserBlocked(t.author_id));
       const showAll = Boolean(state.polls_show_all);
       const visiblePolls = showAll ? polls : polls.slice(0, 1);
       const hiddenCount = Math.max(0, polls.length - visiblePolls.length);
@@ -5558,12 +5856,17 @@
                       ${tTier.tier >= 4 ? `<span class="tier-badge-pill" data-tier="${tTier.tier}" style="margin-right:6px; font-size:10.5px; padding:1px 7px;">${tTier.tier === 5 ? '👑 울대 레전드' : '⚡ 인싸 학우'}</span>` : ''}${escHtml(t.text)}
                     </div>
                     <div style="font-size:12px; color:#98A2B3; margin-top:4px;">블라인드 학우 · ${escHtml(t.created_at || "방금")}</div>
-                    <div style="display:flex; align-items:center; gap:14px; margin-top:8px;">
-                      <button type="button" style="border:none; background:none; color:${liked ? '#E85D75' : '#6B7684'}; font-size:12.5px; font-weight:700; display:inline-flex; align-items:center; gap:5px; cursor:pointer; padding:2px 0;" onclick="toggleTalkLike(${t.id})">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="${liked ? '#E85D75' : 'none'}" stroke="${liked ? '#E85D75' : '#6B7684'}" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>
-                        <span>${likes.length}</span>
-                      </button>
-                      <button type="button" style="border:none; background:none; color:#6B7684; font-size:12.5px; font-weight:600; cursor:pointer; padding:2px 0;" onclick="toggleReplies('t', ${t.id})">답글 ${replyCnt}</button>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:8px;">
+                      <div style="display:flex; align-items:center; gap:14px;">
+                        <button type="button" style="border:none; background:none; color:${liked ? '#E85D75' : '#6B7684'}; font-size:12.5px; font-weight:700; display:inline-flex; align-items:center; gap:5px; cursor:pointer; padding:2px 0;" onclick="toggleTalkLike(${t.id})">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="${liked ? '#E85D75' : 'none'}" stroke="${liked ? '#E85D75' : '#6B7684'}" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>
+                          <span>${likes.length}</span>
+                        </button>
+                        <button type="button" style="border:none; background:none; color:#6B7684; font-size:12.5px; font-weight:600; cursor:pointer; padding:2px 0;" onclick="toggleReplies('t', ${t.id})">답글 ${replyCnt}</button>
+                      </div>
+                      ${(t.author_id && String(t.author_id) !== String(state.user_id)) ? `
+                        <button type="button" style="border:none; background:none; color:#B0B8C1; font-size:11.5px; font-weight:600; cursor:pointer; padding:2px 0;" onclick="blockUser('${escHtml(t.author_id)}', '광장 작성 학우')">차단</button>
+                      ` : ""}
                     </div>
                     ${renderReplyThread('t', t)}
                   </div>
@@ -5612,7 +5915,7 @@
 
     function renderMapTab() {
       const buildingList = Object.keys(ULSAN_CAMPUS_COORDS);
-      let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p));
+      let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p) && !isUserBlocked(p.author_id));
       if (state.map_cat && state.map_cat !== "전체") {
         activePosts = activePosts.filter(p => (p.category || "").includes(state.map_cat));
       }
@@ -5836,7 +6139,7 @@
         });
       }
 
-      let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p));
+      let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p) && !isUserBlocked(p.author_id));
       if (state.map_cat !== "전체") activePosts = activePosts.filter(p => p.category.includes(state.map_cat));
       activePosts.forEach(p => {
         const c = getBuildingCoords(p.location);
@@ -6376,9 +6679,12 @@
                 </button>
               `}
 
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid #E5EAE7;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid #E5EAE7; flex-wrap:wrap; gap:8px;">
                 <span style="font-size:11.5px; color:#8B95A1;">사생활 보호를 위해 연락처 작성은 제한돼요</span>
-                <button type="button" style="border:none; background:none; color:#E02020; font-size:12px; font-weight:600; cursor:pointer;" onclick="reportNoShow('${evalTargetId}')">노쇼 · 비매너 신고</button>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <button type="button" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer;" onclick="blockUser('${evalTargetId}', '${escHtml(evalTargetUser.nickname)}')">🚫 학우 차단</button>
+                  <button type="button" style="border:none; background:none; color:#E02020; font-size:12px; font-weight:600; cursor:pointer;" onclick="reportNoShow('${evalTargetId}')">노쇼 · 비매너 신고</button>
+                </div>
               </div>
             </div>
             `;
@@ -7121,6 +7427,13 @@
                   </span>
                 </button>
               ` : ""}
+              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('privacy')">
+                <span style="font-size:14.5px; font-weight:700;">개인정보 · 차단 · 회원 탈퇴</span>
+                <span style="display:inline-flex; align-items:center; gap:8px;">
+                  ${getMyBlockedUsers().length > 0 ? `<span style="font-size:12px; color:#6B7684;">차단 ${getMyBlockedUsers().length}명</span>` : ''}
+                  <span class="tk-menu-arrow">${sec === 'privacy' ? '▾' : '›'}</span>
+                </span>
+              </button>
               <button type="button" class="tk-menu-row" style="padding:12px 4px 4px; margin:0; border-radius:0; color:#98A2B3;" onclick="clearLogin()">
                 <span style="font-size:14.5px; font-weight:600; color:#98A2B3;">로그아웃</span>
                 <span class="tk-menu-arrow">›</span>
@@ -7212,6 +7525,91 @@
                 <input id="edit_user_pw" type="password" class="input" style="margin-bottom:0;" placeholder="${user.pw_hash ? '새 비밀번호 입력 (4자리 이상)' : '사용할 비밀번호 입력 (4자리 이상)'}" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('edit_user_pw')" />
                 <button type="button" class="btn btn-primary" style="width:auto; padding:0 16px; min-height:44px;" onclick="saveUserPasswordFromProfile('edit_user_pw')">저장</button>
               </div>
+            </div>
+          ` : ''}
+
+          ${sec === 'privacy' ? renderPrivacyAndAccountPanel(user) : ''}
+        </div>
+      `;
+    }
+
+    function renderPrivacyAndAccountPanel(user) {
+      const blockedList = getMyBlockedUsers();
+      const hasTT = typeof hasUserTimetable === "function" && hasUserTimetable(state.user_id);
+      const maskedEmail = (() => {
+        const em = String(user.email || "");
+        if (!em || !em.includes("@")) return "등록된 이메일 없음 (외부 비공개)";
+        const [idPart, domPart] = em.split("@");
+        return `${idPart.slice(0, 2)}***@${domPart} (타 학우에게 절대 비공개)`;
+      })();
+
+      return `
+        <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:18px; margin-bottom:12px;">
+          <div style="font-size:15.5px; font-weight:800; color:#191F28; margin-bottom:4px;">🛡️ 개인정보 · 위치 · 차단 · 회원 탈퇴</div>
+          <div style="font-size:12px; color:#6B7684; margin-bottom:14px;">울대모는 만 19세 이상 학우의 사생활을 철저히 보호하며 언제든 열람·초기화·탈퇴할 수 있습니다.</div>
+
+          <!-- 1) 내 개인정보 보호 현황 -->
+          <div style="background:#F7F9F8; border-radius:12px; padding:12px 14px; margin-bottom:12px; font-size:12.5px; color:#333D4B; line-height:1.6;">
+            <div><b>• 학번 (로그인 ID):</b> ${escHtml(state.user_id)} <span style="color:#287D62; font-weight:700;">(타인에게 비공개)</span></div>
+            <div><b>• 본인 확인 이메일:</b> ${escHtml(maskedEmail)}</div>
+            <div><b>• 블라인드 보호:</b> 방장이 번개 신청을 수락하기 전까지 상세 학과와 MBTI는 숨겨집니다.</div>
+          </div>
+
+          <!-- 2) 위치정보(GPS) 및 시간표 데이터 제어 -->
+          <div style="border:1px solid #E5E8EB; border-radius:12px; padding:12px 14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+              <div>
+                <div style="font-size:13.5px; font-weight:700; color:#191F28;">캠퍼스 건물 단위 도보 거리 표시 (위치 동의)</div>
+                <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">위치정보는 서버에 저장되지 않고 내 기기 내에서만 계산돼요.</div>
+              </div>
+              <button type="button" onclick="state.gps_consent=!state.gps_consent; render();" style="width:42px; height:24px; border-radius:12px; border:none; background:${state.gps_consent ? '#287D62' : '#D0D5DD'}; position:relative; cursor:pointer; flex-shrink:0;">
+                <span style="position:absolute; top:3px; left:${state.gps_consent ? '21px' : '3px'}; width:18px; height:18px; border-radius:9px; background:#FFFFFF; transition:left 0.18s;"></span>
+              </button>
+            </div>
+            ${hasTT ? `
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #F2F4F3;">
+                <div>
+                  <div style="font-size:13.5px; font-weight:700; color:#191F28;">내 공강 시간표 데이터</div>
+                  <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">등록된 강의 시간표를 즉시 삭제하고 초기화합니다.</div>
+                </div>
+                <button type="button" onclick="resetMyTimetableData()" style="height:32px; padding:0 12px; border-radius:16px; border:1px solid #E5E8EB; background:#FFFFFF; color:#4E5968; font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0;">시간표 초기화</button>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- 3) 차단한 학우 관리 -->
+          <div style="border:1px solid #E5E8EB; border-radius:12px; padding:12px 14px; margin-bottom:12px;">
+            <div style="font-size:13.5px; font-weight:700; color:#191F28; margin-bottom:6px;">🚫 차단한 학우 관리 (${blockedList.length}명)</div>
+            ${blockedList.length === 0 ? `
+              <div style="font-size:12px; color:#8B95A1;">현재 차단한 학우가 없어요. 번개 상세·대화방·광장에서 특정 학우를 차단할 수 있습니다.</div>
+            ` : `
+              <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                ${blockedList.map(bSid => {
+                  const bUser = (DB.users || {})[bSid];
+                  const bNick = bUser && bUser.nickname ? bUser.nickname : "블라인드 학우";
+                  const bAv = (bUser && bUser.avatar ? bUser.avatar : "🐶").split(" ")[0];
+                  return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#F7F9F8; border-radius:10px; padding:8px 12px;">
+                      <span style="font-size:13px; font-weight:700; color:#191F28;">${escHtml(bAv)} ${escHtml(bNick)}</span>
+                      <button type="button" onclick="unblockUser('${escHtml(bSid)}')" style="height:28px; padding:0 10px; border-radius:14px; border:1px solid #C5E6D6; background:#FFFFFF; color:#287D62; font-size:11.5px; font-weight:700; cursor:pointer;">차단 해제</button>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            `}
+          </div>
+
+          <!-- 4) 약관 및 개인정보처리방침 전문 보기 -->
+          <div class="row-2" style="margin-bottom:14px;">
+            <button type="button" class="btn" style="height:40px; border-radius:12px; font-size:12.5px; font-weight:700; background:#F7F9F8; border:none; color:#333D4B;" onclick="openPolicyDocModal('privacy')">개인정보처리방침 보기</button>
+            <button type="button" class="btn" style="height:40px; border-radius:12px; font-size:12.5px; font-weight:700; background:#F7F9F8; border:none; color:#333D4B;" onclick="openPolicyDocModal('terms')">서비스 이용약관 보기</button>
+          </div>
+
+          <!-- 5) 회원 탈퇴 (계정 및 개인정보 즉시 영구 삭제) -->
+          ${!isCurrentUserAdmin() ? `
+            <div style="padding-top:12px; border-top:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:12px; color:#8B95A1;">탈퇴 시 모든 개인정보와 활동 내역이 즉시 파기됩니다.</span>
+              <button type="button" onclick="confirmDeleteMyAccount()" style="height:36px; padding:0 14px; border-radius:18px; border:1px solid #FECACA; background:#FFF5F5; color:#E02020; font-size:12.5px; font-weight:800; cursor:pointer;">회원 탈퇴 (계정 영구 삭제)</button>
             </div>
           ` : ''}
         </div>
