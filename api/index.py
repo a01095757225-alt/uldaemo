@@ -481,6 +481,7 @@ def _supabase_load_db():
                 col_checks = [
                     ("email", str, ""),
                     ("joined_at", str, ""),
+                    ("is_suspended", bool, False),
                     ("nickname", str, ""),
                     ("department", str, "울산대"),
                     ("mbti", str, ""),
@@ -500,6 +501,9 @@ def _supabase_load_db():
                             raw_val = cast_fn(raw_u.get(col_key, default_val))
                             if col_val != raw_val:
                                 base_u[col_key] = col_val
+                                if col_key == "is_suspended" and col_val is False:
+                                    base_u["report_count"] = 0
+                                    base_u["reported_by"] = []
                                 admin_edited = True
                         except Exception:
                             pass
@@ -544,6 +548,7 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
                     "student_id": str(sid),
                     "email": str(u.get("email") or ""),
                     "joined_at": str(u.get("joined_at") or ""),
+                    "is_suspended": bool(u.get("is_suspended") or int(u.get("report_count") or 0) >= 3),
                     "nickname": str(u.get("nickname") or ""),
                     "department": str(u.get("department") or "울산대"),
                     "mbti": str(u.get("mbti") or ""),
@@ -568,8 +573,8 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
                     with urllib.request.urlopen(req_users, timeout=6):
                         pass
                 except Exception:
-                    # DB에 email/joined_at 컬럼이 아직 추가되지 않은 환경에서도 기존 동기화 무중단 유지
-                    fallback_rows = [{k: v for k, v in r.items() if k not in ("email", "joined_at")} for r in user_rows]
+                    # DB에 email/joined_at/is_suspended 컬럼이 아직 추가되지 않은 환경에서도 기존 동기화 무중단 유지
+                    fallback_rows = [{k: v for k, v in r.items() if k not in ("email", "joined_at", "is_suspended")} for r in user_rows]
                     req_users_fb = urllib.request.Request(
                         f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
                         data=json.dumps(fallback_rows, ensure_ascii=False).encode("utf-8"),
