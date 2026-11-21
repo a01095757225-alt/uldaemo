@@ -817,6 +817,15 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         current["polls"] = merged_polls[:50]
 
         merged_talks = _merge_list_by_id(current.get("plaza_talks"), client_db.get("plaza_talks"))
+        now_ms_talk = int(time.time() * 1000)
+        talk_ttl_ms = 3 * 24 * 60 * 60 * 1000
+        merged_talks = [
+            t for t in merged_talks
+            if isinstance(t, dict) and (
+                int(t.get("created_ts") or t.get("id") or 0) <= 1000000000000
+                or (now_ms_talk - int(t.get("created_ts") or t.get("id") or 0)) <= talk_ttl_ms
+            )
+        ]
         merged_talks.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["plaza_talks"] = merged_talks[:100]
 
