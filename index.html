@@ -5269,6 +5269,7 @@
         text,
         category,
         created_at: timeLabel,
+        created_ts: Date.now(),
         likes: []
       });
       saveDB(true);
@@ -5969,7 +5970,7 @@
                 <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
                   <div>
                     <div style="font-size:12px; font-weight:700; color:#6B7684;">🎟️ 보유 룰렛 티켓</div>
-                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${ticketCnt}장</span></div>
+                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${st.coffeeTickets}장</span></div>
                     <div style="font-size:11px; color:#6B7684; line-height:1.35;">3일 연속 출석·첫 번개 달성 시 티켓 지급</div>
                   </div>
                   <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="handleDailyCheckin()">
@@ -5983,6 +5984,16 @@
       `;
     }
 
+    const PLAZA_TALK_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+    function isPlazaTalkExpired(t) {
+      if (!t) return true;
+      const ts = Number(t.created_ts || t.id || 0);
+      if (ts > 1000000000000) {
+        return (Date.now() - ts) > PLAZA_TALK_TTL_MS;
+      }
+      return false;
+    }
+
     function renderPlazaTab() {
       ensurePlazaDefaults(DB);
       state.plaza_view = state.plaza_view || "balance";
@@ -5992,7 +6003,7 @@
       const polls = curPollCat === "전체"
         ? allPolls
         : allPolls.filter(p => (p.tag || "").includes(curPollCat));
-      const talks = (DB.plaza_talks || []).filter(t => t && !isUserBlocked(t.author_id));
+      const talks = (DB.plaza_talks || []).filter(t => t && !isPlazaTalkExpired(t) && !isUserBlocked(t.author_id));
       const showAll = Boolean(state.polls_show_all);
       const visiblePolls = showAll ? polls : polls.slice(0, 1);
       const hiddenCount = Math.max(0, polls.length - visiblePolls.length);
@@ -6108,7 +6119,10 @@
               </button>
             ` : ""}
 
-            <div style="font-size:18px; font-weight:800; color:#191F28; margin:16px 0 10px;">한줄 이야기</div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:16px 0 10px;">
+              <span style="font-size:18px; font-weight:800; color:#191F28;">한줄 이야기</span>
+              <span style="font-size:12px; font-weight:600; color:#8B95A1;">등록 후 3일 뒤 자동 삭제</span>
+            </div>
 
             <!-- 상단 한줄 남기기 입력 바 (피그마 ④ 광장 개선안) -->
             <div style="display:flex; align-items:center; gap:8px; background:#FFFFFF; border:1.5px solid #E5E8EB; height:52px; border-radius:16px; padding:0 10px 0 16px; margin-bottom:12px;">
