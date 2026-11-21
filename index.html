@@ -6902,17 +6902,16 @@
             </div>
           ` : ""}
 
-          <!-- 상단 고정 안심 안내 띠 (피그마 ③ 대화 개선안) -->
-          <div style="background:#EEF8F3; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #DDF2E7;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-              <span style="font-size:12px; font-weight:700; color:#287D62;">만남이 끝나면 후기와 노쇼 신고가 열려요. 연락처는 공개되지 않아요.</span>
+          <!-- 상단 컴팩트 약속 요약 바 (지도 보기 · 도착했어요 원터치) -->
+          <div style="background:#FFFFFF; padding:9px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid #EEF0EF; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1;">
+              <span style="font-size:13.5px; flex-shrink:0;">📍</span>
+              <span style="font-size:13px; font-weight:700; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.location)} · ${escHtml(post.meet_time || '오늘')}</span>
             </div>
-            ${((timePassed && !hasReviewed) || Number(post.id) === 999999001) ? `
-              <button type="button" onclick="openReviewModal(${post.id})" style="border:none; background:#287D62; color:#FFFFFF; height:26px; padding:0 10px; border-radius:13px; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0;">
-                후기 남기기 ›
-              </button>
-            ` : ""}
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+              <button type="button" onclick="openDetailModal(${post.id})" style="height:28px; padding:0 11px; border-radius:14px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:11.5px; font-weight:700; cursor:pointer;">지도 보기</button>
+              <button type="button" onclick="sendQuickChatPhrase(${post.id}, '도착했어요! 지금 도착해서 기다리고 있어요 🙌')" style="height:28px; padding:0 11px; border-radius:14px; border:none; background:#EEF8F3; color:#287D62; font-size:11.5px; font-weight:800; cursor:pointer;">도착했어요</button>
+            </div>
           </div>
 
           <!-- 메시지 목록 -->
@@ -6920,32 +6919,52 @@
             ${renderChatMessagesInner(post.id)}
           </div>
 
-          <!-- 하단 AI 첫 인사 제안 박스 + 메시지 입력 바 -->
-          <div class="tk-room-footer" style="border-top:none;">
-            <div style="margin-bottom:10px; padding:10px 14px; background:#EEF8F3; border:1.5px solid #287D62; border-radius:16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-              <div style="min-width:0; flex:1;">
-                <div style="font-size:11px; font-weight:700; color:#287D62;">AI 첫 인사 제안</div>
-                <div style="font-size:12.5px; font-weight:700; color:#191F28; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                  ${state['ai_hint_' + post.id] ? escHtml(state['ai_hint_' + post.id]) : escHtml(defaultIcebreaker)}
+          <!-- 하단 스마트 접이식 AI 대화 소재 추천 서랍 + 메시지 입력 바 -->
+          <div class="tk-room-footer" style="border-top:1px solid #EEF0EF;">
+            ${(() => {
+              const drawerState = state['ai_drawer_open_' + post.id];
+              const isAiOpen = (drawerState === undefined) ? (msgs.length <= 2) : Boolean(drawerState);
+              if (!isAiOpen) return "";
+              const isAiLoading = Boolean(state['ai_loading_' + post.id]);
+              const aiList = getAiSuggestionsForPost(post);
+              return `
+                <div style="margin-bottom:10px; padding:11px 13px; background:#EEF8F3; border:1.5px solid #287D62; border-radius:16px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                    <span style="font-size:12px; font-weight:800; color:#287D62; display:inline-flex; align-items:center; gap:4px;">
+                      <span>✨</span><span>AI 대화 소재 추천</span>
+                    </span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <button type="button" ${isAiLoading ? 'disabled' : ''} onclick="triggerAiIcebreaker(${post.id})" style="border:none; background:none; color:#287D62; font-size:11.5px; font-weight:700; cursor:pointer; padding:0;">${isAiLoading ? '추천 중...' : '새로고침'}</button>
+                      <button type="button" onclick="toggleAiDrawer(${post.id}, false)" aria-label="접기" style="border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;">✕</button>
+                    </div>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${aiList.map((txt, idx) => `
+                      <button type="button" onclick="applyAiSuggestionToInput(${post.id}, ${idx})" style="flex:1 1 200px; text-align:left; background:#FFFFFF; border:1px solid #D3EAE0; border-radius:12px; padding:8px 11px; font-size:12.5px; font-weight:600; color:#191F28; line-height:1.4; cursor:pointer; word-break:keep-all;">
+                        ${escHtml(txt)}
+                      </button>
+                    `).join("")}
+                  </div>
                 </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-                <button type="button" onclick="triggerAiIcebreaker(${post.id})" title="다른 대화 주제 추천" style="height:28px; padding:0 9px; border-radius:14px; border:1px solid #C5E6D6; background:#FFFFFF; color:#287D62; font-size:11px; font-weight:700; cursor:pointer;">새 제안</button>
-                <button type="button" onclick="const inp=document.getElementById('chat_in_${post.id}'); if(inp){ inp.value='${escHtml(state['ai_hint_' + post.id] || defaultQuickText)}'; inp.focus(); }" style="height:28px; padding:0 12px; border-radius:14px; border:none; background:#287D62; color:#FFFFFF; font-size:11px; font-weight:700; cursor:pointer;">입력창에 넣기</button>
-              </div>
-            </div>
+              `;
+            })()}
 
             <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 4px;">
               ${getQuickChatPhrasesForCurrentUser().map(phrase => `
-                <button type="button" class="cat-btn" style="height:32px; font-size:12.5px; padding:0 12px; flex-shrink:0; white-space:nowrap;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
+                <button type="button" class="cat-btn" style="height:30px; font-size:12px; padding:0 11px; flex-shrink:0; white-space:nowrap;" onmousedown="event.preventDefault()" onclick="sendQuickChatPhrase(${post.id}, '${escHtml(phrase)}')">${escHtml(phrase)}</button>
               `).join("")}
             </div>
 
-            <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; border-radius:26px; padding:4px 8px 4px 16px; min-height:52px;">
-              <textarea id="chat_in_${post.id}" class="tk-chat-input" style="background:transparent; padding:10px 4px; border-radius:0;" rows="1" autocomplete="off" placeholder="메시지를 입력하세요" onkeydown="handleChatInputKeydown(event, ${post.id})" oninput="autoResizeChatInput(this)"></textarea>
-              <button type="button" onclick="sendChatMessage(${post.id})" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" style="width:36px; height:36px; border-radius:18px; border:none; background:#287D62; color:#FFFFFF; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" onclick="toggleAiDrawer(${post.id})" title="AI 대화 소재 추천 열기/접기" style="height:40px; padding:0 11px; border-radius:20px; border:1.5px solid #C5E6D6; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:4px; cursor:pointer; flex-shrink:0;">
+                <span>✨</span><span>AI</span>
               </button>
+              <div style="flex:1; display:flex; align-items:center; gap:8px; background:#F7F9F8; border-radius:24px; padding:4px 6px 4px 14px; min-height:46px;">
+                <textarea id="chat_in_${post.id}" class="tk-chat-input" style="background:transparent; padding:8px 4px; border-radius:0;" rows="1" autocomplete="off" placeholder="메시지를 입력하세요" onkeydown="handleChatInputKeydown(event, ${post.id})" oninput="autoResizeChatInput(this)"></textarea>
+                <button type="button" onclick="sendChatMessage(${post.id})" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" style="width:36px; height:36px; border-radius:18px; border:none; background:#287D62; color:#FFFFFF; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -7061,9 +7080,9 @@
       };
 
       const dateHeaderHtml = `
-        <div style="text-align:center; margin:2px 0 8px;">
-          <span style="display:inline-block; background:#FFFFFF; border:1px solid #E5EAE7; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600; color:#6B7684;">
-            ${escHtml(post.meet_date || getTodayStr())} · 안심 대화
+        <div style="text-align:center; margin:4px 0 12px;">
+          <span style="display:inline-flex; align-items:center; gap:5px; background:#EDF1EF; border-radius:999px; padding:5px 13px; font-size:11.5px; font-weight:700; color:#4E5968;">
+            <span>🔒</span><span>방장 수락 완료 · 연락처는 공개되지 않아요</span>
           </span>
         </div>
       `;
@@ -7287,34 +7306,107 @@
       showToast("추천 문구가 입력창에 복사되었어요!");
     }
 
+    function getAiSuggestionsForPost(post) {
+      if (!post) return [];
+      const saved = state['ai_suggestions_' + post.id];
+      if (Array.isArray(saved) && saved.length > 0) return saved;
+      const cat = String(post.category || "");
+      if (cat.includes("밥")) {
+        return [
+          "방금 수업 끝났어요! 오늘 공강 몇 시간 있으세요?",
+          "혹시 못 드시는 음식이나 선호하시는 메뉴 있으세요?"
+        ];
+      }
+      if (cat.includes("카")) {
+        return [
+          "오늘 어떤 과제나 공부 하실 예정이세요?",
+          "어느 좌석 쪽에 계신가요? 도착하면 말씀해 주세요!"
+        ];
+      }
+      if (cat.includes("운동")) {
+        return [
+          "오늘 러닝이나 운동은 어느 정도 페이스로 하실 건가요?",
+          "도착하시면 알려주세요! 가볍게 몸 풀고 있어요"
+        ];
+      }
+      return [
+        "안녕하세요! 오늘 몇 시쯤 도착하실 예정인가요?",
+        `${post.location || '캠퍼스'}에서 뵙게 돼서 반가워요! 오늘 공강 여유 있으세요?`
+      ];
+    }
+
+    function toggleAiDrawer(postId, forceState) {
+      const key = 'ai_drawer_open_' + postId;
+      const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(postId));
+      const cur = (state[key] === undefined) ? (msgs.length <= 2) : Boolean(state[key]);
+      state[key] = (typeof forceState === "boolean") ? forceState : !cur;
+      render();
+    }
+
+    function applyAiSuggestionToInput(postId, idx) {
+      const post = findChatPostById(postId);
+      const list = getAiSuggestionsForPost(post);
+      const raw = list[Number(idx)] || list[0] || "";
+      if (!raw) return;
+      const plain = String(raw).replace(/^["']+|["']+$/g, "").trim();
+      const input = document.getElementById(`chat_in_${postId}`);
+      if (input) {
+        input.value = plain;
+        autoResizeChatInput(input);
+        input.focus();
+      }
+      showToast("추천 문구를 입력창에 넣었어요!");
+    }
+
     async function triggerAiIcebreaker(postId) {
       const post = findChatPostById(postId);
-      if (!post) return;
-      showToast("대화 주제를 찾고 있어요");
-      let reply = "";
+      if (!post || state['ai_loading_' + postId]) return;
+      state['ai_loading_' + postId] = true;
+      state['ai_drawer_open_' + postId] = true;
+      render();
+
+      const myId = String(state.user_id || "");
+      const recentMsgs = (DB.messages || [])
+        .filter(m => Number(m.post_id) === Number(postId) && m.sender_id !== "AI_BOT" && m.text)
+        .slice(-4)
+        .map(m => `${String(m.sender_id) === myId ? '나' : '상대'}: ${m.text}`);
+      const prevHints = getAiSuggestionsForPost(post);
+
+      let suggestions = [];
       try {
         const res = await fetch("/api/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "ai_icebreaker",
+            title: post.title,
             location: post.location,
             category: post.category,
-            meeting_style: post.meeting_style
+            meeting_style: post.meeting_style,
+            recent_messages: recentMsgs,
+            prev_hints: prevHints
           })
         });
         const data = await res.json();
-        if (data && data.reply) reply = data.reply;
+        if (data && Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+          suggestions = data.suggestions.map(s => String(s).replace(/^["']+|["']+$/g, "").trim()).filter(Boolean);
+        } else if (data && data.reply) {
+          suggestions = [String(data.reply).replace(/^["']+|["']+$/g, "").trim()];
+        }
       } catch (e) {}
 
-      if (!reply) {
-        reply = `"${post.location}에서 뵙게 돼서 반가워요! 혹시 시간표는 좀 여유 있으신가요? :)"`;
+      if (suggestions.length === 0) {
+        suggestions = [
+          `${post.location}에서 뵙게 돼서 반가워요! 오늘 시간표 여유 있으세요?`,
+          "혹시 오늘 선호하시는 메뉴나 분위기 있으신가요?"
+        ];
       }
 
-      // 상대방 화면에는 절대 전송되지 않고 본인 기기 화면에만 비밀 힌트로 표시
-      state['ai_hint_' + postId] = reply;
+      state['ai_loading_' + postId] = false;
+      state['ai_suggestions_' + postId] = suggestions.slice(0, 2);
+      state['ai_hint_' + postId] = suggestions[0];
       render();
-      showToast("대화 팁을 준비했어요");
+      showToast("✨ 새로운 대화 소재를 추천했어요");
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput) curInput.focus();
     }
@@ -7706,32 +7798,7 @@
             </div>
           ` : ''}
 
-          ${sec === 'edit' ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
-              <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:10px;">프로필 정보 수정</div>
-              <label class="label">닉네임</label>
-              <input id="edit_nick" class="input" value="${escHtml(user.nickname)}" />
-              <label class="label">학과</label>
-              <input id="edit_dept" class="input" value="${escHtml(user.department)}" />
-              <div class="row-2">
-                <div>
-                  <label class="label">프로필 아이콘</label>
-                  <select id="edit_avatar" class="select">
-                    ${AVATARS.map(a => `<option value="${a}" ${user.avatar.split(" ")[0] === a ? "selected" : ""}>${a}</option>`).join("")}
-                  </select>
-                </div>
-                <div>
-                  <label class="label">MBTI</label>
-                  <select id="edit_mbti" class="select">
-                    ${MBTIS.map(m => `<option value="${m}" ${user.mbti === m ? "selected" : ""}>${m}</option>`).join("")}
-                  </select>
-                </div>
-              </div>
-              <label class="label">한줄 자기소개</label>
-              <textarea id="edit_bio" class="textarea" rows="2">${escHtml(user.bio || "")}</textarea>
-              <button class="btn btn-primary" onclick="saveProfileEdit()">변경사항 저장하기</button>
-            </div>
-          ` : ''}
+          ${sec === 'edit' ? renderProfileEditPanel(user, myTier) : ''}
 
           ${sec === 'fav' ? `
             <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
@@ -7986,12 +8053,225 @@
       } catch (e) {}
     }
 
+    function captureProfileEditDraft() {
+      const nickEl = document.getElementById("edit_nick");
+      const deptEl = document.getElementById("edit_dept");
+      const avEl = document.getElementById("edit_avatar");
+      const mbtiEl = document.getElementById("edit_mbti");
+      const bioEl = document.getElementById("edit_bio");
+      state.profile_edit_draft = Object.assign({}, state.profile_edit_draft || {}, {
+        nickname: nickEl ? nickEl.value : (state.profile_edit_draft && state.profile_edit_draft.nickname),
+        department: deptEl ? deptEl.value : (state.profile_edit_draft && state.profile_edit_draft.department),
+        avatar: avEl ? avEl.value : (state.profile_edit_draft && state.profile_edit_draft.avatar),
+        mbti: mbtiEl ? mbtiEl.value : (state.profile_edit_draft && state.profile_edit_draft.mbti),
+        bio: bioEl ? bioEl.value : (state.profile_edit_draft && state.profile_edit_draft.bio)
+      });
+    }
+
+    function updateProfilePreviewLive() {
+      captureProfileEditDraft();
+      const d = state.profile_edit_draft || {};
+      const nick = (d.nickname || "").trim() || "학우";
+      const dept = (d.department || "").trim() || "울산대";
+      const mbti = d.mbti || "모름/비공개";
+      const bio = (d.bio || "").trim() || "한줄 자기소개를 입력해 보세요!";
+      const mode = state.profile_preview_mode || "open";
+      const nickEl = document.getElementById("prof_prev_nick");
+      const subEl = document.getElementById("prof_prev_sub");
+      const bioEl = document.getElementById("prof_prev_bio");
+      const nickCnt = document.getElementById("prof_nick_cnt");
+      const bioCnt = document.getElementById("prof_bio_cnt");
+      if (nickEl) nickEl.textContent = nick;
+      if (subEl) {
+        subEl.textContent = (mode === "blind")
+          ? `${getBroadCollege(dept)} · MBTI 비공개`
+          : `${dept} · ${mbti}`;
+      }
+      if (bioEl) bioEl.textContent = bio;
+      if (nickCnt) nickCnt.textContent = `${(d.nickname || "").length}/12`;
+      if (bioCnt) bioCnt.textContent = `${(d.bio || "").length}/60`;
+    }
+
+    function setProfilePreviewMode(mode) {
+      captureProfileEditDraft();
+      state.profile_preview_mode = mode;
+      render();
+    }
+
+    function selectProfileEditAvatar(av) {
+      captureProfileEditDraft();
+      state.profile_edit_draft = Object.assign({}, state.profile_edit_draft || {}, { avatar: av });
+      render();
+    }
+
+    function toggleProfileMbtiAxis(axisIdx, letter) {
+      captureProfileEditDraft();
+      const d = state.profile_edit_draft || {};
+      const cur = (d.mbti && /^[EI][NS][FT][PJ]$/.test(d.mbti)) ? d.mbti.split("") : ["E", "N", "F", "P"];
+      cur[axisIdx] = letter;
+      state.profile_edit_draft = Object.assign({}, d, { mbti: cur.join("") });
+      render();
+    }
+
+    function toggleProfileMbtiPrivate() {
+      captureProfileEditDraft();
+      const d = state.profile_edit_draft || {};
+      const isPriv = (!d.mbti || d.mbti === "모름/비공개");
+      state.profile_edit_draft = Object.assign({}, d, { mbti: isPriv ? "ENFP" : "모름/비공개" });
+      render();
+    }
+
+    function applyProfileBioTag(tagText) {
+      captureProfileEditDraft();
+      const bioEl = document.getElementById("edit_bio");
+      const cur = bioEl ? bioEl.value.trim() : String((state.profile_edit_draft && state.profile_edit_draft.bio) || "").trim();
+      let next = cur;
+      if (!cur || cur === "반갑습니다! 공강 시간에 같이 소통해요." || cur === "반갑습니다! 공강 시간에 같이 소통해요 🌱") {
+        next = tagText;
+      } else if (!cur.includes(tagText)) {
+        next = `${cur} ${tagText}`.slice(0, 60);
+      }
+      state.profile_edit_draft = Object.assign({}, state.profile_edit_draft || {}, { bio: next });
+      if (bioEl) {
+        bioEl.value = next;
+        updateProfilePreviewLive();
+        bioEl.focus();
+      } else {
+        render();
+      }
+    }
+
+    function renderProfileEditPanel(user, myTier) {
+      const d = state.profile_edit_draft || {};
+      const nick = (d.nickname !== undefined) ? d.nickname : (user.nickname || "");
+      const dept = (d.department !== undefined) ? d.department : (user.department || "");
+      const avatar = ((d.avatar !== undefined) ? d.avatar : (user.avatar || "🐶")).split(" ")[0];
+      const mbti = (d.mbti !== undefined) ? d.mbti : (user.mbti || "모름/비공개");
+      const bio = (d.bio !== undefined) ? d.bio : (user.bio || "");
+      const mode = state.profile_preview_mode || "open";
+      const isMbtiPrivate = (!mbti || mbti === "모름/비공개" || !/^[EI][NS][FT][PJ]$/.test(mbti));
+      const mbtiAxes = [
+        ["E", "I"],
+        ["N", "S"],
+        ["F", "T"],
+        ["P", "J"]
+      ];
+      const bioPresets = [
+        { tag: "#공강 밥약 환영", text: "공강 시간에 가볍게 밥약 환영해요!" },
+        { tag: "#조용히 카공해요", text: "도서관이나 카페에서 조용히 카공해요" },
+        { tag: "#가벼운 스몰토크", text: "부담 없이 가벼운 스몰토크 좋아해요" },
+        { tag: "#러닝 메이트", text: "저녁 트랙 러닝·운동 메이트 구해요!" }
+      ];
+
+      return `
+        <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:20px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+            <div style="font-size:16.5px; font-weight:800; color:#191F28;">프로필 정보 수정</div>
+            <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">블라인드 보호 중</span>
+          </div>
+
+          <!-- 1) 실시간 라이브 프로필 미리보기 카드 (수락 전 블라인드 vs 수락 후 공개) -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:12px; font-weight:700; color:#6B7684;">다른 학우에게 보이는 내 모습</span>
+            <div style="display:inline-flex; background:#F2F4F3; padding:3px; border-radius:999px; gap:2px;">
+              <button type="button" onclick="setProfilePreviewMode('blind')" style="border:none; height:26px; padding:0 11px; border-radius:999px; font-size:11.5px; font-weight:700; cursor:pointer; background:${mode === 'blind' ? '#287D62' : 'transparent'}; color:${mode === 'blind' ? '#FFFFFF' : '#6B7684'};">수락 전 (블라인드)</button>
+              <button type="button" onclick="setProfilePreviewMode('open')" style="border:none; height:26px; padding:0 11px; border-radius:999px; font-size:11.5px; font-weight:700; cursor:pointer; background:${mode === 'open' ? '#287D62' : 'transparent'}; color:${mode === 'open' ? '#FFFFFF' : '#6B7684'};">수락 후 (공개)</button>
+            </div>
+          </div>
+
+          <div style="background:#FFFFFF; border:1.5px solid #E5EAE7; border-radius:18px; padding:16px; margin-bottom:20px; box-shadow:0 4px 14px rgba(0,0,0,0.03);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+              <span style="width:54px; height:54px; border-radius:27px; background:#EEF8F3; font-size:28px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                ${escHtml(avatar)}
+              </span>
+              <div style="min-width:0; flex:1;">
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <span id="prof_prev_nick" style="font-size:16.5px; font-weight:800; color:#191F28;">${escHtml(nick || '학우')}</span>
+                  <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:2px 9px; border-radius:999px;">${myTier.tier === 5 ? '👑 ' : ''}${escHtml(myTier.name)} · ${myTier.displayTemp}°C</span>
+                </div>
+                <div id="prof_prev_sub" style="font-size:12.5px; color:#6B7684; margin-top:3px;">
+                  ${mode === 'blind' ? `${escHtml(getBroadCollege(dept || '울산대'))} · MBTI 비공개` : `${escHtml(dept || '울산대')} · ${escHtml(mbti)}`}
+                </div>
+              </div>
+            </div>
+            <div style="background:#EEF8F3; border-radius:12px; padding:10px 13px; font-size:13px; font-weight:600; color:#1E6B52; line-height:1.45;">
+              <span style="opacity:0.55; margin-right:4px;">“</span><span id="prof_prev_bio">${escHtml(bio || '한줄 자기소개를 입력해 보세요!')}</span>
+            </div>
+          </div>
+
+          <!-- 2) 6종 비주얼 원형 아바타 피커 -->
+          <div style="font-size:13px; font-weight:800; color:#191F28; margin-bottom:10px;">프로필 아바타</div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+            ${AVATARS.map(a => {
+              const sel = (avatar === a);
+              return `
+                <button type="button" onclick="selectProfileEditAvatar('${a}')" style="position:relative; width:54px; height:54px; border-radius:27px; border:${sel ? '2.5px solid #287D62' : '1.5px solid #E5E8EB'}; background:${sel ? '#EEF8F3' : '#FFFFFF'}; font-size:26px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.14s ease;">
+                  ${a}
+                  ${sel ? `<span style="position:absolute; right:-2px; bottom:-2px; width:18px; height:18px; border-radius:9px; background:#287D62; color:#FFFFFF; font-size:10.5px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; border:2px solid #FFFFFF;">✓</span>` : ""}
+                </button>
+              `;
+            }).join("")}
+          </div>
+          <input id="edit_avatar" type="hidden" value="${escHtml(avatar)}" />
+
+          <!-- 3) 닉네임 & 학과 입력 -->
+          <div class="row-2" style="margin-bottom:16px;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <label class="label" style="margin:0;">닉네임</label>
+                <span id="prof_nick_cnt" style="font-size:11.5px; color:#8B95A1; font-weight:600;">${nick.length}/12</span>
+              </div>
+              <input id="edit_nick" class="input" maxlength="12" value="${escHtml(nick)}" oninput="updateProfilePreviewLive()" style="height:44px; background:#F7F9F8; border:1px solid #E5E8EB; border-radius:12px; font-weight:700; margin-bottom:0;" />
+            </div>
+            <div>
+              <label class="label" style="margin:0 0 6px;">학과</label>
+              <input id="edit_dept" class="input" maxlength="20" value="${escHtml(dept)}" oninput="updateProfilePreviewLive()" style="height:44px; background:#F7F9F8; border:1px solid #E5E8EB; border-radius:12px; font-weight:700; margin-bottom:0;" />
+            </div>
+          </div>
+
+          <!-- 4) 4축 비주얼 MBTI 토글 피커 + 비공개 스위치 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-size:13px; font-weight:800; color:#191F28;">MBTI</span>
+            <button type="button" onclick="toggleProfileMbtiPrivate()" style="height:28px; padding:0 12px; border-radius:14px; border:${isMbtiPrivate ? '1.5px solid #191F28' : '1px solid #E5E8EB'}; background:${isMbtiPrivate ? '#191F28' : '#FFFFFF'}; color:${isMbtiPrivate ? '#FFFFFF' : '#6B7684'}; font-size:11.5px; font-weight:700; cursor:pointer;">
+              ${isMbtiPrivate ? '✓ 비공개 중' : '비공개'}
+            </button>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:20px; opacity:${isMbtiPrivate ? '0.45' : '1'};">
+            ${mbtiAxes.map(([left, right], axisIdx) => {
+              const curLetter = !isMbtiPrivate ? mbti[axisIdx] : "";
+              return `
+                <div style="display:grid; grid-template-columns: 1fr 1fr; background:#F2F4F3; border-radius:14px; padding:3px; gap:2px;">
+                  <button type="button" onclick="toggleProfileMbtiAxis(${axisIdx}, '${left}')" style="height:34px; border:none; border-radius:11px; font-size:13.5px; font-weight:800; cursor:pointer; background:${curLetter === left ? '#287D62' : 'transparent'}; color:${curLetter === left ? '#FFFFFF' : '#6B7684'};">${left}</button>
+                  <button type="button" onclick="toggleProfileMbtiAxis(${axisIdx}, '${right}')" style="height:34px; border:none; border-radius:11px; font-size:13.5px; font-weight:800; cursor:pointer; background:${curLetter === right ? '#287D62' : 'transparent'}; color:${curLetter === right ? '#FFFFFF' : '#6B7684'};">${right}</button>
+                </div>
+              `;
+            }).join("")}
+          </div>
+          <input id="edit_mbti" type="hidden" value="${escHtml(mbti)}" />
+
+          <!-- 5) 한줄 자기소개 + 빠른 추천 태그 칩 + 글자 수 카운터 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:800; color:#191F28;">한줄 자기소개</span>
+            <span id="prof_bio_cnt" style="font-size:11.5px; color:#8B95A1; font-weight:600;">${bio.length}/60</span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            ${bioPresets.map(bp => `
+              <button type="button" onclick="applyProfileBioTag('${escHtml(bp.text)}')" style="height:30px; padding:0 11px; border-radius:15px; border:1px solid #E5EAE7; background:#F7F9F8; color:#4E5968; font-size:12px; font-weight:700; cursor:pointer;">${escHtml(bp.tag)}</button>
+            `).join("")}
+          </div>
+          <textarea id="edit_bio" class="textarea" rows="2" maxlength="60" oninput="updateProfilePreviewLive()" style="background:#F7F9F8; border:1px solid #E5E8EB; border-radius:14px; font-size:13.5px; padding:10px 12px; margin-bottom:16px;" placeholder="공강 시간에 같이 하고 싶은 활동을 가볍게 적어보세요!">${escHtml(bio)}</textarea>
+
+          <button type="button" class="btn btn-primary" style="height:48px; border-radius:24px; font-size:15px; font-weight:800;" onclick="saveProfileEdit()">변경사항 저장하기</button>
+        </div>
+      `;
+    }
+
     function saveProfileEdit() {
       const nick = document.getElementById("edit_nick").value.trim();
       const dept = document.getElementById("edit_dept").value.trim();
       const avatar = document.getElementById("edit_avatar").value;
       const mbti = document.getElementById("edit_mbti").value;
-      const bio = document.getElementById("edit_bio").value.trim();
+      const bio = document.getElementById("edit_bio").value.trim().slice(0, 60);
       if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 비워둘 수 없어요.");
 
       const u = DB.users[state.user_id];
@@ -8001,6 +8281,7 @@
       u.mbti = mbti;
       u.bio = bio;
       u.updated_at = Date.now();
+      state.profile_edit_draft = null;
       saveDB(true);
       showToast("✅ 프로필이 수정되었어요!");
       render();
