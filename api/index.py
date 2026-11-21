@@ -991,57 +991,98 @@ class handler(BaseHTTPRequestHandler):
             return
 
         if action == "ai_icebreaker":
-            location = str(data.get("location", "울산대학교"))
-            category = str(data.get("category", "🍚 밥약"))
-            style = str(data.get("meeting_style", "간단한 스몰토크 환영"))
-            prompt = (
-                f"너는 울산대학교 학생들의 번개 모임을 돕는 친절한 캠퍼스 AI 매니저야. "
-                f"장소: '{location}', 카테고리: '{category}', 성향: '{style}'. "
-                "상대방 학우에게 건넬 수 있는 자연스럽고 위트 있는 대학생 스타일의 첫 마디 추천 멘트 1개를 큰따옴표로 감싸서 작성해줘. "
-                "로봇 같은 말투나 상투적인 공강 루틴 이야기는 피하고, 실제 대학생이 쓸 법한 친근한 말투로 1~2문장으로만 답해줘."
-            )
-            reply = call_gemini_api(prompt)
-            if not reply:
+            title = str(data.get("title", "")).strip()
+            location = str(data.get("location", "울산대학교")).strip()
+            category = str(data.get("category", "🍚 밥약")).strip()
+            style = str(data.get("meeting_style", "간단한 스몰토크 환영")).strip()
+            recent_msgs = data.get("recent_messages") or []
+            prev_hints = data.get("prev_hints") or []
+
+            recent_ctx = ""
+            if isinstance(recent_msgs, list) and len(recent_msgs) > 0:
+                lines = [str(x).strip()[:120] for x in recent_msgs[-4:] if str(x).strip()]
+                if lines:
+                    recent_ctx = "\n최근 대화 흐름:\n" + "\n".join(f"- {l}" for l in lines)
+            avoid_ctx = ""
+            if isinstance(prev_hints, list) and len(prev_hints) > 0:
+                avoid_ctx = "\n직전에 추천했던 문구(중복 금지): " + " / ".join(str(x).strip()[:80] for x in prev_hints[-3:])
+
+            if recent_ctx:
+                prompt = (
+                    f"너는 울산대학교 학생들의 캠퍼스 번개 채팅을 돕는 친절한 AI 매니저야.\n"
+                    f"모임 제목: '{title or category}', 장소: '{location}', 카테고리: '{category}', 분위기: '{style}'."
+                    f"{recent_ctx}{avoid_ctx}\n"
+                    "위 대화 흐름에 이어서 어색하지 않게 건넬 수 있는 자연스럽고 센스 있는 대학생 말투의 다음 대화 소재/질문 2개를 추천해줘.\n"
+                    "규칙: 따옴표·번호·불릿 없이 한 줄에 1문장씩, 총 2줄로만 답해줘. (각 문장 35자 이내, 연락처 요구 금지)"
+                )
+            else:
+                prompt = (
+                    f"너는 울산대학교 학생들의 캠퍼스 번개 채팅을 돕는 친절한 AI 매니저야.\n"
+                    f"모임 제목: '{title or category}', 장소: '{location}', 카테고리: '{category}', 분위기: '{style}'."
+                    f"{avoid_ctx}\n"
+                    "처음 만난 학우에게 가볍게 건넬 수 있는 자연스러운 대학생 말투의 첫 인사·대화 주제 2개를 추천해줘.\n"
+                    "규칙: 따옴표·번호·불릿 없이 한 줄에 1문장씩, 총 2줄로만 답해줘. (각 문장 35자 이내, 연락처 요구 금지)"
+                )
+
+            raw_reply = call_gemini_api(prompt)
+            suggestions = []
+            if raw_reply:
+                for line in raw_reply.splitlines():
+                    clean = re.sub(r'^[\s\d.\-•*\'"]+|[\s\'"]+$', "", line).strip()
+                    if len(clean) >= 6:
+                        suggestions.append(clean)
+                    if len(suggestions) >= 2:
+                        break
+
+            if len(suggestions) < 2:
                 cat_lower = category.lower()
                 if "밥" in cat_lower or "식사" in cat_lower:
-                    options = [
-                        f'"오늘 {location} 근처 학식 보셨어요? 돈까스나 제육도 좋고 바사 쪽도 아는 밥집 있는데 선호하시는 메뉴 있으세요?"',
-                        f'"바보사거리 쪽 자주 가시는 맛집 있으신가요? 혹시 못 드시는 음식 있으시면 말씀해 주세요!"',
-                        f'"오늘 든든한 한식이나 덮밥류가 당기시나요, 아니면 분식/면 종류가 편하세요? 좋아하시는 쪽으로 가요!"',
-                        f'"{location} 쪽이나 후문 식당 중 어디가 더 편하세요? 맛있는 거 먹으러 가요 :)"',
+                    pool = [
+                        f"오늘 {location} 메뉴 보셨어요? 선호하시는 메뉴 있으세요?",
+                        "혹시 못 드시는 음식이나 매운 거 괜찮으신지 여쭤봐도 될까요?",
+                        "방금 수업 끝났어요! 오늘 공강은 몇 시간 정도 있으세요?",
+                        "바보사거리 쪽 자주 가시는 최애 맛집 있으신가요?",
                     ]
                 elif "카공" in cat_lower or "커피" in cat_lower or "카페" in cat_lower:
-                    options = [
-                        f'"오늘 {location}에서 어떤 과제나 공부 벼락치기 하세요? 노트북 쓰기 편한 자리 쪽으로 갈까요?"',
-                        f'"조용한 분위기에서 집중하는 편이세요, 아니면 가벼운 대화 가능한 카페가 편하세요?"',
-                        f'"공강 시간 알차게 보내기엔 카공이 최고죠! 혹시 선호하시는 카페나 음료 메뉴 있으신가요?"',
-                        f'"{location} 신관 쪽 자리 잡으셨나요? 커피 한잔하면서 같이 파이팅해요!"',
+                    pool = [
+                        f"오늘 {location}에서 어떤 과제나 공부 하실 예정이세요?",
+                        "조용히 각자 집중하는 편이세요, 아니면 가끔 수다도 괜찮으세요?",
+                        "혹시 선호하시는 카페나 자주 드시는 음료 메뉴 있으세요?",
+                        "노트북 콘센트 있는 자리 쪽으로 잡을까요?",
                     ]
                 elif "운동" in cat_lower or "헬스" in cat_lower or "러닝" in cat_lower:
-                    options = [
-                        f'"{location}에서 가볍게 러닝이나 스트레칭 위주로 하실 건가요? 평소 운동 루틴에 맞춰서 같이 해요!"',
-                        f'"운동 혼자 하면 심심한데 같이 하게 돼서 좋네요! 오늘 가볍게 땀 흘려봐요 ㅎㅎ"',
-                        f'"{location} 쪽에서 뵈면 될까요? 무리하지 않고 편하게 운동해요 :)"',
+                    pool = [
+                        f"{location}에서 가볍게 러닝이나 스트레칭 위주로 하실 건가요?",
+                        "평소 운동 루틴이나 페이스는 어느 정도 편하세요?",
+                        "혼자 하면 심심한데 같이 하게 돼서 좋네요! 도착하시면 알려주세요",
                     ]
                 elif "산책" in cat_lower:
-                    options = [
-                        f'"날씨 딱 좋은데 식물원 쪽 가볍게 걸으면서 이야기 나눌까요? 오늘 공강은 몇 시간 남으셨어요?"',
-                        f'"캠퍼스 산책하면서 음료 테이크아웃 한잔 어떠세요? 편하게 걸어요 :)"',
+                    pool = [
+                        "날씨 딱 좋은데 음료 하나 테이크아웃해서 가볍게 걸을까요?",
+                        "오늘 공강은 몇 시간 남으셨어요? 편하게 걸으면서 얘기해요!",
                     ]
                 elif "게임" in cat_lower:
-                    options = [
-                        f'"주로 어떤 게임 즐겨 하세요? 롤, 배그, 스팀 게임 다 괜찮은데 편하게 맞춰서 해요!"',
-                        f'"오늘 스트레스 풀 겸 가볍게 즐겨봐요! 평소 티어나 포지션 어떻게 되세요? ㅎㅎ"',
+                    pool = [
+                        "주로 어떤 게임 즐겨 하세요? 편하게 맞춰서 같이 해요!",
+                        "오늘 스트레스 풀 겸 가볍게 한 판 해봐요! 평소 포지션이 어떻게 되세요?",
                     ]
                 else:
-                    options = [
-                        f'"혹시 몇 학번이세요? 이번 학기 전공 수업 들으시는 건 좀 어떠세요?"',
-                        f'"MBTI가 어떻게 되세요? 저는 먼저 편하게 말 걸어주시면 금방 친해지는 편이에요 ㅎㅎ"',
-                        f'"{location}에서 뵙게 돼서 반가워요! 오늘 시간표는 좀 여유 있으신 편인가요?"',
-                        f'"만나서 반갑습니다! 어색해하지 마시고 편하게 말씀 나눠요 :)"',
+                    pool = [
+                        f"{location}에서 뵙게 돼서 반가워요! 오늘 시간표는 여유 있으신가요?",
+                        "이번 학기 전공 수업 들으시는 건 좀 어떠세요?",
+                        "MBTI가 어떻게 되세요? 어색해하지 마시고 편하게 얘기해요!",
                     ]
-                reply = random.choice(options)
-            self._send_json(200, {"ok": True, "reply": reply})
+                prev_set = set(str(x) for x in prev_hints)
+                fresh = [x for x in pool if x not in prev_set and x not in suggestions]
+                random.shuffle(fresh)
+                for item in fresh:
+                    suggestions.append(item)
+                    if len(suggestions) >= 2:
+                        break
+                while len(suggestions) < 2 and pool:
+                    suggestions.append(pool[len(suggestions) % len(pool)])
+
+            self._send_json(200, {"ok": True, "reply": suggestions[0], "suggestions": suggestions[:2]})
             return
 
         self._send_json(400, {"ok": False, "message": "Unknown action"})
