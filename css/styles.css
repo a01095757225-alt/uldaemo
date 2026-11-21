@@ -2509,3 +2509,102 @@ body[data-tier="5"] .tier-avatar-frame.is-self,
   display: none !important;
 }
 
+/* =========================================================
+   ✨ 글로벌 입체 버튼 · 카드 호버 · 포커스 마이크로 인터랙션
+   ========================================================= */
+button, a, [onclick] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 모든 일반 버튼에 공통 입체 트랜지션 부여 */
+button:not(:disabled) {
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.18s ease,
+              background-color 0.16s ease,
+              border-color 0.16s ease,
+              filter 0.15s ease;
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* 일반 액션 버튼 · 칩 · 알약 버튼: 호버 시 부드럽게 입체 상승 */
+  button:not(:disabled):not(.tk-menu-row):not(.side-nav-btn):not(.dock-btn):not(.tk-room-back):not(.tk-room-top-btn):hover {
+    transform: translateY(-1.5px);
+    box-shadow: 0 6px 14px rgba(25, 31, 40, 0.08);
+    filter: brightness(1.015);
+  }
+
+  /* 포레스트 그린 메인 CTA 버튼: 브랜드 그린 입체 그림자 강조 */
+  .btn-primary:not(:disabled):hover,
+  .side-create-btn:not(:disabled):hover,
+  .fab-create:not(:disabled):hover,
+  .empty-state-btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(40, 125, 98, 0.28) !important;
+    filter: brightness(1.03);
+  }
+
+  /* 홈 피드 번개 카드: 마우스 호버 시 입체 부상 + 은은한 민트 테두리 */
+  .tk-feed-grid > div:hover {
+    transform: translateY(-3px);
+    border-color: #B8DFCE !important;
+    box-shadow: 0 10px 24px rgba(25, 31, 40, 0.07);
+  }
+
+  /* 리스트형 메뉴 행: 들뜨지 않고 부드러운 배경 하이라이트 */
+  .tk-menu-row:hover {
+    background-color: #F7F9F8;
+  }
+}
+
+/* 모든 버튼 클릭/터치 시 탄성 있게 꾹 눌리는 물리 피드백 */
+button:not(:disabled):not(.tk-menu-row):active {
+  transform: translateY(0.5px) scale(0.965) !important;
+  box-shadow: 0 2px 5px rgba(25, 31, 40, 0.06) !important;
+}
+.tk-menu-row:active {
+  transform: scale(0.99) !important;
+  background-color: #EEF8F3 !important;
+}
+.tk-feed-grid > div:active {
+  transform: scale(0.985) !important;
+}
+
+/* 입력창 포커스 시 브랜드 그린 소프트 글로우 */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #287D62 !important;
+  box-shadow: 0 0 0 3px rgba(40, 125, 98, 0.13);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+/* PC 커스텀 초슬림 스크롤바 */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D5DCE0;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #98A2B3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):hover,
+  button:not(:disabled):active,
+  .tk-feed-grid > div:hover,
+  .tk-feed-grid > div:active {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
+
