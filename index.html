@@ -5527,9 +5527,16 @@
       return buildMenuBoardForTheme(state.menu_people_filter || "all", false);
     }
 
+    function resetRouletteResultState() {
+      state.last_roulette_win_idx = null;
+      state.last_roulette_result = null;
+      state.last_roulette_desc = null;
+      state.last_roulette_menu = null;
+    }
+
     function changeMenuTheme(themeKey) {
       state.menu_people_filter = themeKey;
-      state.last_roulette_win_idx = null;
+      resetRouletteResultState();
       state.menu_just_shuffled = true;
       setTimeout(() => { state.menu_just_shuffled = false; }, 520);
       buildMenuBoardForTheme(themeKey, true);
@@ -5537,7 +5544,7 @@
     }
 
     function shuffleMenuRoulette() {
-      state.last_roulette_win_idx = null;
+      resetRouletteResultState();
       state.menu_just_shuffled = true;
       setTimeout(() => { state.menu_just_shuffled = false; }, 520);
       buildMenuBoardForTheme(state.menu_people_filter || "all", true);
@@ -5818,10 +5825,10 @@
             <!-- 모드 전환 탭: 공강 메뉴 추천 vs 리워드 룰렛 -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; gap:6px; width:100%;">
-                <button class="btn" style="flex:1; min-height:38px; padding:0 12px; font-size:13px; font-weight:800; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; state.last_roulette_win_idx=null; render();">
+                <button class="btn" style="flex:1; min-height:38px; padding:0 12px; font-size:13px; font-weight:800; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; resetRouletteResultState(); render();">
                   🍴 오늘의 공강 메뉴 룰렛
                 </button>
-                <button class="btn" style="flex:1; min-height:38px; padding:0 12px; font-size:13px; font-weight:800; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; state.last_roulette_win_idx=null; render();">
+                <button class="btn" style="flex:1; min-height:38px; padding:0 12px; font-size:13px; font-weight:800; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : '#6B7684'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; resetRouletteResultState(); render();">
                   🎁 혜택 리워드 룰렛 (티켓 ${st.coffeeTickets}장)
                 </button>
               </div>
