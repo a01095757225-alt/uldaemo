@@ -4720,7 +4720,7 @@
     }
 
     function renderDetailModal() {
-      const post = DB.posts.find(p => p.id === state.selected_post_id);
+      const post = findChatPostById(state.selected_post_id);
       if (!post) { state.active_modal = null; return renderHomeTab(); }
       const author = DB.users[post.author_id] || { nickname: "학우", avatar: "🐶", department: "울산대", mbti: "ENFP", manner_temp: 36.5, keywords: [] };
       const authorSt = getUserStatsAndBadges(post.author_id);
@@ -6577,10 +6577,10 @@
     function renderSingleChatRoomCard(room) {
       const myId = String(state.user_id);
       const { post, partnerId, otherIds, totalMembers, msgs } = room;
-      const partner = Number(postId) === 999999001
+      const partner = (Number(post.id) === 999999001 || partnerId === "demo_buddy")
         ? { avatar: "🐱", nickname: "울대모 체험 학우", department: "컴퓨터공학과", manner_temp: 38.5 }
         : (DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 });
-      const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+      const otherNames = otherIds.map(uid => uid === "demo_buddy" ? "울대모 체험 학우" : ((DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid)).join(", ");
 
       let markedRead = false;
       msgs.forEach(m => {
@@ -6842,10 +6842,10 @@
       const allMemberIds = [String(post.author_id), ...approvedApps.map(a => String(a.applicant_id))];
       const uniqueOthers = Array.from(new Set(allMemberIds.filter(uid => uid && uid !== myId)));
       const partnerId = uniqueOthers[0] || String(post.author_id);
-      const partner = Number(postId) === 999999001
+      const partner = (Number(postId) === 999999001 || partnerId === "demo_buddy")
         ? { avatar: "🐱", nickname: "울대모 체험 학우", department: "컴퓨터공학과", manner_temp: 38.5 }
         : (DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 });
-      const otherNames = uniqueOthers.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
+      const otherNames = uniqueOthers.map(uid => uid === "demo_buddy" ? "울대모 체험 학우" : ((DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid)).join(", ");
       const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(postId));
 
       const lastPartnerMsg = msgs.filter(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT").slice(-1)[0];
