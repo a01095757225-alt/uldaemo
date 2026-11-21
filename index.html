@@ -6498,7 +6498,7 @@
       });
 
       activeChats.sort((a, b) => b.lastMsgTs - a.lastMsgTs);
-      if (isCurrentUserAdmin() && !state.closed_demo_chat) {
+      if ((isCurrentUserAdmin() || String(state.user_id) === "20249876") && !state.closed_demo_chat) {
         const demoPost = getDemoChatPost();
         const demoMsgs = (DB.messages || []).filter(m => Number(m.post_id) === 999999001);
         const demoLast = demoMsgs.length > 0 ? demoMsgs[demoMsgs.length - 1] : null;
