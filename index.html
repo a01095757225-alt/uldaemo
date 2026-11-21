@@ -790,7 +790,7 @@
       u.coffee_tickets = (u.coffee_tickets || 0) + 1;
       u.bonus_score = (u.bonus_score || 0) + 15;
       u.updated_at = Date.now();
-      notifyUser(uid, "[첫 번개 달성 리워드] 첫 번개 매칭 성공으로 아메리카노 추첨권 1장과 챌린지 활동 점수 +15점이 지급되었습니다. 만남 후 서로 매너 칭찬을 남겨 매너온도와 공식 인증 뱃지를 달성해보세요!");
+      notifyUser(uid, "[첫 번개 달성 리워드] 첫 번개 매칭 성공으로 행운의 룰렛 티켓 1장이 지급되었습니다. 만남 후 서로 매너 칭찬을 남겨 매너온도와 공식 인증 뱃지를 달성해보세요!");
       return true;
     }
 
@@ -808,9 +808,9 @@
       setTimeout(() => { state.just_stamped_day = null; }, 900);
       if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
         u.coffee_tickets = (u.coffee_tickets || 0) + 1;
-        showToast(`연속 ${u.streak_days}일 출석 달성! 아메리카노 추첨권 +1장 & 활동 랭킹 +3점 획득!`);
+        showToast(`연속 ${u.streak_days}일 출석 달성! 행운의 룰렛 티켓 +1장 보너스 획득!`);
       } else {
-        showToast(`출석체크 완료! (연속 ${u.streak_days}일째 · 활동 랭킹 +3점 획득)`);
+        showToast(`출석체크 완료! (연속 ${u.streak_days}일째 출석)`);
       }
       u.updated_at = Date.now();
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
@@ -5372,8 +5372,8 @@
       { label: "상단부스트+1", short: "번개부스트", full: "⚡ 내 번개 상단 부스트권 +1개 당첨! (홈 피드 상단 강조)", desc: "내가 만든 번개를 홈 피드 최상단에 강조 노출해요", type: "boost", val: 1 },
       { label: "추가개설+1", short: "추가개설권", full: "➕ 일일 번개 추가 개설권 +1회 당첨!", desc: "오늘 하루 티어 개설 한도를 +1회 늘려줘요", type: "extra_post", val: 1 },
       { label: "매너+0.1°C", short: "온도+0.1°", full: "🌡️ 성실 활동 보너스 매너온도 +0.1°C 상승!", desc: "다음 티어 승급을 앞당겨주는 활동 보너스예요", type: "temp", val: 0.1 },
-      { label: "응모권+2장", short: "응모권+2", full: "☕ 이달의 커피 기프티콘 응모권 +2장 당첨!", desc: "월간 커피 쿠폰 추첨 및 룰렛에 사용해요", type: "ticket", val: 2 },
-      { label: "부스트+점수", short: "부스트+10점", full: "⚡ 번개 부스트권 +1개 & 챌린지 +10점 당첨!", desc: "번개 상단 노출권과 월간 랭킹 점수를 함께 받았어요", type: "boost_score", val: 1, score: 10 },
+      { label: "티켓+2장", short: "룰렛티켓+2", full: "🎟️ 행운의 룰렛 티켓 +2장 당첨!", desc: "부스트권·개설권 룰렛을 2번 더 돌릴 수 있어요", type: "ticket", val: 2 },
+      { label: "부스트+티켓", short: "부스트+1개", full: "⚡ 내 번개 상단 부스트권 +1개 추가 당첨!", desc: "내가 만든 번개를 홈 피드 상단에 강조 노출할 수 있어요", type: "boost_score", val: 1, score: 10 },
       { label: "티켓+1(한번더)", short: "한번더+1", full: "🎟️ 보너스 티켓 +1장 (무료로 한 번 더 돌리기!)", desc: "티켓 소모 없이 한 번 더 돌릴 수 있어요", type: "ticket", val: 1 }
     ];
 
@@ -5936,12 +5936,12 @@
 
                 <div style="background:#F7F9F8; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between;">
                   <div>
-                    <div style="font-size:12px; font-weight:700; color:#6B7684;">☕ 커피 응모 · 이달의 랭킹</div>
-                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${myRank}위 <span style="font-size:12px; color:#287D62;">(${st.rewardScore}점)</span></span></div>
-                    <div style="font-size:11px; color:#6B7684; line-height:1.35;">이달의 활동 TOP 3 학우에게 커피 쿠폰 증정</div>
+                    <div style="font-size:12px; font-weight:700; color:#6B7684;">🎟️ 보유 룰렛 티켓</div>
+                    <div style="font-size:17px; font-weight:800; color:#191F28; margin:2px 0;"><span class="${state.just_won_roulette ? 'wallet-count-pop' : ''}">${ticketCnt}장</span></div>
+                    <div style="font-size:11px; color:#6B7684; line-height:1.35;">3일 연속 출석·첫 번개 달성 시 티켓 지급</div>
                   </div>
-                  <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="state.profile_sec='challenge'; switchTab('마이');">
-                    이달의 랭킹 보러 가기 ›
+                  <button type="button" class="btn" style="margin-top:8px; min-height:30px; font-size:11.5px; font-weight:700; padding:0 8px;" onclick="handleDailyCheckin()">
+                    오늘 출석체크하기 ›
                   </button>
                 </div>
               </div>
@@ -7621,16 +7621,12 @@
                   <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
                 </span>
               </button>
-              <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="openTimetableModal()">
+              <button type="button" class="tk-menu-row" style="padding:12px 4px 4px; margin:0; border-radius:0;" onclick="openTimetableModal()">
                 <span style="font-size:14.5px; font-weight:700;">내 시간표 · 공강 메이트</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
                   <span style="font-size:12.5px; color:${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '#287D62' : '#8B95A1'}; font-weight:700;">${(typeof hasUserTimetable === 'function' && hasUserTimetable(state.user_id)) ? '등록됨' : '미등록'}</span>
                   <span class="tk-menu-arrow">›</span>
                 </span>
-              </button>
-              <button type="button" class="tk-menu-row" style="padding:12px 4px 4px; margin:0; border-radius:0;" onclick="toggleProfileSection('challenge')">
-                <span style="font-size:14.5px; font-weight:700;">월간 커피 쿠폰 챌린지</span>
-                <span class="tk-menu-arrow">${sec === 'challenge' ? '▾' : '›'}</span>
               </button>
             </div>
 
@@ -7709,8 +7705,6 @@
               ` : ""}
             </div>
           ` : ''}
-
-          ${sec === 'challenge' ? `<div style="margin-bottom:12px;">${renderChallengeAndRewardCard()}</div>` : ''}
 
           ${sec === 'edit' ? `
             <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
