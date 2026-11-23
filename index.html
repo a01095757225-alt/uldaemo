@@ -353,7 +353,18 @@
       return initial;
     }
 
-    let _deletedPostIds = [];
+    let _deletedPostIds = (() => {
+      try {
+        const raw = JSON.parse(localStorage.getItem("uldaemo_deleted_posts") || "[]");
+        return Array.isArray(raw) ? raw.map(Number).filter(n => !isNaN(n)) : [];
+      } catch (e) { return []; }
+    })();
+    function saveDeletedPostIds() {
+      try {
+        _deletedPostIds = Array.from(new Set(_deletedPostIds.map(Number).filter(n => !isNaN(n)))).slice(-500);
+        localStorage.setItem("uldaemo_deleted_posts", JSON.stringify(_deletedPostIds));
+      } catch (e) {}
+    }
     let _syncTimer = null;
 
     function mergeCloudDBIntoLocal(cloudDb) {
@@ -429,12 +440,24 @@
         return merged;
       };
 
+      if (Array.isArray(cloudDb.deleted_post_ids) && cloudDb.deleted_post_ids.length > 0) {
+        let addedDel = false;
+        cloudDb.deleted_post_ids.forEach(rawId => {
+          const nid = Number(rawId);
+          if (!isNaN(nid) && !_deletedPostIds.includes(nid)) {
+            _deletedPostIds.push(nid);
+            addedDel = true;
+          }
+        });
+        if (addedDel) saveDeletedPostIds();
+      }
+
       const mergeList = (localArr, cloudArr) => {
-        const deletedSet = new Set(_deletedPostIds);
+        const deletedSet = new Set(_deletedPostIds.map(Number));
         const map = new Map();
-        (localArr || []).forEach(it => { if (it && it.id && !deletedSet.has(it.id)) map.set(it.id, it); });
+        (localArr || []).forEach(it => { if (it && it.id && !deletedSet.has(Number(it.id))) map.set(it.id, it); });
         (cloudArr || []).forEach(it => {
-          if (it && it.id && !deletedSet.has(it.id)) {
+          if (it && it.id && !deletedSet.has(Number(it.id))) {
             if (map.has(it.id)) {
               map.set(it.id, mergeItem(map.get(it.id), it));
             } else {
@@ -446,7 +469,7 @@
       };
 
       if (Array.isArray(cloudDb.posts)) {
-        DB.posts = mergeList(DB.posts, cloudDb.posts).sort((a, b) => (b.id || 0) - (a.id || 0));
+        DB.posts = mergeList(DB.posts, cloudDb.posts).filter(p => p && p.status !== "취소됨").sort((a, b) => (b.id || 0) - (a.id || 0));
         changed = true;
       }
       if (Array.isArray(cloudDb.applications)) {
@@ -6358,11 +6381,16 @@
         }
       });
 
+      const numPostId = Number(postId);
       if (p) {
         p.status = "취소됨";
         p.updated_at = Date.now();
       }
-      if (!_deletedPostIds.includes(postId)) _deletedPostIds.push(postId);
+      if (!isNaN(numPostId) && !_deletedPostIds.includes(numPostId)) {
+        _deletedPostIds.push(numPostId);
+        saveDeletedPostIds();
+      }
+      DB.posts = (DB.posts || []).filter(x => Number(x.id) !== numPostId);
       saveDB(true);
       if (state.selected_post_id === postId) state.active_modal = null;
       showToast("번개 모임이 취소되었어요.");
