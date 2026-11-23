@@ -86,7 +86,7 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
     if not isinstance(db_obj, dict):
         return db_obj
     vid = str(viewer_id or "").strip()
-    posts = db_obj.get("posts") or []
+    posts = [p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and p.get("id") not in (101, 102, 103)]
     apps = db_obj.get("applications") or []
     msgs = db_obj.get("messages") or []
     notifs = db_obj.get("notifications") or []
@@ -956,8 +956,8 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", i
 
                 s_users[uid] = merged_u
 
-        # 2. Posts 병합 (영구 삭제 목록 deleted_post_ids 누적 관리로 타 기기 캐시 부활 원천 차단)
-        all_deleted_posts = set()
+    # 2. Posts 병합 (영구 삭제 목록 deleted_post_ids 누적 관리 + 임시 시드 번개 101/102/103 영구 제거)
+        all_deleted_posts = {101, 102, 103}
         for raw_del_src in (current.get("deleted_post_ids") or [], client_db.get("deleted_post_ids") or [], deleted_post_ids or []):
             for x in raw_del_src:
                 try:
