@@ -1955,6 +1955,8 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     position: sticky;
     top: 0;
     height: 100dvh;
+    max-height: none;
+    overflow-y: auto;
   }
   .side-logo {
     display: flex;
@@ -2058,17 +2060,19 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     margin-top: 12px;
   }
 
-  /* PC 우측 4단 카드 패널 */
+  /* PC 우측 4단 카드 패널 (잘림 없이 본문과 자연스럽게 이어지도록 스크롤 통합) */
   .app-shell.wide .pc-right {
     display: flex;
     flex-direction: column;
     gap: 14px;
     border-left: none;
-    padding: 32px 24px 32px 0;
-    position: sticky;
-    top: 0;
-    height: 100dvh;
-    overflow-y: auto;
+    padding: 32px 24px 48px 0;
+    position: static;
+    top: auto;
+    height: auto;
+    max-height: none;
+    overflow-y: visible;
+    align-self: start;
   }
 
   /* PC 지도: 왼쪽 번개 목록(360px) + 오른쪽 풀 지도 2열 분할 */
