@@ -524,10 +524,11 @@ body {
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .input, .select, .textarea {
   width: 100%;
+  min-height: 44px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  font-size: 13.5px;
+  font-size: 14px;
   font-family: inherit;
   background: #FFFFFF;
   color: var(--text-main);
