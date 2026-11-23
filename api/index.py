@@ -112,6 +112,7 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
         return {
             "users": {},
             "posts": posts,
+            "deleted_post_ids": db_obj.get("deleted_post_ids") or [],
             "applications": [],
             "messages": [],
             "notifications": [],
@@ -173,6 +174,7 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
     return {
         "users": safe_users,
         "posts": posts,
+        "deleted_post_ids": db_obj.get("deleted_post_ids") or [],
         "applications": apps,
         "messages": safe_msgs,
         "notifications": safe_notifs,
@@ -806,15 +808,16 @@ def load_cloud_db(force: bool = False):
     if not force and _DB_MEM_CACHE["db"] and (now - _DB_MEM_CACHE["ts"] < 2.0):
         return _DB_MEM_CACHE["db"]
 
-    # 1순위: Supabase PostgreSQL DB
+    # 1순위: Supabase PostgreSQL DB (설정되어 있으면 오래된 GitHub 스냅샷으로 절대 폴백하지 않음)
     if _has_supabase():
         sb_db = _supabase_load_db()
         if isinstance(sb_db, dict) and "users" in sb_db:
             _DB_MEM_CACHE["db"] = sb_db
             _DB_MEM_CACHE["ts"] = now
             return sb_db
+        return _DB_MEM_CACHE["db"]
 
-    # 2순위(폴백): GitHub Issue #1 클라우드 스토리지
+    # 2순위(Supabase 미설정 환경 전용): GitHub Issue #1 클라우드 스토리지
     gh_db = _github_load_db()
     if isinstance(gh_db, dict) and "users" in gh_db:
         _DB_MEM_CACHE["db"] = gh_db
@@ -833,10 +836,12 @@ def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
     else:
         merged = dict(c_item)
         merged.update(s_item)
-    # '승인됨'이 이전 기기의 오래된 '대기중' 캐시로 되돌아가는 것만 방지 (나감/취소됨/종료됨은 최신 updated_at 우선)
+    # 취소된 번개는 이전 기기 캐시로 부활 금지, '승인됨'은 오래된 '대기중' 캐시로만 되돌아가지 않도록 보호
     s_st = s_item.get("status")
     c_st = c_item.get("status")
-    if (s_st == "승인됨" and c_st == "대기중") or (c_st == "승인됨" and s_st == "대기중"):
+    if s_st == "취소됨" or c_st == "취소됨":
+        merged["status"] = "취소됨"
+    elif (s_st == "승인됨" and c_st == "대기중") or (c_st == "승인됨" and s_st == "대기중"):
         merged["status"] = "승인됨"
     elif (s_st == "매칭완료" and c_st == "모집중") or (c_st == "매칭완료" and s_st == "모집중"):
         merged["status"] = "매칭완료"
@@ -876,14 +881,19 @@ def _merge_list_by_id(server_list, client_list, deleted_ids=None):
 
 
 def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", is_admin: bool = False):
-    current = load_cloud_db(force=False) or {
-        "users": {},
-        "posts": [],
-        "applications": [],
-        "messages": [],
-        "notifications": [],
-        "reviews": [],
-    }
+    current = load_cloud_db(force=True)
+    if not isinstance(current, dict):
+        if _has_supabase():
+            return False, None
+        current = {
+            "users": {},
+            "posts": [],
+            "deleted_post_ids": [],
+            "applications": [],
+            "messages": [],
+            "notifications": [],
+            "reviews": [],
+        }
     vid = str(viewer_id or "").strip()
     if isinstance(client_db, dict):
         # 1. Users 병합 (최신 updated_at 우선 + 서버 민감 필드(pw_hash/email/상세학과/시간표) 보호 + 탈퇴 계정 부활 방지)
@@ -946,9 +956,24 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", i
 
                 s_users[uid] = merged_u
 
-        # 2. Posts 병합 (최신 글이 위로 오도록 정렬)
+        # 2. Posts 병합 (영구 삭제 목록 deleted_post_ids 누적 관리로 타 기기 캐시 부활 원천 차단)
+        all_deleted_posts = set()
+        for raw_del_src in (current.get("deleted_post_ids") or [], client_db.get("deleted_post_ids") or [], deleted_post_ids or []):
+            for x in raw_del_src:
+                try:
+                    all_deleted_posts.add(int(x))
+                except Exception:
+                    pass
+        for p in list(current.get("posts") or []) + list(client_db.get("posts") or []):
+            if isinstance(p, dict) and p.get("status") == "취소됨" and p.get("id") is not None:
+                try:
+                    all_deleted_posts.add(int(p.get("id")))
+                except Exception:
+                    pass
+        current["deleted_post_ids"] = sorted(all_deleted_posts)[-500:]
         prev_post_ids = {p.get("id") for p in (current.get("posts") or []) if isinstance(p, dict)}
-        merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), deleted_post_ids)
+        merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), all_deleted_posts)
+        merged_posts = [p for p in merged_posts if isinstance(p, dict) and p.get("status") != "취소됨"]
         merged_posts.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["posts"] = merged_posts
 
@@ -1007,14 +1032,16 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", i
         merged_talks.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["plaza_talks"] = merged_talks[:100]
 
-    # 1순위: Supabase PostgreSQL DB에 저장 (uldaemo_state, uldaemo_users, uldaemo_posts 동시 동기화)
+    # 1순위: Supabase PostgreSQL DB에 저장 (설정되어 있으면 GitHub 구버전으로 폴백 금지)
     if _has_supabase():
-        if _supabase_save_db(current, deleted_post_ids):
+        all_del_ids = current.get("deleted_post_ids") or deleted_post_ids or []
+        if _supabase_save_db(current, all_del_ids):
             _DB_MEM_CACHE["db"] = current
             _DB_MEM_CACHE["ts"] = time.time()
             return True, current
+        return False, current
 
-    # 2순위(폴백): GitHub Issue #1 클라우드 스토리지에 저장
+    # 2순위(Supabase 미설정 환경 전용): GitHub Issue #1 클라우드 스토리지에 저장
     if _github_save_db(current):
         _DB_MEM_CACHE["db"] = current
         _DB_MEM_CACHE["ts"] = time.time()
