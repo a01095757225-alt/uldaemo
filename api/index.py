@@ -8,6 +8,9 @@ import time
 import random
 import urllib.request
 import urllib.parse
+import hmac
+import hashlib
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -16,9 +19,167 @@ from email.utils import formataddr, formatdate, make_msgid
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 DEFAULT_SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "uldaemo.official@gmail.com")
-DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "knxqjnrestyggctq")
+DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "울대모 <noreply@uladaemo.app>").strip()
+ADMIN_STUDENT_IDS = {"20261275"}
+ADMIN_PW_HASH = "799bd88683489d6a99dee51db6c04b3ca41c9a730fe7c34f44283157bd2aaded"
+SESSION_SECRET = (
+    os.environ.get("SESSION_SECRET")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("GITHUB_TOKEN")
+    or "uldaemo-session-key-v1"
+).encode("utf-8")
+
+
+def _make_session_token(student_id: str, is_admin: bool = False) -> str:
+    exp = int(time.time()) + 30 * 24 * 3600
+    payload = f"{str(student_id).strip()}|{exp}|{1 if is_admin else 0}"
+    sig = hmac.new(SESSION_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    raw = f"{payload}|{sig}".encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _verify_session_token(token: str, expected_sid: str = ""):
+    if not token or not isinstance(token, str):
+        return None
+    try:
+        decoded = base64.urlsafe_b64decode(token.encode("ascii")).decode("utf-8")
+        parts = decoded.split("|")
+        if len(parts) != 4:
+            return None
+        sid, exp_str, admin_flag, sig = parts
+        if int(exp_str) < int(time.time()):
+            return None
+        expected_sig = hmac.new(
+            SESSION_SECRET,
+            f"{sid}|{exp_str}|{admin_flag}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        if expected_sid and str(sid) != str(expected_sid).strip():
+            return None
+        return {"student_id": sid, "is_admin": admin_flag == "1"}
+    except Exception:
+        return None
+
+
+def _get_broad_college(dept: str) -> str:
+    d = str(dept or "")
+    if any(k in d for k in ("컴퓨터", "IT", "ICT", "ict", "전기", "전자", "기계", "화공", "조선", "건축", "토목", "신소재", "산업", "반도체", "공학", "인공지능")):
+        return "공과대학"
+    if any(k in d for k in ("경영", "경제", "회계", "글로벌", "금융", "무역")):
+        return "경영대학"
+    if any(k in d for k in ("국어", "영어", "일본", "중국", "역사", "철학", "사회", "행정", "법학", "경찰", "아동", "언론", "인문")):
+        return "인문·사회대학"
+    if any(k in d for k in ("수학", "물리", "화학", "생명", "식품", "스포츠", "자연")):
+        return "자연과학대학"
+    if any(k in d for k in ("디자인", "미술", "음악", "섬유", "시각", "예술")):
+        return "예술대학"
+    if any(k in d for k in ("의예", "의학", "간호")):
+        return "의과·간호대학"
+    return "울산대학교 학우"
+
+
+def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = False) -> dict:
+    if not isinstance(db_obj, dict):
+        return db_obj
+    vid = str(viewer_id or "").strip()
+    posts = db_obj.get("posts") or []
+    apps = db_obj.get("applications") or []
+    msgs = db_obj.get("messages") or []
+    notifs = db_obj.get("notifications") or []
+    reviews = db_obj.get("reviews") or []
+    polls = db_obj.get("polls") or []
+    talks = db_obj.get("plaza_talks") or []
+    users = db_obj.get("users") or {}
+
+    # 비로그인 상태: 개인정보·채팅·알림·신청내역·학번 목록 완전 차단
+    if not vid:
+        safe_polls = []
+        for pl in polls:
+            if not isinstance(pl, dict):
+                continue
+            sp = dict(pl)
+            sp["votes_a"] = [f"anon_a_{i}" for i in range(len(pl.get("votes_a") or []))]
+            sp["votes_b"] = [f"anon_b_{i}" for i in range(len(pl.get("votes_b") or []))]
+            if isinstance(pl.get("replies"), list):
+                sp["replies"] = [
+                    {**r, "author_id": "blind"} for r in pl["replies"] if isinstance(r, dict)
+                ]
+            safe_polls.append(sp)
+        return {
+            "users": {},
+            "posts": posts,
+            "applications": [],
+            "messages": [],
+            "notifications": [],
+            "reviews": [],
+            "polls": safe_polls,
+            "plaza_talks": [],
+        }
+
+    # 로그인 사용자: 승인된 모임의 파트너 ID 및 채팅방 ID 계산
+    accepted_post_ids = set()
+    for p in posts:
+        if isinstance(p, dict) and str(p.get("author_id")) == vid and p.get("id") is not None:
+            accepted_post_ids.add(int(p.get("id")))
+    for a in apps:
+        if isinstance(a, dict) and str(a.get("applicant_id")) == vid and a.get("status") == "승인됨" and a.get("post_id") is not None:
+            accepted_post_ids.add(int(a.get("post_id")))
+
+    accepted_partner_ids = {vid}
+    for p in posts:
+        if isinstance(p, dict) and p.get("id") is not None and int(p.get("id")) in accepted_post_ids:
+            accepted_partner_ids.add(str(p.get("author_id") or ""))
+    for a in apps:
+        if isinstance(a, dict) and a.get("post_id") is not None and int(a.get("post_id")) in accepted_post_ids and a.get("status") == "승인됨":
+            accepted_partner_ids.add(str(a.get("applicant_id") or ""))
+
+    safe_users = {}
+    for uid, u in users.items():
+        if not isinstance(u, dict):
+            continue
+        su = dict(u)
+        su["has_pw"] = bool(u.get("pw_hash"))
+        su.pop("pw_hash", None)
+        if is_admin:
+            safe_users[uid] = su
+        elif str(uid) == vid:
+            safe_users[uid] = su
+        else:
+            su.pop("email", None)
+            su.pop("timetable", None)
+            su.pop("blocked_users", None)
+            if str(uid) not in accepted_partner_ids:
+                su["department"] = _get_broad_college(u.get("department", ""))
+                su["mbti"] = "모름/비공개"
+            safe_users[uid] = su
+
+    if is_admin:
+        safe_msgs = msgs
+        safe_notifs = notifs
+    else:
+        safe_msgs = [
+            m for m in msgs
+            if isinstance(m, dict) and m.get("post_id") is not None and int(m.get("post_id")) in accepted_post_ids
+        ]
+        safe_notifs = [
+            n for n in notifs
+            if isinstance(n, dict) and str(n.get("user_id")) == vid
+        ]
+
+    return {
+        "users": safe_users,
+        "posts": posts,
+        "applications": apps,
+        "messages": safe_msgs,
+        "notifications": safe_notifs,
+        "reviews": reviews,
+        "polls": polls,
+        "plaza_talks": talks,
+    }
 
 
 def call_gemini_api(prompt: str) -> str:
@@ -672,10 +833,12 @@ def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
     else:
         merged = dict(c_item)
         merged.update(s_item)
-    # 한 번 '승인됨' 또는 '매칭완료'가 된 상태는 이전 기기의 '대기중'/'모집중' 캐시로 절대 되돌아가지 않도록 보호
-    if s_item.get("status") == "승인됨" or c_item.get("status") == "승인됨":
+    # '승인됨'이 이전 기기의 오래된 '대기중' 캐시로 되돌아가는 것만 방지 (나감/취소됨/종료됨은 최신 updated_at 우선)
+    s_st = s_item.get("status")
+    c_st = c_item.get("status")
+    if (s_st == "승인됨" and c_st == "대기중") or (c_st == "승인됨" and s_st == "대기중"):
         merged["status"] = "승인됨"
-    elif s_item.get("status") == "매칭완료" or c_item.get("status") == "매칭완료":
+    elif (s_st == "매칭완료" and c_st == "모집중") or (c_st == "매칭완료" and s_st == "모집중"):
         merged["status"] = "매칭완료"
     if s_item.get("is_read") == 1 or c_item.get("is_read") == 1:
         merged["is_read"] = 1
@@ -712,7 +875,7 @@ def _merge_list_by_id(server_list, client_list, deleted_ids=None):
     return list(by_id.values())
 
 
-def sync_cloud_db(client_db: dict, deleted_post_ids=None):
+def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", is_admin: bool = False):
     current = load_cloud_db(force=False) or {
         "users": {},
         "posts": [],
@@ -721,8 +884,9 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         "notifications": [],
         "reviews": [],
     }
+    vid = str(viewer_id or "").strip()
     if isinstance(client_db, dict):
-        # 1. Users 병합 (최신 updated_at 우선 반영하여 다른 기기의 관심 카테고리/프로필 보호 + 탈퇴 계정 부활 방지)
+        # 1. Users 병합 (최신 updated_at 우선 + 서버 민감 필드(pw_hash/email/상세학과/시간표) 보호 + 탈퇴 계정 부활 방지)
         deleted_users_map = current.setdefault("deleted_users_map", {})
         c_users = client_db.get("users") or {}
         if isinstance(c_users, dict):
@@ -748,6 +912,20 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
                     else:
                         merged_u = dict(c_u)
                         merged_u.update(s_u)
+                    # 마스킹된 클라이언트가 서버의 pw_hash/email/상세정보를 빈 값으로 덮어쓰지 못하도록 보호
+                    if s_u.get("pw_hash") and not c_u.get("pw_hash"):
+                        merged_u["pw_hash"] = s_u["pw_hash"]
+                    if s_u.get("email") and not c_u.get("email"):
+                        merged_u["email"] = s_u["email"]
+                    if s_u.get("timetable") and not c_u.get("timetable") and str(uid) != vid:
+                        merged_u["timetable"] = s_u["timetable"]
+                    if s_u.get("blocked_users") and not c_u.get("blocked_users") and str(uid) != vid:
+                        merged_u["blocked_users"] = s_u["blocked_users"]
+                    if vid and not is_admin and str(uid) != vid:
+                        for prot_k in ("nickname", "department", "mbti", "bio", "avatar", "email", "pw_hash", "timetable", "fav_cats", "blocked_users"):
+                            if prot_k in s_u:
+                                merged_u[prot_k] = s_u[prot_k]
+                merged_u.pop("has_pw", None)
 
                 # 동일 계정의 중복 신고 방지 (reported_by 기준 1인 1회만 인정) 및 운영진 계정(20261275 등) 정지 해제 보장
                 if str(uid) == "20261275":
@@ -894,23 +1072,86 @@ class handler(BaseHTTPRequestHandler):
             })
             return
 
-        if action == "load_db":
-            db_obj = load_cloud_db(force=bool(data.get("force")))
+        def _resolve_viewer():
+            tok = str(data.get("session_token") or "").strip()
+            sess = _verify_session_token(tok)
+            if sess:
+                return sess["student_id"], bool(sess["is_admin"])
+            vid = str(data.get("viewer_id") or "").strip()
+            adm_hash = str(data.get("admin_pw_hash") or "").strip()
+            is_adm = bool(vid in ADMIN_STUDENT_IDS and adm_hash == ADMIN_PW_HASH)
+            return vid, is_adm
+
+        if action == "verify_login":
+            sid = str(data.get("student_id") or "").strip()
+            pw_hash = str(data.get("pw_hash") or "").strip()
+            if not sid:
+                self._send_json(400, {"ok": False, "reason": "missing_sid"})
+                return
+            db_obj = load_cloud_db(force=True) or {}
+            user = (db_obj.get("users") or {}).get(sid)
+            if not isinstance(user, dict):
+                self._send_json(200, {"ok": False, "reason": "not_found"})
+                return
+            stored_hash = str(user.get("pw_hash") or "").strip()
+            if not stored_hash:
+                self._send_json(200, {"ok": False, "reason": "no_pw"})
+                return
+            if not pw_hash:
+                self._send_json(200, {"ok": False, "reason": "missing_pw"})
+                return
+            if not hmac.compare_digest(stored_hash, pw_hash):
+                self._send_json(200, {"ok": False, "reason": "wrong_pw"})
+                return
+            is_adm = sid in ADMIN_STUDENT_IDS
+            token = _make_session_token(sid, is_admin=is_adm)
+            sanitized = _sanitize_db_for_viewer(db_obj, sid, is_adm)
             self._send_json(200, {
-                "ok": bool(db_obj),
+                "ok": True,
+                "session_token": token,
+                "db": sanitized,
+            })
+            return
+
+        if action == "issue_session":
+            sid = str(data.get("student_id") or "").strip()
+            pw_hash = str(data.get("pw_hash") or "").strip()
+            adm_hash = str(data.get("admin_pw_hash") or "").strip()
+            if not sid:
+                self._send_json(400, {"ok": False})
+                return
+            if sid in ADMIN_STUDENT_IDS and adm_hash == ADMIN_PW_HASH:
+                self._send_json(200, {"ok": True, "session_token": _make_session_token(sid, is_admin=True)})
+                return
+            db_obj = load_cloud_db(force=True) or {}
+            user = (db_obj.get("users") or {}).get(sid)
+            if isinstance(user, dict) and user.get("pw_hash") and pw_hash and hmac.compare_digest(str(user["pw_hash"]), pw_hash):
+                self._send_json(200, {"ok": True, "session_token": _make_session_token(sid, is_admin=False)})
+                return
+            self._send_json(403, {"ok": False, "message": "세션 발급 인증에 실패했습니다."})
+            return
+
+        if action == "load_db":
+            viewer_id, is_admin = _resolve_viewer()
+            db_obj = load_cloud_db(force=bool(data.get("force")))
+            safe_db = _sanitize_db_for_viewer(db_obj, viewer_id, is_admin) if db_obj else None
+            self._send_json(200, {
+                "ok": bool(safe_db),
                 "storage": "supabase" if _has_supabase() else "github_fallback",
-                "db": db_obj,
+                "db": safe_db,
             })
             return
 
         if action == "sync_db":
+            viewer_id, is_admin = _resolve_viewer()
             client_db = data.get("db") or {}
             deleted_post_ids = data.get("deleted_post_ids") or []
-            ok, merged = sync_cloud_db(client_db, deleted_post_ids)
+            ok, merged = sync_cloud_db(client_db, deleted_post_ids, viewer_id=viewer_id, is_admin=is_admin)
+            safe_merged = _sanitize_db_for_viewer(merged, viewer_id, is_admin) if merged else None
             self._send_json(200, {
                 "ok": ok,
                 "storage": "supabase" if _has_supabase() else "github_fallback",
-                "db": merged,
+                "db": safe_merged,
             })
             return
 
@@ -920,6 +1161,19 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"ok": False, "message": "삭제할 수 없는 계정입니다."})
                 return
             current = load_cloud_db(force=True) or {}
+            tok = str(data.get("session_token") or "").strip()
+            pw_hash = str(data.get("pw_hash") or "").strip()
+            sess = _verify_session_token(tok, expected_sid=sid)
+            stored_u = (current.get("users") or {}).get(sid) if isinstance(current, dict) else None
+            pw_ok = bool(
+                isinstance(stored_u, dict)
+                and stored_u.get("pw_hash")
+                and pw_hash
+                and hmac.compare_digest(str(stored_u["pw_hash"]), pw_hash)
+            )
+            if not sess and not pw_ok:
+                self._send_json(403, {"ok": False, "message": "본인 인증 토큰이 필요합니다. 다시 로그인 후 시도해주세요."})
+                return
             now_ms = int(time.time() * 1000)
             if isinstance(current, dict):
                 users_map = current.setdefault("users", {})
