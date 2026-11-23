@@ -1910,6 +1910,9 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
 }
 /* .floating-top-btn bottom handled by body.has-fab */
 .side-create-btn { display: none; }
+@media (max-width: 1023px) {
+  .app-shell.wide .main-col { padding-bottom: 148px; }
+}
 
 /* =====================================================
    PC 데스크톱 버전 (toss_karrot_preview_pc.html 100% 반영)
