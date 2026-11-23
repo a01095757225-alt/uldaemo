@@ -2963,6 +2963,9 @@
 
         const routeKey = `${state.active_modal || 'tab'}:${state.nav_tab}:${state.active_chat_post_id || ''}`;
         const routeChanged = (window._lastRouteKey !== routeKey);
+        if (routeChanged && window._lastRouteKey && typeof pushSpaHistoryState === "function") {
+          pushSpaHistoryState(routeKey);
+        }
         window._lastRouteKey = routeKey;
         const isMobileChatOpen = (!isPC() && state.nav_tab === "채팅" && !state.active_modal && !state.chat_list_mode && state.active_chat_post_id);
 
@@ -3231,14 +3234,15 @@
               한 번 로그인하면 <b>30일간 자동 로그인</b>이 유지됩니다. 로그아웃 후 다시 로그인하거나 새 기기에서 접속할 때만 비밀번호를 입력합니다.
             </div>
             <label class="label">학번 (아이디)</label>
-            <input id="login_sid" class="input" value="${escHtml(state.pending_login_sid || '')}" placeholder="학번 입력 (예: 20240001)" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
+            <input id="login_sid" class="input" value="${escHtml(state.pending_login_sid || '')}" placeholder="학번 8자리 (예: 20240001)" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
             <label class="label">비밀번호</label>
-            <input id="login_pw" type="password" class="input" placeholder="비밀번호 입력 (미설정 기존 학우는 학번만 입력 후 클릭)" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
-            <button class="btn btn-primary" onclick="handleLoginSubmit()">울대모 시작하기</button>
+            <input id="login_pw" type="password" class="input" placeholder="비밀번호 4자리 이상" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
+            <div style="font-size:11.5px; color:#8B95A1; margin:-2px 0 10px;">처음 설정하는 기존 학우는 비워두고 누르면 바로 설정할 수 있어요.</div>
+            <button class="btn btn-primary" style="min-height:46px;" onclick="handleLoginSubmit()">울대모 시작하기</button>
 
-            <div style="margin-top:12px; padding-top:12px; border-top:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-              <span style="font-size:12px; color:#6B7684;">이미 가입했는데 비밀번호가 없거나 잊으셨나요?</span>
-              <button type="button" style="border:none; background:none; color:#287D62; font-size:12px; font-weight:800; cursor:pointer; padding:0;" onclick="openPwResetFlow()">
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+              <span style="font-size:12px; color:#6B7684;">비밀번호가 없거나 잊으셨나요?</span>
+              <button type="button" style="border:none; background:none; color:#287D62; font-size:12.5px; font-weight:800; cursor:pointer; padding:8px 4px; min-height:36px; display:inline-flex; align-items:center;" onclick="openPwResetFlow()">
                 ${state.pw_reset_mode ? '비밀번호 설정 창 닫기 ▲' : '비밀번호 최초 설정 · 재설정 →'}
               </button>
             </div>
@@ -3285,7 +3289,7 @@
             <input id="signup_sid" class="input" placeholder="예: 20240001" />
 
             <label class="label">로그인 비밀번호 설정 (4자리 이상) (필수)</label>
-            <input id="signup_pw" type="password" class="input" placeholder="숫자 또는 영문 4자리 이상 (평소엔 자동 로그인 유지)" autocomplete="new-password" />
+            <input id="signup_pw" type="password" class="input" placeholder="비밀번호 4자리 이상 (자동 로그인 유지)" autocomplete="new-password" />
 
             <div style="margin: 10px 0;">
               <div style="font-size:13px; font-weight:700; margin-bottom:4px;">Step 1. 이메일 본인 인증 (구글·네이버·학교메일 모두 가능)</div>
@@ -3295,8 +3299,8 @@
                 </div>
               ` : `
                 <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px;">
-                  <input id="signup_email" class="input" value="${state.pending_email}" placeholder="예: myid@gmail.com / @naver.com" />
-                  <button class="btn" style="height:40px;" onclick="requestEmailOtp()">인증 요청</button>
+                  <input id="signup_email" class="input" value="${state.pending_email}" placeholder="자주 쓰는 이메일 주소" />
+                  <button class="btn" style="height:44px;" onclick="requestEmailOtp()">인증 요청</button>
                 </div>
                 ${state.auth_code_sent ? `
                   <div style="font-size:12px; color:#287D62; font-weight:600; margin:4px 0 6px; line-height:1.45;">
@@ -3305,7 +3309,7 @@
                   </div>
                   <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px; margin-bottom:6px;">
                     <input id="signup_otp_code" class="input" placeholder="인증번호 6자리 입력" />
-                    <button class="btn btn-primary" style="height:40px;" onclick="confirmEmailOtp()">인증 확인</button>
+                    <button class="btn btn-primary" style="height:44px;" onclick="confirmEmailOtp()">인증 확인</button>
                   </div>
                 ` : ""}
               `}
@@ -3334,7 +3338,7 @@
             <div class="row-2">
               <div>
                 <label class="label">학과 (필수)</label>
-                <input id="signup_dept" class="input" value="컴퓨터공학과" />
+                <input id="signup_dept" class="input" value="" placeholder="예: 컴퓨터공학과, 경영학과" />
               </div>
               <div>
                 <label class="label">MBTI (필수)</label>
@@ -3345,39 +3349,39 @@
             </div>
 
             <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:14px; padding:12px 14px; margin:10px 0 12px;">
-              <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:800; color:#191F28; cursor:pointer; padding-bottom:9px; margin-bottom:9px; border-bottom:1px solid #E5EAE7;">
-                <input id="signup_agree_all" type="checkbox" ${state.signup_agree_age19 && state.signup_agree_terms && state.signup_agree_privacy ? 'checked' : ''} onchange="toggleAllSignupConsents(this.checked)" style="width:17px; height:17px; accent-color:#287D62;" />
+              <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:800; color:#191F28; cursor:pointer; padding-bottom:9px; margin-bottom:9px; border-bottom:1px solid #E5EAE7; min-height:36px;">
+                <input id="signup_agree_all" type="checkbox" ${state.signup_agree_age19 && state.signup_agree_terms && state.signup_agree_privacy ? 'checked' : ''} onchange="toggleAllSignupConsents(this.checked)" style="width:18px; height:18px; accent-color:#287D62;" />
                 <span>약관 및 만 19세 이상 전체 동의</span>
               </label>
-              <div style="display:flex; flex-direction:column; gap:7px;">
-                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer;">
-                  <input id="signup_agree_age19" type="checkbox" ${state.signup_agree_age19 ? 'checked' : ''} onchange="state.signup_agree_age19=this.checked; syncSignupMasterCheckbox();" style="width:15px; height:15px; accent-color:#287D62;" />
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer; min-height:36px;">
+                  <input id="signup_agree_age19" type="checkbox" ${state.signup_agree_age19 ? 'checked' : ''} onchange="state.signup_agree_age19=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
                   <span><b style="color:#287D62;">[필수]</b> 만 19세 이상 성인 학우입니다</span>
                 </label>
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                  <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer;">
-                    <input id="signup_agree_terms" type="checkbox" ${state.signup_agree_terms ? 'checked' : ''} onchange="state.signup_agree_terms=this.checked; syncSignupMasterCheckbox();" style="width:15px; height:15px; accent-color:#287D62;" />
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px;">
+                  <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer; flex:1;">
+                    <input id="signup_agree_terms" type="checkbox" ${state.signup_agree_terms ? 'checked' : ''} onchange="state.signup_agree_terms=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
                     <span><b style="color:#287D62;">[필수]</b> 서비스 이용약관 및 비매너 무관용 원칙 동의</span>
                   </label>
-                  <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:11.5px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0; flex-shrink:0;">보기</button>
+                  <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:8px 10px; min-height:36px; min-width:44px; flex-shrink:0;">보기</button>
                 </div>
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                  <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer;">
-                    <input id="signup_agree_privacy" type="checkbox" ${state.signup_agree_privacy ? 'checked' : ''} onchange="state.signup_agree_privacy=this.checked; syncSignupMasterCheckbox();" style="width:15px; height:15px; accent-color:#287D62;" />
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px;">
+                  <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#333D4B; cursor:pointer; flex:1;">
+                    <input id="signup_agree_privacy" type="checkbox" ${state.signup_agree_privacy ? 'checked' : ''} onchange="state.signup_agree_privacy=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
                     <span><b style="color:#287D62;">[필수]</b> 개인정보 수집 및 이용 동의</span>
                   </label>
-                  <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#6B7684; font-size:11.5px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0; flex-shrink:0;">보기</button>
+                  <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:8px 10px; min-height:36px; min-width:44px; flex-shrink:0;">보기</button>
                 </div>
               </div>
             </div>
 
-            <button class="btn btn-primary" style="margin-top:6px;" onclick="handleSignupSubmit()">가입 완료 및 울대모 시작하기</button>
+            <button class="btn btn-primary" style="margin-top:6px; min-height:46px;" onclick="handleSignupSubmit()">가입 완료 및 울대모 시작하기</button>
           </div>
         `}
-        <div style="text-align:center; margin:14px 0 8px; font-size:12px; color:#8B95A1; display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer; padding:0;">서비스 이용약관</button>
+        <div style="text-align:center; margin:12px 0 8px; font-size:12px; color:#8B95A1; display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap;">
+          <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer; padding:8px 6px; min-height:36px;">서비스 이용약관</button>
           <span>·</span>
-          <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#287D62; font-size:12px; font-weight:800; cursor:pointer; padding:0;">개인정보처리방침</button>
+          <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#287D62; font-size:12px; font-weight:800; cursor:pointer; padding:8px 6px; min-height:36px;">개인정보처리방침</button>
           <span>·</span>
           <span>만 19세 이상 대학생 전용</span>
         </div>
@@ -4210,7 +4214,7 @@
             <span style="font-size:17px; font-weight:800; color:#191F28;">모집 중인 번개</span>
             <span style="font-size:13px; color:#6B7684; font-weight:600;">${list.length}개</span>
           </div>
-          <select aria-label="번개 정렬 기준" onchange="setHomeSortOpt(this.value)" style="height:32px; padding:0 11px; border-radius:16px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:12px; font-weight:700; cursor:pointer; outline:none;">
+          <select aria-label="번개 정렬 기준" onchange="setHomeSortOpt(this.value)" style="height:38px; padding:0 12px; border-radius:19px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:12.5px; font-weight:700; cursor:pointer; outline:none;">
             ${sortOpts.map(o => `<option value="${escHtml(o.key)}" ${curSort.includes(o.key.replace('순','')) ? 'selected' : ''}>${escHtml(o.label)}</option>`).join("")}
           </select>
         </div>
@@ -4218,7 +4222,7 @@
           ${timeChips.map(tc => {
             const active = (curTimeFilter === tc.key);
             return `
-              <button type="button" onclick="setHomeTimeFilter('${tc.key}')" style="height:30px; padding:0 12px; border-radius:15px; border:${active ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${active ? '#EEF8F3' : '#FFFFFF'}; color:${active ? '#287D62' : '#6B7684'}; font-size:12px; font-weight:${active ? '800' : '600'}; cursor:pointer; flex-shrink:0;">
+              <button type="button" onclick="setHomeTimeFilter('${tc.key}')" style="height:36px; padding:0 14px; border-radius:18px; border:${active ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${active ? '#EEF8F3' : '#FFFFFF'}; color:${active ? '#287D62' : '#6B7684'}; font-size:12.5px; font-weight:${active ? '800' : '600'}; cursor:pointer; flex-shrink:0;">
                 ${escHtml(tc.label)}
               </button>
             `;
@@ -4227,12 +4231,30 @@
       `;
 
       if (list.length === 0) {
+        const qStr = String(state.search_q || "").trim();
+        const catStr = (state.home_cat && state.home_cat !== "전체") ? state.home_cat : "";
+        const hasAnyFilter = Boolean(qStr || catStr || curTimeFilter !== "전체");
+        let emptyTitle = "아직 열린 번개가 없어요";
+        let emptySub = "첫 번개를 열어볼까요?";
+        if (qStr && catStr) {
+          emptyTitle = `'${qStr}' ${catStr} 번개가 아직 없어요`;
+          emptySub = "필터를 초기화하거나 직접 번개를 열어볼까요?";
+        } else if (qStr) {
+          emptyTitle = `'${qStr}' 검색 결과에 맞는 번개가 없어요`;
+          emptySub = "검색어를 지우거나 직접 번개를 열어볼까요?";
+        } else if (catStr) {
+          emptyTitle = `'${catStr}' 카테고리에 열린 번개가 아직 없어요`;
+          emptySub = "전체 번개를 보거나 직접 열어볼까요?";
+        } else if (curTimeFilter !== "전체") {
+          emptyTitle = `'${curTimeFilter}' 시간대에 열린 번개가 없어요`;
+          emptySub = "전체 시간대로 보거나 직접 첫 번개를 열어볼까요?";
+        }
         return filterHeaderHtml + renderEmptyStateBox(
           'sparkle',
-          curTimeFilter !== "전체" ? `'${curTimeFilter}' 시간대에 열린 번개가 없어요` : '아직 열린 번개가 없어요',
-          curTimeFilter !== "전체" ? '전체 시간대로 보거나 직접 첫 번개를 열어볼까요?' : '첫 번개를 열어볼까요?',
-          curTimeFilter !== "전체" ? '전체 번개 보기' : '번개 열기',
-          curTimeFilter !== "전체" ? "setHomeTimeFilter('전체');" : "state.active_modal='create'; render();"
+          emptyTitle,
+          emptySub,
+          hasAnyFilter ? '전체 번개 보기' : '번개 열기',
+          hasAnyFilter ? "resetHomeFilters();" : "state.active_modal='create'; render();"
         );
       }
 
@@ -4261,6 +4283,13 @@
     }
 
     let _searchDebounceTimer = null;
+    function resetHomeFilters() {
+      state.search_q = "";
+      state.home_cat = "전체";
+      state.home_time_filter = "전체";
+      state.home_visible_cnt = 8;
+      render();
+    }
     function handleHomeSearchInput(val) {
       state.search_q = val;
       state.home_visible_cnt = 8;
@@ -4838,8 +4867,9 @@
         { val: "☕ 카공", label: "카공" },
         { val: "🏃 운동", label: "운동" },
         { val: "🎮 게임/PC방", label: "게임" },
-        { val: "🌿 산책", label: "산책" },
         { val: "🍻 술/번개", label: "술/번개" },
+        { val: "🌿 산책", label: "산책" },
+        { val: "🚖 택시/카풀", label: "택시/카풀" },
         { val: "📚 스터디", label: "스터디" },
         { val: "💬 기타", label: "기타" }
       ];
@@ -4856,7 +4886,7 @@
         <div style="max-width:920px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
             <div style="display:flex; align-items:center; gap:10px;">
-              <button type="button" onclick="state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();" style="width:36px; height:36px; border-radius:18px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:16px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
+              <button type="button" onclick="state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();" style="width:44px; height:44px; border-radius:22px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:18px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
               <h1 style="margin:0; font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">번개 만들기</h1>
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -5255,7 +5285,10 @@
               </div>
 
               <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:22px; padding:20px;">
-                <div style="font-size:13px; font-weight:700; color:#6B7684; margin-bottom:12px;">방장 블라인드 프로필</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                  <div style="font-size:13px; font-weight:700; color:#6B7684;">${isAuthor ? '방장 프로필 (내 정보)' : '방장 블라인드 프로필'}</div>
+                  ${isAuthor ? `<span style="font-size:11px; font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">수락 전엔 타인에게 단과대만 보여요</span>` : ''}
+                </div>
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
                   <span style="width:48px; height:48px; border-radius:24px; background:#EEF8F3; font-size:24px; line-height:1; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
                     ${escHtml(hostAvatar)}
@@ -7809,7 +7842,10 @@
 
             <div style="margin-top:18px; display:flex; justify-content:space-between; align-items:flex-end; gap:8px;">
               <div>
-                <div style="font-size:12px; color:#CFEADF; font-weight:600;">매너온도</div>
+                <div style="display:inline-flex; align-items:center; gap:6px;">
+                  <span style="font-size:12px; color:#CFEADF; font-weight:600;">매너온도</span>
+                  <button type="button" onclick="state.show_temp_guide=!state.show_temp_guide; render();" style="border:1px solid rgba(255,255,255,0.45); background:rgba(255,255,255,0.16); color:#FFFFFF; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; cursor:pointer;">${state.show_temp_guide ? '안내 닫기 ▲' : '어떻게 오르나요? ?'}</button>
+                </div>
                 <div style="font-size:38px; font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em; margin-top:2px;">
                   ${myTier.displayTemp}°C
                 </div>
@@ -7822,6 +7858,15 @@
             <div style="height:8px; border-radius:4px; background:rgba(255,255,255,0.3); margin-top:12px; overflow:hidden;">
               <div style="width:${myTier.gaugePct}%; height:100%; background:#FFFFFF; border-radius:4px; transition:width 0.5s ease;"></div>
             </div>
+            ${state.show_temp_guide ? `
+              <div style="margin-top:14px; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.24); border-radius:14px; padding:12px 14px; font-size:12px; color:#FFFFFF; line-height:1.55;">
+                <div style="font-weight:800; margin-bottom:6px;">🌡️ 울대모 매너온도 산정 기준 (36.5°C 시작)</div>
+                <div>• 좋은 만남 후기를 받으면 <b>+0.5°C</b> 상승해요</div>
+                <div>• 만남 후 따뜻한 후기를 남기면 내 온도도 <b>+0.2°C</b> 올라가요</div>
+                <div>• 노쇼·비매너 신고 접수 시 <b>-3.0°C</b> 차감 및 누적 3회 시 즉시 정지돼요</div>
+                <div style="margin-top:6px; font-size:11.5px; color:#D8F3E5;">등급: 새싹(&lt;36.5) → 따뜻한(36.5) → 믿음직(40.0) → 인싸(45.0) → 레전드(50.0°C+)</div>
+              </div>
+            ` : ''}
           </div>
 
           <!-- 3칸 활동 요약 그리드 (받은 후기 / 신청한 번개 / 만든 번개) -->
@@ -8569,6 +8614,27 @@
         }, 250);
       }
     } catch (e) {}
+
+    let _isHandlingPopState = false;
+    function pushSpaHistoryState(key) {
+      if (_isHandlingPopState || !window.history || typeof window.history.pushState !== "function") return;
+      try {
+        const curKey = window.history.state && window.history.state.uldaemoKey;
+        if (curKey !== key) {
+          window.history.pushState({ uldaemoKey: key, nav_tab: state.nav_tab, active_modal: state.active_modal || null }, "");
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener("popstate", () => {
+      if (!state || !state.user_id) return;
+      _isHandlingPopState = true;
+      try {
+        window.handleNativeBack();
+      } finally {
+        _isHandlingPopState = false;
+      }
+    });
 
     // Flutter WebView 네이티브 뒤로가기(Android 물리 뒤로가기) 브릿지 훅
     window.handleNativeBack = function() {
