@@ -459,8 +459,10 @@
       };
     }
 
+    let _initialCloudSynced = false;
     function applyServerSnapshot(serverDb) {
       if (!serverDb || typeof serverDb !== "object") return false;
+      _initialCloudSynced = true;
       DB.users = serverDb.users || {};
       DB.posts = Array.isArray(serverDb.posts) ? serverDb.posts : [];
       DB.applications = Array.isArray(serverDb.applications) ? serverDb.applications : [];
@@ -780,28 +782,22 @@
       return true;
     }
 
-    function handleDailyCheckin() {
+    async function handleDailyCheckin() {
       if (!state.user_id || !DB.users[state.user_id]) return;
       const u = DB.users[state.user_id];
       const today = getTodayStr();
       if (u.last_checkin === today) {
         return showToast("오늘 출석체크를 이미 완료했어요. 내일 또 참여해 주세요.");
       }
-      u.last_checkin = today;
-      u.streak_days = (u.streak_days || 1) + 1;
-      u.bonus_score = (u.bonus_score || 0) + 3;
-      state.just_stamped_day = Math.min(7, u.streak_days);
+      const res = await callApiAction("checkin", {});
+      if (!res.ok) return showToast(res.message || "출석체크에 실패했어요.");
+      if (res.already) return showToast("오늘 출석체크를 이미 완료했어요. 내일 또 참여해 주세요.");
+      const streak = res.streak_days || ((DB.users[state.user_id] && DB.users[state.user_id].streak_days) || 1);
+      state.just_stamped_day = Math.min(7, streak);
       setTimeout(() => { state.just_stamped_day = null; }, 900);
-      if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
-        u.coffee_tickets = (u.coffee_tickets || 0) + 1;
-        showToast(`연속 ${u.streak_days}일 출석 달성! 행운의 룰렛 티켓 +1장 보너스 획득!`);
-      } else {
-        showToast(`출석체크 완료! (연속 ${u.streak_days}일째 출석)`);
-      }
-      u.updated_at = Date.now();
+      showToast(`출석체크 완료! (연속 ${streak}일째 · 룰렛 티켓 +1장)`);
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
       fireConfetti();
-      saveDB(true);
       render();
     }
 
@@ -2640,7 +2636,7 @@
               </span>
               <div style="min-width:0;">
                 <div style="font-size:15px; font-weight:800; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</div>
-                <div style="font-size:12px; color:#6B7684; margin-top:2px;">연속 ${st.streakDays}일째</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:2px;">${(!_initialCloudSynced && getSessionToken()) ? `<span class="skeleton-bar" style="display:inline-block; width:56px; height:12px; border-radius:6px; background:#E5EAE7; vertical-align:middle;"></span>` : `연속 ${st.streakDays}일째`}</div>
               </div>
             </div>
             <span style="height:32px; padding:0 14px; border-radius:16px; background:${st.checkedInToday ? '#EEF8F3' : '#287D62'}; color:${st.checkedInToday ? '#287D62' : '#FFFFFF'}; font-size:12.5px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
@@ -5773,7 +5769,7 @@
               <span style="font-size:16px; font-weight:800; color:#191F28;">7일 연속 출석 스탬프</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:#287D62;">
-              연속 <b style="color:#191F28;">${st.streakDays}일째</b> 출석 중
+              ${(!_initialCloudSynced && getSessionToken()) ? `<span class="skeleton-bar" style="display:inline-block; width:82px; height:14px; border-radius:7px; background:#E5EAE7; vertical-align:middle;"></span>` : `연속 <b style="color:#191F28;">${st.streakDays}일째</b> 출석 중`}
             </span>
           </div>
 
@@ -5999,7 +5995,7 @@
             <div style="display:flex; align-items:center; gap:8px;">
               <button type="button" onclick="handleDailyCheckin()" style="height:34px; padding:0 12px; border-radius:17px; border:none; background:#EEF8F3; color:#287D62; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-                <span>${st.streakDays}일째 출석</span>
+                <span>${(!_initialCloudSynced && getSessionToken()) ? '동기화 중...' : `${st.streakDays}일째 출석`}</span>
               </button>
               ${state.plaza_view === 'balance' ? `
                 <button type="button" onclick="state.show_poll_form=!state.show_poll_form; render();" title="새 밸런스 투표 만들기" style="width:34px; height:34px; border-radius:17px; border:none; background:${state.show_poll_form ? '#191F28' : '#F7F9F8'}; color:${state.show_poll_form ? '#FFFFFF' : '#191F28'}; font-size:18px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
@@ -7636,7 +7632,7 @@
             </button>
             <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'myposts' ? '#287D62' : '#E5E8EB'}; border-radius:16px; padding:14px 8px; text-align:center; cursor:pointer;">
               <div style="font-size:22px; font-weight:800; color:#191F28;">${myPosts.length}</div>
-              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">만든 번개</div>
+              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">진행 중 번개${myPastPosts.length > 0 ? ` (지난 ${myPastPosts.length})` : ''}</div>
             </button>
           </div>
 
@@ -7701,7 +7697,7 @@
               <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('myposts')">
                 <span style="font-size:14.5px; font-weight:700;">내가 만든 번개</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
-                  <span style="font-size:13px; color:#8B95A1;">${myPosts.length}건</span>
+                  <span style="font-size:13px; color:#8B95A1;">진행 ${myPosts.length}건${myPastPosts.length > 0 ? ` · 지난 ${myPastPosts.length}건` : ''}</span>
                   <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
                 </span>
               </button>
