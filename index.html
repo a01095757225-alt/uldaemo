@@ -58,6 +58,10 @@
       chatEmptySub: "신청 한 번이면 채팅방이 열려요",
       chatContactWarn: "연락처는 만나서 직접 주고받아요. 지금은 앱 안에서만 이야기해요",
       tempRecentReviews: (cnt) => cnt > 0 ? `최근 후기 ${cnt}개 반영` : "첫 후기를 기다리고 있어요",
+      balanceCycleBadge: "이번 3일 밸런스",
+      balanceCycleRule: "3일마다 새 주제로 바뀌어요",
+      balanceMoreBtn: (cnt) => `다른 밸런스 투표 ${cnt}개 더보기`,
+      balanceCollapseBtn: "투표 접기",
       onboardingCards: [
         {
           step: "1 / 3",
@@ -304,54 +308,102 @@
 
     const VIRAL_BALANCE_POOL = [
       {
+        id: 507,
         tag: "💘 연애 레전드",
         question: "⚖️ [이별 밸런스] 겪어보면 멘탈이 더 바사삭 부서지는 이별은?",
         opt_a: "💔 헤어지고 3일 만에 새 애인 생기는 환승이별",
-        opt_b: "👻 아무 이유도 모른 채 하루아침에 차단당한 잠수이별"
+        opt_b: "👻 아무 이유도 모른 채 하루아침에 차단당한 잠수이별",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 508,
         tag: "🍜 음식 난제",
         question: "⚖️ [괴식 대결] 10만 원 받고 한 그릇 국물까지 다 비워야 한다면?",
         opt_a: "🌿 따뜻한 민트초코 소스 듬뿍 뿌린 양념치킨",
-        opt_b: "🍍 구운 파인애플과 초콜릿 넣은 돼지국밥"
+        opt_b: "🍍 구운 파인애플과 초콜릿 넣은 돼지국밥",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 509,
         tag: "💸 인생·만약에",
         question: "⚖️ 평생 스마트폰을 이 상태로만 써야 한다면?",
         opt_a: "🔋 아무리 충전해도 최대 배터리가 15%까지만 차는 폰",
-        opt_b: "🐢 모든 앱과 영상이 무조건 5초씩 버퍼링 걸리는 폰"
+        opt_b: "🐢 모든 앱과 영상이 무조건 5초씩 버퍼링 걸리는 폰",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 510,
         tag: "💘 연애 레전드",
         question: "⚖️ 10년 지기 절친이 내 전 애인과 사귄다고 고백한다면?",
         opt_a: "🤬 절대 용서 못 함, 둘 다 당장 손절",
-        opt_b: "🤝 이미 끝난 인연인데 어쩔 수 없지, 쿨하게 인정"
+        opt_b: "🤝 이미 끝난 인연인데 어쩔 수 없지, 쿨하게 인정",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 511,
         tag: "💸 인생·만약에",
         question: "⚖️ [계절 극악 밸런스] 1년 내내 단 하나의 날씨에서만 살아야 한다면?",
         opt_a: "🥵 에어컨 고장 난 38도 한여름 폭염",
-        opt_b: "🥶 보일러 고장 난 영하 18도 한겨울 한파"
+        opt_b: "🥶 보일러 고장 난 영하 18도 한겨울 한파",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 512,
         tag: "🍜 음식 난제",
         question: "⚖️ [음식 궁합] 평생 이 조합으로만 먹어야 한다면?",
         opt_a: "🍕 탄산음료·피클 없이 퍽퍽한 피자만 먹기",
-        opt_b: "🍗 치킨무·양념소스·콜라 없이 눅눅한 후라이드 치킨만 먹기"
+        opt_b: "🍗 치킨무·양념소스·콜라 없이 눅눅한 후라이드 치킨만 먹기",
+        votes_a: [],
+        votes_b: []
       }
     ];
+
+    const ROTATING_BALANCE_POLLS = [...DEFAULT_POLLS, ...VIRAL_BALANCE_POOL];
+    const BALANCE_ROTATION_DAYS = 3;
+    const BALANCE_CYCLE_MS = BALANCE_ROTATION_DAYS * 24 * 60 * 60 * 1000;
+    const BALANCE_EPOCH_KST_MS = Date.UTC(2026, 0, 1) - (9 * 60 * 60 * 1000);
+
+    function getBalancePollCycleInfo(nowMs = Date.now()) {
+      const elapsed = Math.max(0, nowMs - BALANCE_EPOCH_KST_MS);
+      const cycleNumber = Math.floor(elapsed / BALANCE_CYCLE_MS);
+      const poolIdx = cycleNumber % ROTATING_BALANCE_POLLS.length;
+      const activeTemplate = ROTATING_BALANCE_POLLS[poolIdx];
+      const remainMs = BALANCE_CYCLE_MS - (elapsed % BALANCE_CYCLE_MS);
+      const remainDays = Math.floor(remainMs / (24 * 60 * 60 * 1000));
+      const remainHours = Math.floor((remainMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+      let countdownText = "곧 새 주제로 바뀌어요";
+      if (remainDays >= 1) {
+        countdownText = `다음 주제까지 ${remainDays}일 ${remainHours}시간`;
+      } else if (remainHours >= 1) {
+        countdownText = `다음 주제까지 ${remainHours}시간`;
+      }
+      return {
+        cycleNumber,
+        poolIdx,
+        activePollId: activeTemplate.id,
+        activeTemplate,
+        remainDays,
+        remainHours,
+        countdownText
+      };
+    }
 
     const DEFAULT_PLAZA_TALKS = [];
 
     function ensurePlazaDefaults(dbObj) {
       if (!Array.isArray(dbObj.polls)) {
-        dbObj.polls = JSON.parse(JSON.stringify(DEFAULT_POLLS));
+        dbObj.polls = JSON.parse(JSON.stringify(ROTATING_BALANCE_POLLS));
       } else {
-        // 기존 구형 질문(101, 102, 103) 제거 및 신규 레전드 밸런스 질문 자동 보충
+        // 기존 구형 질문(101, 102, 103) 제거 및 3일 로테이션 밸런스 질문(501~512) 자동 보충
         dbObj.polls = dbObj.polls.filter(p => p && !LEGACY_POLL_IDS.has(p.id));
-        const existingIds = new Set(dbObj.polls.map(p => p.id));
-        DEFAULT_POLLS.forEach(defP => {
-          if (!existingIds.has(defP.id)) {
+        const existingIds = new Set(dbObj.polls.map(p => Number(p.id)));
+        ROTATING_BALANCE_POLLS.forEach(defP => {
+          if (!existingIds.has(Number(defP.id))) {
             dbObj.polls.push(JSON.parse(JSON.stringify(defP)));
           }
         });
@@ -5247,11 +5299,12 @@
     // =========================================================
     // 6-B. 🔥 캠퍼스 광장 탭 (오늘의 울대 밸런스 게임 & 24시간 한줄 잔디톡)
     // =========================================================
-    function voteBalancePoll(pollId, side) {
+    async function voteBalancePoll(pollId, side) {
       ensurePlazaDefaults(DB);
-      const poll = DB.polls.find(p => p.id === pollId);
+      const poll = DB.polls.find(p => Number(p.id) === Number(pollId));
       if (!poll) return;
       const uid = state.user_id;
+      const wasVoted = (poll.votes_a || []).includes(uid) || (poll.votes_b || []).includes(uid);
       poll.votes_a = (poll.votes_a || []).filter(u => u !== uid);
       poll.votes_b = (poll.votes_b || []).filter(u => u !== uid);
       if (side === "A") poll.votes_a.push(uid);
@@ -5259,18 +5312,33 @@
 
       // 첫 투표 보너스: 활동 리워드 점수 +2점 (매너온도는 실제 대면 만남 평가로만 변동)
       const me = DB.users[uid];
-      if (me && !window["_voted_" + pollId]) {
+      if (me && !wasVoted && !window["_voted_" + pollId]) {
         window["_voted_" + pollId] = true;
         me.bonus_score = (me.bonus_score || 0) + 2;
         showToast("투표 완료! 캠퍼스 소통 참여로 활동 리워드 점수 +2점 획득!");
       } else {
         showToast("투표가 반영되었어요!");
       }
-      saveDB(true);
+      saveDB(false);
       render();
+      if (getSessionToken()) {
+        await callApiAction("plaza_vote", {
+          poll_id: poll.id,
+          side,
+          poll_meta: {
+            id: poll.id,
+            tag: poll.tag || "",
+            question: poll.question || "",
+            opt_a: poll.opt_a || "",
+            opt_b: poll.opt_b || ""
+          }
+        });
+        ensurePlazaDefaults(DB);
+        render();
+      }
     }
 
-    function createNewBalancePoll() {
+    async function createNewBalancePoll() {
       const qEl = document.getElementById("plaza_poll_q");
       const aEl = document.getElementById("plaza_poll_a");
       const bEl = document.getElementById("plaza_poll_b");
@@ -5282,18 +5350,35 @@
       if (q.length < 3 || !a || !b) {
         return showToast("질문과 A, B 선택지를 모두 입력해주세요!");
       }
+      const formattedQ = q.startsWith("⚖️") ? q : `⚖️ ${q}`;
+      if (getSessionToken()) {
+        const res = await callApiAction("plaza_create_poll", {
+          tag,
+          question: formattedQ,
+          opt_a: a,
+          opt_b: b
+        });
+        if (!res.ok) return showToast(res.message || "투표 등록에 실패했어요.");
+        ensurePlazaDefaults(DB);
+        state.show_poll_form = false;
+        state.polls_show_all = true;
+        showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
+        render();
+        return;
+      }
       ensurePlazaDefaults(DB);
       DB.polls.unshift({
         id: Date.now(),
         tag,
-        question: q.startsWith("⚖️") ? q : `⚖️ ${q}`,
+        question: formattedQ,
         opt_a: a,
         opt_b: b,
         votes_a: [state.user_id],
         votes_b: []
       });
       state.show_poll_form = false;
-      saveDB(true);
+      state.polls_show_all = true;
+      saveDB(false);
       showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
       render();
     }
@@ -6121,7 +6206,17 @@
       ensurePlazaDefaults(DB);
       state.plaza_view = state.plaza_view || "balance";
       const st = getUserStatsAndBadges(state.user_id);
-      const allPolls = DB.polls || [];
+      const cycleInfo = getBalancePollCycleInfo();
+      const rotatingIds = new Set(ROTATING_BALANCE_POLLS.map(p => Number(p.id)));
+      const allPolls = [...(DB.polls || [])].sort((a, b) => {
+        const aActive = Number(a.id) === Number(cycleInfo.activePollId) ? 1 : 0;
+        const bActive = Number(b.id) === Number(cycleInfo.activePollId) ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        const aCustom = rotatingIds.has(Number(a.id)) ? 0 : 1;
+        const bCustom = rotatingIds.has(Number(b.id)) ? 0 : 1;
+        if (aCustom !== bCustom) return bCustom - aCustom;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
       const curPollCat = state.plaza_poll_cat || "전체";
       const polls = curPollCat === "전체"
         ? allPolls
@@ -6186,12 +6281,18 @@
               const pctB = total === 0 ? 50 : (100 - pctA);
               const cleanQ = String(p.question || "").replace(/^⚖️\s*/, "").trim();
               const progressPct = total >= 5 ? pctA : Math.min(100, Math.round((total / 5) * 100));
+              const isFeaturedCycle = Number(p.id) === Number(cycleInfo.activePollId);
+              const isCustomPoll = !rotatingIds.has(Number(p.id));
 
               return `
-                <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:20px; margin-bottom:20px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:12.5px; font-weight:700; color:#287D62;">오늘의 밸런스</span>
-                    <button type="button" style="font-size:12.5px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="drawRandomViralPoll()">다른 질문 ›</button>
+                <div style="background:#FFFFFF; border:1.5px solid ${isFeaturedCycle ? '#C5E6D6' : '#E5E8EB'}; border-radius:20px; padding:20px; margin-bottom:20px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span style="font-size:12.5px; font-weight:800; color:#287D62;">${isFeaturedCycle ? escHtml(COPY.balanceCycleBadge) : (isCustomPoll ? '학우가 만든 투표' : '지난 밸런스')}</span>
+                    ${isFeaturedCycle ? `
+                      <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">${escHtml(cycleInfo.countdownText)}</span>
+                    ` : `
+                      <span style="font-size:11.5px; font-weight:600; color:#8B95A1;">${escHtml(p.tag || '밸런스')}</span>
+                    `}
                   </div>
                   <div style="font-size:20px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:14px;">${escHtml(cleanQ)}</div>
 
@@ -6237,8 +6338,8 @@
             }).join("")}
 
             ${polls.length > 1 ? `
-              <button type="button" style="width:100%; height:40px; border:1px solid #E5E8EB; border-radius:12px; background:#FFFFFF; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
-                ${showAll ? '투표 접기' : `다른 밸런스 투표 ${hiddenCount}개 더보기`}
+              <button type="button" style="width:100%; height:44px; border:1px solid #E5E8EB; border-radius:12px; background:#FFFFFF; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
+                ${showAll ? escHtml(COPY.balanceCollapseBtn) : escHtml(COPY.balanceMoreBtn(hiddenCount))}
               </button>
             ` : ""}
 

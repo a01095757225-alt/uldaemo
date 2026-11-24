@@ -2021,10 +2021,32 @@ class handler(BaseHTTPRequestHandler):
                 poll_id = data.get("poll_id")
                 side = str(data.get("side") or "").upper()
                 poll = next((p for p in (db_obj.get("polls") or []) if isinstance(p, dict) and str(p.get("id")) == str(poll_id)), None)
+                if not poll and str(poll_id).isdigit() and 501 <= int(poll_id) <= 512:
+                    meta = data.get("poll_meta") if isinstance(data.get("poll_meta"), dict) else {}
+                    q_meta = str(meta.get("question") or "").strip()[:120]
+                    a_meta = str(meta.get("opt_a") or "").strip()[:60]
+                    b_meta = str(meta.get("opt_b") or "").strip()[:60]
+                    if q_meta and a_meta and b_meta:
+                        poll = {
+                            "id": int(poll_id),
+                            "tag": str(meta.get("tag") or "밸런스").strip()[:24],
+                            "question": q_meta,
+                            "opt_a": a_meta,
+                            "opt_b": b_meta,
+                            "votes_a": [],
+                            "votes_b": [],
+                            "replies": [],
+                        }
+                        db_obj.setdefault("polls", []).append(poll)
                 if poll and side in ("A", "B"):
+                    prev_voted = (actor_id in [str(u) for u in (poll.get("votes_a") or [])]) or (actor_id in [str(u) for u in (poll.get("votes_b") or [])])
                     poll["votes_a"] = [u for u in (poll.get("votes_a") or []) if str(u) != actor_id]
                     poll["votes_b"] = [u for u in (poll.get("votes_b") or []) if str(u) != actor_id]
                     poll["votes_a" if side == "A" else "votes_b"].append(actor_id)
+                    if not prev_voted:
+                        me_u = (db_obj.get("users") or {}).get(actor_id)
+                        if isinstance(me_u, dict):
+                            me_u["bonus_score"] = int(me_u.get("bonus_score") or 0) + 2
             elif action == "plaza_create_poll":
                 q = str(data.get("question") or "").strip()[:100]
                 a = str(data.get("opt_a") or "").strip()[:40]
