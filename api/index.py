@@ -8,6 +8,7 @@ import time
 import random
 import urllib.request
 import urllib.parse
+import urllib.error
 import hmac
 import hashlib
 import base64
@@ -1517,7 +1518,27 @@ class handler(BaseHTTPRequestHandler):
             })
             return
 
-        # ---- 3) 공개 학교 정보 API ----
+        # ---- 3) 공개 학교 정보 및 상태 점검 API ----
+        if action == "health":
+            db_probe = "no_config"
+            if _has_supabase():
+                try:
+                    rows = _supabase_fetch_table("uldaemo_users?select=student_id&limit=1")
+                    db_probe = f"ok_rows_{len(rows) if isinstance(rows, list) else 'nonlist'}"
+                except urllib.error.HTTPError as he:
+                    db_probe = f"http_{he.code}"
+                except Exception as ex:
+                    db_probe = f"err_{type(ex).__name__}"
+            self._send_json(200, {
+                "ok": True,
+                "has_supabase": _has_supabase(),
+                "url_ok": bool(SUPABASE_URL.startswith("https://") and ".supabase.co" in SUPABASE_URL),
+                "key_prefix": "jwt" if SUPABASE_KEY.startswith("eyJ") else ("sb_secret" if SUPABASE_KEY.startswith("sb_secret_") else "other"),
+                "key_len": len(SUPABASE_KEY),
+                "db_probe": db_probe,
+            })
+            return
+
         if action == "ulsan_notices":
             items = get_ulsan_notices()
             self._send_json(200, {"ok": bool(items), "items": items[:40]})
