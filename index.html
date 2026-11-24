@@ -483,19 +483,16 @@
             delete selfCopy.pw_hash;
             safeUsers[k] = selfCopy;
           } else {
-            // 캐시 저장 시에도 타인 개인정보(학번·이메일·성별·pw_hash) 저장 원천 차단
+            // 캐시 저장 시에도 타인 개인정보 및 내부 운영 필드 저장 원천 차단
             safeUsers[k] = {
               nickname: u.nickname || "학우",
               avatar: u.avatar || "🐶",
               manner_temp: u.manner_temp != null ? u.manner_temp : 36.5,
-              keywords: Array.isArray(u.keywords) ? u.keywords : [],
-              report_count: Number(u.report_count || 0),
-              bonus_score: Number(u.bonus_score || 0),
-              streak_days: Number(u.streak_days || 1),
-              role: u.role === "admin" ? "admin" : "user",
+              verified_badges: Array.isArray(u.verified_badges) ? u.verified_badges : [],
               ...(u.department ? { department: u.department } : {}),
               ...(u.mbti ? { mbti: u.mbti } : {}),
-              ...(u.bio ? { bio: u.bio } : {})
+              ...(u.bio ? { bio: u.bio } : {}),
+              ...(Array.isArray(u.keywords) ? { keywords: u.keywords } : {})
             };
           }
         });
@@ -681,8 +678,32 @@
     }
 
     const SESSION_TOKEN_KEY = "uldaemo_session_token";
+    function isSessionTokenLocallyValid(tok) {
+      if (!tok || typeof tok !== "string") return false;
+      try {
+        const b64 = tok.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+        const parts = atob(padded).split("|");
+        if (parts.length !== 4) return false;
+        const exp = Number(parts[1]);
+        if (!exp || exp <= Math.floor(Date.now() / 1000)) return false;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
     function getSessionToken() {
-      try { return localStorage.getItem(SESSION_TOKEN_KEY) || ""; } catch (e) { return ""; }
+      try {
+        const tok = localStorage.getItem(SESSION_TOKEN_KEY) || "";
+        if (!tok) return "";
+        if (!isSessionTokenLocallyValid(tok)) {
+          localStorage.removeItem(SESSION_TOKEN_KEY);
+          localStorage.removeItem("uldaemo_uid");
+          localStorage.removeItem(DB_CACHE_KEY);
+          return "";
+        }
+        return tok;
+      } catch (e) { return ""; }
     }
     function setSessionToken(tok) {
       try {
@@ -721,6 +742,9 @@
     }
 
     async function callApiAction(action, payload = {}) {
+      if (!getSessionToken()) {
+        return { ok: false, error: "AUTH_REQUIRED", message: "로그인이 필요합니다." };
+      }
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -765,7 +789,7 @@
 
     let _pullInFlight = false;
     async function pullFromCloud(force = false) {
-      if (!getSessionToken() || _pullInFlight) return false;
+      if (!getSessionToken() || !state || !state.user_id || _pullInFlight) return false;
       _pullInFlight = true;
       try {
         const res = await fetch("/api/index", {
@@ -8636,7 +8660,9 @@
     const _urlParams = new URLSearchParams(window.location.search || "");
     const _previewTt = _urlParams.get("preview_tt");
     if (!_previewTt) {
-      pullFromCloud(true);
+      if (state.user_id && getSessionToken()) {
+        pullFromCloud(true);
+      }
       scheduleNextCloudPull(4000);
     } else {
       // 미리보기 전용(저장 안 됨): 2·3·4번 공강 매칭 화면 시연

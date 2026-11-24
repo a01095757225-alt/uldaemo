@@ -237,10 +237,21 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
     def pub_id(uid: str) -> str:
         return _mask_uid(uid, vid)
 
-    # 2. 회원 응답 필터링 (일반 학생·관리자 공통 — 관리자도 일반 응답에서는 학생과 동일한 최소 범위만 수신):
-    #    - 본인: 본인 프로필 전체(pw_hash 제외)
-    #    - 타인(수락 전): 별명, 아바타, 매너온도, 인증 뱃지/키워드만 (학번·학과·성별·MBTI·이메일·소개 제외)
-    #    - 타인(수락 후 파트너): 학과·MBTI·소개만 추가 공개 (학번·성별·이메일은 어떤 경우에도 타인에게 미노출)
+    def _public_verified_badges(u_obj: dict):
+        badges = []
+        if str(u_obj.get("email") or "").strip():
+            badges.append("학교 인증")
+        if int(u_obj.get("report_count") or 0) == 0:
+            badges.append("노쇼 ZERO")
+        if float(u_obj.get("manner_temp") if u_obj.get("manner_temp") is not None else 36.5) >= 38.0:
+            badges.append("따뜻한 매너")
+        return badges
+
+    # 2. 회원 응답 필터링 (일반 학생·관리자 공통):
+    #    - 본인: 본인 프로필 전체(pw_hash 제외, role/report_count/bonus_score/streak_days 포함)
+    #    - 타인(신청 대기중 포함 미승인 상태): nickname, avatar, manner_temp, verified_badges만
+    #      (role, report_count, bonus_score, streak_days, department, mbti, bio, keywords, email, gender, student_id 제외)
+    #    - 타인(승인됨 파트너): department, mbti, bio, keywords만 추가 공개
     safe_users = {}
     for uid, u in users.items():
         if not isinstance(u, dict):
@@ -250,6 +261,7 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             su = dict(u)
             su["has_pw"] = bool(u.get("pw_hash"))
             su["role"] = "admin" if _is_admin_user(u) else "user"
+            su["verified_badges"] = _public_verified_badges(u)
             su.pop("pw_hash", None)
             safe_users[vid] = su
         else:
@@ -258,16 +270,13 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
                 "nickname": str(u.get("nickname") or "학우"),
                 "avatar": str(u.get("avatar") or "🐶"),
                 "manner_temp": float(u.get("manner_temp") if u.get("manner_temp") is not None else 36.5),
-                "keywords": list(u.get("keywords") or []),
-                "report_count": int(u.get("report_count") or 0),
-                "bonus_score": int(u.get("bonus_score") or 0),
-                "streak_days": int(u.get("streak_days") or 1),
-                "role": "admin" if _is_admin_user(u) else "user",
+                "verified_badges": _public_verified_badges(u),
             }
             if uid_str in accepted_partner_ids:
                 su["department"] = str(u.get("department") or "울산대")
                 su["mbti"] = str(u.get("mbti") or "모름/비공개")
                 su["bio"] = str(u.get("bio") or "")
+                su["keywords"] = list(u.get("keywords") or [])
             safe_users[alias] = su
 
     # 3. 번개: 공개 필드만 반환 + 작성자 ID 별칭화 + 수락 인원수(accepted_count) 포함
@@ -294,13 +303,13 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             "updated_at": p.get("updated_at"),
         })
 
-    # 4. 신청 내역: 본인이 신청한 건 + 본인이 만든 번개에 들어온 신청 (+ 수락된 채팅방의 참여자 목록)만 반환 (관리자 동일 적용)
+    # 4. 신청 내역: 내가 신청한 건과 내가 만든 번개에 들어온 건만 반환
     safe_apps = []
     for a in apps:
         pid = a.get("post_id")
         ipid = int(pid) if pid is not None else 0
         ap_id = str(a.get("applicant_id") or "")
-        if ap_id == vid or ipid in hosted_post_ids or (ipid in accepted_post_ids and a.get("status") == "승인됨"):
+        if ap_id == vid or ipid in hosted_post_ids:
             safe_apps.append({
                 "id": a.get("id"),
                 "post_id": pid,
