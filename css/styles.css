@@ -1913,6 +1913,15 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
 .side-create-btn { display: none; }
 @media (max-width: 1023px) {
   .app-shell.wide .main-col { padding-bottom: 148px; }
+  /* 모바일 접근성: 주요 터치 대상 최소 44px 보장 */
+  .btn, .input, .select, .tk-menu-row, .cat-btn, .quick-chip, .time-quick-chip, .max-quick-chip {
+    min-height: 44px;
+  }
+  .cat-btn, .quick-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* =====================================================
