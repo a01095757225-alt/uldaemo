@@ -1913,6 +1913,15 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
 .side-create-btn { display: none; }
 @media (max-width: 1023px) {
   .app-shell.wide .main-col { padding-bottom: 148px; }
+  /* 모바일 접근성: 주요 터치 대상 최소 44px 보장 */
+  .btn, .input, .select, .tk-menu-row, .cat-btn, .quick-chip, .time-quick-chip, .max-quick-chip {
+    min-height: 44px;
+  }
+  .cat-btn, .quick-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* =====================================================
@@ -2109,16 +2118,30 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     align-items: start;
   }
 
-  /* PC 세부 화면 v2 (모던 미니멀 2열/3열 와이드 그리드) */
+  /* PC 세부 화면 v2 (1024~1279px 1열, 1280px+ 2열 와이드 그리드) */
   .pc-create-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 28px;
+    grid-template-columns: 1fr;
+    gap: 20px;
     align-items: start;
   }
   .pc-create-col-right {
-    border-left: 1px solid #F2F4F3;
-    padding-left: 28px;
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid #F2F4F3;
+    padding-top: 20px;
+  }
+  @media (min-width: 1280px) {
+    .pc-create-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+    .pc-create-col-right {
+      border-left: 1px solid #F2F4F3;
+      padding-left: 28px;
+      border-top: none;
+      padding-top: 0;
+    }
   }
   .pc-detail-2col {
     display: grid;

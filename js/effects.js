@@ -274,16 +274,17 @@ function showMeetupMatchCelebration(post, applicantUser, mode = "match") {
     banner.classList.add("is-hiding");
     setTimeout(() => { if (banner && banner.parentElement) banner.remove(); }, 260);
   };
+  const _esc = (typeof escHtml === "function") ? escHtml : (s => String(s || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])));
   banner.innerHTML = `
     <div class="match-avatar-pair">
-      <span class="match-avatar-circle">${hostAvatar}</span>
-      <span class="match-avatar-circle second">${apAvatar}</span>
-      <span class="match-spark-badge">${badgeLabel}</span>
+      <span class="match-avatar-circle">${_esc(hostAvatar)}</span>
+      <span class="match-avatar-circle second">${_esc(apAvatar)}</span>
+      <span class="match-spark-badge">${_esc(badgeLabel)}</span>
     </div>
     <div style="min-width:0; flex:1;">
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-        <span style="font-size:11px; font-weight:800; color:#34D399; letter-spacing:0.02em;">${topMainTxt}</span>
-        <span style="font-size:11px; color:#9CA3AF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${topSubTxt}</span>
+        <span style="font-size:11px; font-weight:800; color:#34D399; letter-spacing:0.02em;">${_esc(topMainTxt)}</span>
+        <span style="font-size:11px; color:#9CA3AF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${_esc(topSubTxt)}</span>
       </div>
       <div style="font-size:14px; font-weight:800; color:#FFFFFF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
         ${bottomTxt}

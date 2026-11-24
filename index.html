@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>울대모 - 우리 학교, 가볍게 모여!</title>
   <meta name="description" content="울산대학교 학우들을 위한 캠퍼스 안심 번개 매칭 플랫폼 (공강 밥약·카공·운동·산책)" />
   <meta name="theme-color" content="#287D62" />
@@ -41,10 +41,146 @@
       console.error("Global JS Error:", msg, line, col, error);
       const root = document.getElementById("app");
       if (root && (!root.innerHTML || root.innerHTML.trim() === "")) {
-        root.innerHTML = `<div class="app-shell" style="padding:24px; text-align:center;"><div class="uldaemo-card" style="padding:28px 20px;"><h3>⚠️ 화면 표시 복구 중</h3><p style="font-size:13px; color:#6B7684; margin:12px 0;">화면을 불러오는 도중 오류가 감지되었습니다.<br><span style="font-size:11px; color:#E02020;">${msg}</span></p><button class="btn btn-primary" onclick="localStorage.removeItem('uldaemo_db_v5'); location.reload();">🔄 화면 새로고침</button></div></div>`;
+        const safeErrMsg = String(msg || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+        root.innerHTML = `<div class="app-shell" style="padding:24px; text-align:center;"><div class="uldaemo-card" style="padding:28px 20px;"><h3>⚠️ 화면 표시 복구 중</h3><p style="font-size:13px; color:#6B7684; margin:12px 0;">화면을 불러오는 도중 오류가 감지되었습니다.<br><span style="font-size:11px; color:#E02020;">${safeErrMsg}</span></p><button class="btn btn-primary" onclick="localStorage.removeItem('uldaemo_db_v5'); location.reload();">🔄 화면 새로고침</button></div></div>`;
       }
     };
     // =========================================================
+    // 0. UX 카피 중앙 관리 상수 (토스·당근 톤, 해요체, 서버 실제 동작 일치)
+    // =========================================================
+    const COPY = {
+      homeEmptyTitle: "지금 열린 번개가 없어요",
+      homeEmptySub: "공강이면 첫 번개, 10초면 돼요",
+      blindNotice: "수락하기 전엔 이름도 학과도 비밀이에요",
+      blindPreviewTitle: "수락 전, 상대에게는 이렇게 보여요",
+      blindPreviewNote: "서버에서도 수락 전엔 학번·학과·MBTI·이메일을 아예 보내지 않아요.",
+      chatEmptyTitle: "아직 대화가 없어요",
+      chatEmptySub: "신청 한 번이면 채팅방이 열려요",
+      chatContactWarn: "연락처는 만나서 직접 주고받아요. 지금은 앱 안에서만 이야기해요",
+      tempRecentReviews: (cnt) => cnt > 0 ? `최근 후기 ${cnt}개 반영` : "첫 후기를 기다리고 있어요",
+      balanceCycleBadge: "이번 3일 밸런스",
+      balanceCycleRule: "3일마다 새 주제로 바뀌어요",
+      balanceMoreBtn: (cnt) => `다른 밸런스 투표 ${cnt}개 더보기`,
+      balanceCollapseBtn: "투표 접기",
+      onboardingCards: [
+        {
+          step: "1 / 3",
+          badge: "블라인드 보호",
+          title: "수락 전엔 이름도 학과도 비밀이에요",
+          desc: "별명과 매너온도만으로 가볍게 신청해요. 방장이 수락할 때만 서로의 학과가 열려요."
+        },
+        {
+          step: "2 / 3",
+          badge: "인앱 안심 채팅",
+          title: "연락처 없이 앱 안에서만 이야기해요",
+          desc: "전화번호나 SNS 아이디 공유는 자동으로 막아드려요. 만나서 직접 주고받으세요."
+        },
+        {
+          step: "3 / 3",
+          badge: "매너온도 신뢰",
+          title: "만남 후 매너온도로 신뢰를 쌓아요",
+          desc: "따뜻한 후기엔 온도가 올라가고, 노쇼·비매너는 신고 누적으로 바로 제한돼요."
+        }
+      ]
+    };
+
+    function openBlindPreviewModal() {
+      state.blind_preview_open = true;
+      render();
+    }
+    function closeBlindPreviewModal() {
+      state.blind_preview_open = false;
+      render();
+    }
+    function renderBlindPreviewModalHtml() {
+      if (!state.blind_preview_open || !state.user_id || !DB.users[state.user_id]) return "";
+      const me = DB.users[state.user_id];
+      const myTemp = resolveUserTempForTier(state.user_id);
+      const myTier = getTierByTemp(myTemp);
+      const myAvatar = (me.avatar || "🐶").split(" ")[0];
+      return `
+        <div class="modal-backdrop" style="position:fixed; inset:0; z-index:99998; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,0.52); backdrop-filter:blur(4px);" onclick="if(event.target===this) closeBlindPreviewModal();">
+          <div style="background:#FFFFFF; width:100%; max-width:360px; border-radius:24px; padding:22px 20px; box-shadow:0 16px 36px rgba(0,0,0,0.22);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <span style="font-size:16px; font-weight:800; color:#191F28;">${escHtml(COPY.blindPreviewTitle)}</span>
+              <button type="button" onclick="closeBlindPreviewModal()" style="border:none; background:none; font-size:18px; color:#6B7684; cursor:pointer; min-width:36px; min-height:36px;">✕</button>
+            </div>
+            <div style="background:#F7F9F8; border:1.5px solid #E5EAE7; border-radius:18px; padding:16px; margin-bottom:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="width:48px; height:48px; border-radius:24px; background:#EEF8F3; font-size:24px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(myAvatar)}</span>
+                <div style="min-width:0; flex:1;">
+                  <div style="font-size:15.5px; font-weight:800; color:#191F28;">${escHtml(myTier.name)} · ${myTier.displayTemp}°C</div>
+                  <div style="font-size:12.5px; color:#6B7684; margin-top:2px;">이름·학과·MBTI 비공개</div>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:12px;">
+                <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">별명·아바타 공개</span>
+                <span style="font-size:11.5px; font-weight:700; color:#6B7684; background:#FFFFFF; border:1px solid #E5E8EB; padding:4px 10px; border-radius:999px;">학번·학과·이메일 비밀</span>
+              </div>
+            </div>
+            <div style="font-size:12.5px; color:#4E5968; line-height:1.5; margin-bottom:16px;">
+              ${escHtml(COPY.blindPreviewNote)}
+            </div>
+            <button type="button" class="btn btn-primary" style="min-height:44px; border-radius:14px; font-weight:800;" onclick="closeBlindPreviewModal()">확인했어요</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function openBlindOnboardingIfNew(uid) {
+      try {
+        const k = "uldaemo_onboarded_" + String(uid || "");
+        if (!localStorage.getItem(k)) {
+          state.onboarding_step = 0;
+          state.onboarding_open = true;
+        }
+      } catch (e) {}
+    }
+    function closeBlindOnboarding() {
+      try {
+        if (state.user_id) localStorage.setItem("uldaemo_onboarded_" + String(state.user_id), "1");
+      } catch (e) {}
+      state.onboarding_open = false;
+      state.onboarding_step = 0;
+      render();
+    }
+    function nextBlindOnboardingStep() {
+      const cur = Number(state.onboarding_step || 0);
+      if (cur + 1 >= COPY.onboardingCards.length) {
+        closeBlindOnboarding();
+        return;
+      }
+      state.onboarding_step = cur + 1;
+      render();
+    }
+    function renderBlindOnboardingHtml() {
+      if (!state.onboarding_open || !state.user_id) return "";
+      const idx = Math.max(0, Math.min(COPY.onboardingCards.length - 1, Number(state.onboarding_step || 0)));
+      const card = COPY.onboardingCards[idx];
+      const isLast = (idx === COPY.onboardingCards.length - 1);
+      return `
+        <div class="modal-backdrop" style="position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(15,23,42,0.56); backdrop-filter:blur(4px);">
+          <div style="background:#FFFFFF; width:100%; max-width:360px; border-radius:26px; padding:22px 20px; box-shadow:0 18px 40px rgba(0,0,0,0.24);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <span style="font-size:12px; font-weight:800; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">${escHtml(card.badge)} · ${escHtml(card.step)}</span>
+              <button type="button" onclick="closeBlindOnboarding()" style="border:none; background:none; color:#8B95A1; font-size:13px; font-weight:700; cursor:pointer; padding:6px 8px; min-height:36px;">건너뛰기</button>
+            </div>
+            <div style="font-size:19px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:10px;">
+              ${escHtml(card.title)}
+            </div>
+            <div style="font-size:13.5px; color:#4E5968; line-height:1.55; margin-bottom:20px;">
+              ${escHtml(card.desc)}
+            </div>
+            <div style="display:flex; justify-content:center; gap:6px; margin-bottom:16px;">
+              ${COPY.onboardingCards.map((_, i) => `<span style="width:${i === idx ? '18px' : '6px'}; height:6px; border-radius:3px; background:${i === idx ? '#287D62' : '#D0D5DD'}; transition:all 0.2s;"></span>`).join("")}
+            </div>
+            <button type="button" class="btn btn-primary" style="min-height:46px; border-radius:14px; font-size:15px; font-weight:800;" onclick="nextBlindOnboardingStep()">
+              ${isLast ? '울대모 시작하기' : '다음'}
+            </button>
+          </div>
+        </div>
+      `;
+    }
 
     function getTodayStr() {
       const d = new Date();
@@ -172,54 +308,102 @@
 
     const VIRAL_BALANCE_POOL = [
       {
+        id: 507,
         tag: "💘 연애 레전드",
         question: "⚖️ [이별 밸런스] 겪어보면 멘탈이 더 바사삭 부서지는 이별은?",
         opt_a: "💔 헤어지고 3일 만에 새 애인 생기는 환승이별",
-        opt_b: "👻 아무 이유도 모른 채 하루아침에 차단당한 잠수이별"
+        opt_b: "👻 아무 이유도 모른 채 하루아침에 차단당한 잠수이별",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 508,
         tag: "🍜 음식 난제",
         question: "⚖️ [괴식 대결] 10만 원 받고 한 그릇 국물까지 다 비워야 한다면?",
         opt_a: "🌿 따뜻한 민트초코 소스 듬뿍 뿌린 양념치킨",
-        opt_b: "🍍 구운 파인애플과 초콜릿 넣은 돼지국밥"
+        opt_b: "🍍 구운 파인애플과 초콜릿 넣은 돼지국밥",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 509,
         tag: "💸 인생·만약에",
         question: "⚖️ 평생 스마트폰을 이 상태로만 써야 한다면?",
         opt_a: "🔋 아무리 충전해도 최대 배터리가 15%까지만 차는 폰",
-        opt_b: "🐢 모든 앱과 영상이 무조건 5초씩 버퍼링 걸리는 폰"
+        opt_b: "🐢 모든 앱과 영상이 무조건 5초씩 버퍼링 걸리는 폰",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 510,
         tag: "💘 연애 레전드",
         question: "⚖️ 10년 지기 절친이 내 전 애인과 사귄다고 고백한다면?",
         opt_a: "🤬 절대 용서 못 함, 둘 다 당장 손절",
-        opt_b: "🤝 이미 끝난 인연인데 어쩔 수 없지, 쿨하게 인정"
+        opt_b: "🤝 이미 끝난 인연인데 어쩔 수 없지, 쿨하게 인정",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 511,
         tag: "💸 인생·만약에",
         question: "⚖️ [계절 극악 밸런스] 1년 내내 단 하나의 날씨에서만 살아야 한다면?",
         opt_a: "🥵 에어컨 고장 난 38도 한여름 폭염",
-        opt_b: "🥶 보일러 고장 난 영하 18도 한겨울 한파"
+        opt_b: "🥶 보일러 고장 난 영하 18도 한겨울 한파",
+        votes_a: [],
+        votes_b: []
       },
       {
+        id: 512,
         tag: "🍜 음식 난제",
         question: "⚖️ [음식 궁합] 평생 이 조합으로만 먹어야 한다면?",
         opt_a: "🍕 탄산음료·피클 없이 퍽퍽한 피자만 먹기",
-        opt_b: "🍗 치킨무·양념소스·콜라 없이 눅눅한 후라이드 치킨만 먹기"
+        opt_b: "🍗 치킨무·양념소스·콜라 없이 눅눅한 후라이드 치킨만 먹기",
+        votes_a: [],
+        votes_b: []
       }
     ];
+
+    const ROTATING_BALANCE_POLLS = [...DEFAULT_POLLS, ...VIRAL_BALANCE_POOL];
+    const BALANCE_ROTATION_DAYS = 3;
+    const BALANCE_CYCLE_MS = BALANCE_ROTATION_DAYS * 24 * 60 * 60 * 1000;
+    const BALANCE_EPOCH_KST_MS = Date.UTC(2026, 0, 1) - (9 * 60 * 60 * 1000);
+
+    function getBalancePollCycleInfo(nowMs = Date.now()) {
+      const elapsed = Math.max(0, nowMs - BALANCE_EPOCH_KST_MS);
+      const cycleNumber = Math.floor(elapsed / BALANCE_CYCLE_MS);
+      const poolIdx = cycleNumber % ROTATING_BALANCE_POLLS.length;
+      const activeTemplate = ROTATING_BALANCE_POLLS[poolIdx];
+      const remainMs = BALANCE_CYCLE_MS - (elapsed % BALANCE_CYCLE_MS);
+      const remainDays = Math.floor(remainMs / (24 * 60 * 60 * 1000));
+      const remainHours = Math.floor((remainMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+      let countdownText = "곧 새 주제로 바뀌어요";
+      if (remainDays >= 1) {
+        countdownText = `다음 주제까지 ${remainDays}일 ${remainHours}시간`;
+      } else if (remainHours >= 1) {
+        countdownText = `다음 주제까지 ${remainHours}시간`;
+      }
+      return {
+        cycleNumber,
+        poolIdx,
+        activePollId: activeTemplate.id,
+        activeTemplate,
+        remainDays,
+        remainHours,
+        countdownText
+      };
+    }
 
     const DEFAULT_PLAZA_TALKS = [];
 
     function ensurePlazaDefaults(dbObj) {
       if (!Array.isArray(dbObj.polls)) {
-        dbObj.polls = JSON.parse(JSON.stringify(DEFAULT_POLLS));
+        dbObj.polls = JSON.parse(JSON.stringify(ROTATING_BALANCE_POLLS));
       } else {
-        // 기존 구형 질문(101, 102, 103) 제거 및 신규 레전드 밸런스 질문 자동 보충
+        // 기존 구형 질문(101, 102, 103) 제거 및 3일 로테이션 밸런스 질문(501~512) 자동 보충
         dbObj.polls = dbObj.polls.filter(p => p && !LEGACY_POLL_IDS.has(p.id));
-        const existingIds = new Set(dbObj.polls.map(p => p.id));
-        DEFAULT_POLLS.forEach(defP => {
-          if (!existingIds.has(defP.id)) {
+        const existingIds = new Set(dbObj.polls.map(p => Number(p.id)));
+        ROTATING_BALANCE_POLLS.forEach(defP => {
+          if (!existingIds.has(Number(defP.id))) {
             dbObj.polls.push(JSON.parse(JSON.stringify(defP)));
           }
         });
@@ -278,9 +462,7 @@
         } catch (e) {}
       }
       const initial = ensurePlazaDefaults({
-        users: {
-          "20261275": { student_id: "20261275", email: "user@ulsan.ac.kr", nickname: "사과", avatar: "🐶", gender: "남성", department: "컴퓨터공학과", mbti: "모름/비공개", manner_temp: 36.5, report_count: 0, bio: "반갑습니다! 공강 시간에 같이 소통해요 🌱", keywords: ["시간 약속을 잘 지켜요 ⏰", "친절해요 😊"] }
-        },
+        users: {},
         posts: [],
         applications: [],
         messages: [],
@@ -314,7 +496,7 @@
         DB.deleted_users_map = Object.assign({}, DB.deleted_users_map || {}, cloudDb.deleted_users_map);
         for (const [delSid, delTs] of Object.entries(DB.deleted_users_map)) {
           const localU = DB.users && DB.users[delSid];
-          if (localU && Number(localU.created_at || 0) <= Number(delTs || 0) && String(delSid) !== "20261275") {
+          if (localU && Number(localU.created_at || 0) <= Number(delTs || 0) && localU.role !== "admin") {
             delete DB.users[delSid];
             changed = true;
           }
@@ -326,7 +508,7 @@
         for (const [uid, uObj] of Object.entries(cloudDb.users)) {
           if (uObj && typeof uObj === "object") {
             const delTs = Number(delMap[uid] || 0);
-            if (delTs > 0 && Number(uObj.created_at || 0) <= delTs && String(uid) !== "20261275") {
+            if (delTs > 0 && Number(uObj.created_at || 0) <= delTs && uObj.role !== "admin") {
               delete DB.users[uid];
               continue;
             }
@@ -455,48 +637,60 @@
       } catch (e) {}
     }
     function getApiAuthPayload() {
-      const vid = (typeof state !== "undefined" && state && state.user_id) ? String(state.user_id) : "";
-      let admHash = "";
-      try { admHash = localStorage.getItem("uldaemo_admin_auth") || ""; } catch (e) {}
       return {
-        viewer_id: vid,
-        session_token: getSessionToken(),
-        admin_pw_hash: (vid === "20261275" ? admHash : "")
+        session_token: getSessionToken()
       };
     }
 
-    let _lastSyncedPayloadSig = "";
-    async function syncToCloud(immediate = false) {
-      const curPayloadSig = getDbStateSignature() + "|" + JSON.stringify(_deletedPostIds || []);
-      if (curPayloadSig === _lastSyncedPayloadSig && !immediate) return;
-
-      const runSync = async () => {
-        const snapSig = getDbStateSignature() + "|" + JSON.stringify(_deletedPostIds || []);
-        if (snapSig === _lastSyncedPayloadSig) return;
-        try {
-          const res = await fetch("/api/index", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(Object.assign({
-              action: "sync_db",
-              db: DB,
-              deleted_post_ids: _deletedPostIds
-            }, getApiAuthPayload()))
-          });
-          const data = await res.json();
-          if (data && data.ok) {
-            _lastSyncedPayloadSig = snapSig;
-            if (data.db) mergeCloudDBIntoLocal(data.db);
-          }
-        } catch (e) {}
-      };
-      if (immediate) {
-        clearTimeout(_syncTimer);
-        await runSync();
-      } else {
-        clearTimeout(_syncTimer);
-        _syncTimer = setTimeout(runSync, 600);
+    let _initialCloudSynced = false;
+    function applyServerSnapshot(serverDb) {
+      if (!serverDb || typeof serverDb !== "object") return false;
+      _initialCloudSynced = true;
+      DB.users = serverDb.users || {};
+      DB.posts = Array.isArray(serverDb.posts) ? serverDb.posts : [];
+      DB.applications = Array.isArray(serverDb.applications) ? serverDb.applications : [];
+      DB.messages = Array.isArray(serverDb.messages) ? serverDb.messages : [];
+      DB.notifications = Array.isArray(serverDb.notifications) ? serverDb.notifications : [];
+      DB.reviews = Array.isArray(serverDb.reviews) ? serverDb.reviews : [];
+      if (Array.isArray(serverDb.polls) && serverDb.polls.length) {
+        DB.polls = serverDb.polls.filter(p => p && !LEGACY_POLL_IDS.has(p.id));
       }
+      ensurePlazaDefaults(DB);
+      DB.plaza_talks = Array.isArray(serverDb.plaza_talks) ? serverDb.plaza_talks : [];
+      if (Array.isArray(serverDb.deleted_post_ids)) {
+        _deletedPostIds = serverDb.deleted_post_ids.map(Number).filter(n => !isNaN(n));
+        saveDeletedPostIds();
+      }
+      purgeDemoData(DB);
+      try { localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB)); } catch (e) {}
+      return true;
+    }
+
+    async function callApiAction(action, payload = {}) {
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ action }, payload, getApiAuthPayload()))
+        });
+        const data = await res.json().catch(() => ({ ok: false }));
+        if (res.status === 401 && state && state.user_id) {
+          executeLogoutNow();
+          showToast("세션이 만료되었습니다. 다시 로그인해주세요.");
+          return { ok: false, status: 401, message: data.message };
+        }
+        if (data && data.ok && data.db) {
+          applyServerSnapshot(data.db);
+        }
+        return Object.assign({ status: res.status }, data);
+      } catch (e) {
+        return { ok: false, status: 0, message: "서버 연결에 실패했습니다." };
+      }
+    }
+
+    async function syncToCloud(immediate = false) {
+      // 보안 강화: 전체 DB sync_db는 영구 폐지됨. 모든 변경은 전용 액션 API(callApiAction)를 사용합니다.
+      return false;
     }
 
     function getDbStateSignature() {
@@ -516,23 +710,27 @@
     }
 
     async function pullFromCloud(force = false) {
+      if (!getSessionToken()) return false;
       try {
         const res = await fetch("/api/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(Object.assign({ action: "load_db", force }, getApiAuthPayload()))
         });
+        if (res.status === 401) {
+          if (state && state.user_id) executeLogoutNow();
+          return false;
+        }
         const data = await res.json();
         if (data && data.ok && data.db) {
           const sigBefore = getDbStateSignature();
-          const localUserCountBefore = Object.keys(DB.users || {}).length;
           const prevNotifIds = new Set((DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).map(n => n.id));
           const prevApprovedIds = new Set(
             (DB.applications || [])
               .filter(a => String(a.applicant_id) === String(state.user_id) && a.status === "승인됨")
               .map(a => a.id)
           );
-          mergeCloudDBIntoLocal(data.db);
+          applyServerSnapshot(data.db);
           const sigAfter = getDbStateSignature();
 
           // 내 참여 신청이 방금 '승인됨'으로 바뀌었다면 즉시 토스트 안내
@@ -550,11 +748,6 @@
                 showSystemNotification("⚡ 울대모 새 알림", newlyArrived[0].message, "/");
               }
             }
-            // 로그인 상태에서 이 기기에만 있던 내 가입 계정이 클라우드에 아직 안 올라가 있었다면 즉시 업로드
-            const cloudUsers = data.db.users || {};
-            if (DB.users && DB.users[state.user_id] && !cloudUsers[state.user_id]) {
-              syncToCloud(true);
-            }
           }
 
           // 데이터가 실제로 바뀐 경우에만 화면 갱신 (지도 깜빡임 및 입력창 커서 풀림 원천 방지)
@@ -562,7 +755,6 @@
             const ae = document.activeElement;
             const typing = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
             if (ae && ae.id && ae.id.startsWith("chat_in_")) {
-              // 채팅 입력 중일 때는 입력창(input) DOM을 절대 건드리지 않고 말풍선 목록만 부분 갱신
               updateAllChatBoxesInPlace();
             } else if (!typing) {
               renderWithoutMapFlicker();
@@ -575,33 +767,26 @@
     }
 
     function saveDB(immediate = false) {
-      localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
-      syncToCloud(immediate);
+      try { localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB)); } catch (e) {}
     }
 
     let DB = loadDB();
 
-    // 운영진(관리자) 권한: 학번 20261275 단 1개 계정 + 전용 비밀번호 인증을 통과한 경우에만 부여됩니다.
-    // (비밀번호 원문은 코드에 저장하지 않고 SHA-256 해시만 보관합니다.)
-    const ADMIN_STUDENT_IDS = ["20261275"];
-    const ADMIN_PW_HASH = "799bd88683489d6a99dee51db6c04b3ca41c9a730fe7c34f44283157bd2aaded";
-    const ADMIN_AUTH_KEY = "uldaemo_admin_auth";
-    async function hashAdminPw(pw) {
-      const buf = new TextEncoder().encode("uldaemo-admin::" + pw);
-      const digest = await crypto.subtle.digest("SHA-256", buf);
-      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
-    }
+    // 보안 강화: 클라이언트 하드코딩 관리자 학번/해시/localStorage 저장 완전 제거 (서버 users.role 컬럼으로만 판별)
     async function hashUserPw(sid, pw) {
       const buf = new TextEncoder().encode("uldaemo-user::" + String(sid).trim() + "::" + String(pw));
       const digest = await crypto.subtle.digest("SHA-256", buf);
       return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
     }
-    function isAdminAuthed() {
-      try { return localStorage.getItem(ADMIN_AUTH_KEY) === ADMIN_PW_HASH; } catch (e) { return false; }
-    }
     function isCurrentUserAdmin() {
-      if (!state || !state.user_id) return false;
-      return ADMIN_STUDENT_IDS.includes(String(state.user_id)) && isAdminAuthed();
+      if (!state || !state.user_id || !DB || !DB.users) return false;
+      const u = DB.users[state.user_id];
+      return Boolean(u && u.role === "admin");
+    }
+    function isTargetAdminUser(uid) {
+      if (!uid || !DB || !DB.users) return false;
+      const u = DB.users[uid];
+      return Boolean(u && u.role === "admin");
     }
 
     // =========================================================
@@ -780,28 +965,22 @@
       return true;
     }
 
-    function handleDailyCheckin() {
+    async function handleDailyCheckin() {
       if (!state.user_id || !DB.users[state.user_id]) return;
       const u = DB.users[state.user_id];
       const today = getTodayStr();
       if (u.last_checkin === today) {
         return showToast("오늘 출석체크를 이미 완료했어요. 내일 또 참여해 주세요.");
       }
-      u.last_checkin = today;
-      u.streak_days = (u.streak_days || 1) + 1;
-      u.bonus_score = (u.bonus_score || 0) + 3;
-      state.just_stamped_day = Math.min(7, u.streak_days);
+      const res = await callApiAction("checkin", {});
+      if (!res.ok) return showToast(res.message || "출석체크에 실패했어요.");
+      if (res.already) return showToast("오늘 출석체크를 이미 완료했어요. 내일 또 참여해 주세요.");
+      const streak = res.streak_days || ((DB.users[state.user_id] && DB.users[state.user_id].streak_days) || 1);
+      state.just_stamped_day = Math.min(7, streak);
       setTimeout(() => { state.just_stamped_day = null; }, 900);
-      if (u.streak_days >= 3 && u.streak_days % 3 === 0) {
-        u.coffee_tickets = (u.coffee_tickets || 0) + 1;
-        showToast(`연속 ${u.streak_days}일 출석 달성! 행운의 룰렛 티켓 +1장 보너스 획득!`);
-      } else {
-        showToast(`출석체크 완료! (연속 ${u.streak_days}일째 출석)`);
-      }
-      u.updated_at = Date.now();
+      showToast(`출석체크 완료! (연속 ${streak}일째 · 룰렛 티켓 +1장)`);
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
       fireConfetti();
-      saveDB(true);
       render();
     }
 
@@ -1037,82 +1216,19 @@
       submitMannerPraise(postId, partnerId, kw, detail, isNone);
     }
 
-    function submitMannerPraise(postId, partnerId, keyword, detail = "", isNone = false) {
+    async function submitMannerPraise(postId, partnerId, keyword, detail = "", isNone = false) {
       if (!state.user_id || !partnerId) return;
-      if (partnerId === state.user_id) {
+      if (String(partnerId) === String(state.user_id)) {
         return showToast("[어뷰징 방지] 본인에게는 매너 평가를 남길 수 없어요.");
       }
-      DB.reviews = DB.reviews || [];
-      const alreadyThisPost = DB.reviews.some(r => Number(r.post_id) === Number(postId) && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(partnerId));
-      if (alreadyThisPost) {
-        return showToast("이 번개 모임에서 이미 후기를 완료했어요.");
-      }
-
-      if (isNone) {
-        // 후기 없음 선택: 상대방 알림/온도 변동 없이 조용히 완료 기록
-        DB.reviews.push({
-          id: Date.now(),
-          post_id: postId,
-          from_id: state.user_id,
-          to_id: partnerId,
-          keyword: "후기없음",
-          detail: "",
-          is_none: true,
-          created_at: getTodayStr()
-        });
-        state['chat_action_open_' + postId] = false;
-        delete state['review_draft_' + postId];
-        if (state.active_modal === "review") {
-          const postObj = findChatPostById(postId);
-          const approved = (DB.applications || []).filter(a => Number(a.post_id) === Number(postId) && a.status === "승인됨");
-          const allIds = postObj ? [String(postObj.author_id), ...approved.map(a => String(a.applicant_id))] : [];
-          const remainUid = allIds.find(uid => uid && uid !== String(state.user_id) && !(DB.reviews || []).some(r => Number(r.post_id) === Number(postId) && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(uid)));
-          if (remainUid) {
-            state[`chat_eval_target_${postId}`] = String(remainUid);
-          } else {
-            state.active_modal = null;
-          }
-        }
-        saveDB(true);
-        showToast("후기 없이 모임을 깔끔하게 마무리했어요.");
-        render();
-        return;
-      }
-
-      // 어뷰징 방지: 동일 학우 간 반복 평가는 월 최대 2회까지만 인정
-      const samePairCount = DB.reviews.filter(r => !r.is_none && String(r.from_id) === String(state.user_id) && String(r.to_id) === String(partnerId)).length;
-      if (samePairCount >= 2) {
-        return showToast("[어뷰징 방지] 동일한 학우와의 반복 평가는 월 최대 2회까지만 매너온도 및 인증 뱃지 실적에 반영돼요.");
-      }
-
-      DB.reviews.push({
-        id: Date.now(),
-        post_id: postId,
-        from_id: state.user_id,
-        to_id: partnerId,
-        keyword: keyword || "친절해요",
-        detail: detail || "",
-        is_none: false,
-        created_at: getTodayStr()
+      const res = await callApiAction("submit_review", {
+        post_id: Number(postId),
+        target_user_id: String(partnerId),
+        keyword: isNone ? "후기없음" : (keyword || "친절해요"),
+        detail: isNone ? "" : (detail || ""),
+        is_none: Boolean(isNone)
       });
-
-      const partner = DB.users[partnerId];
-      const me = DB.users[state.user_id];
-      if (partner) {
-        partner.manner_temp = Math.min(60, Math.round(((partner.manner_temp || 36.5) + 0.5) * 10) / 10);
-        partner.keywords = partner.keywords || [];
-        if (keyword && !partner.keywords.includes(keyword)) partner.keywords.push(keyword);
-        partner.updated_at = Date.now();
-        const detailMsg = detail ? ` ("${detail}")` : "";
-        notifyUser(partnerId, `${me ? me.nickname : "학우"}님이 [${keyword}] 매너 후기를 남겨 매너온도가 0.5°C 올랐어요${detailMsg}`, postId);
-      }
-      if (me) {
-        me.manner_temp = Math.min(60, Math.round(((me.manner_temp || 36.5) + 0.2) * 10) / 10);
-        me.updated_at = Date.now();
-      }
-
-      checkAndGrantFirstMeetupReward(state.user_id);
-      checkAndGrantFirstMeetupReward(partnerId);
+      if (!res.ok) return showToast(res.message || "후기 등록에 실패했어요.");
 
       state['chat_action_open_' + postId] = false;
       delete state['review_draft_' + postId];
@@ -1127,17 +1243,15 @@
           state.active_modal = null;
         }
       }
-      fireConfetti();
-      saveDB(true);
-      showToast("매너 후기를 보냈어요! (상대방 +0.5°C, 내 온도 +0.2°C)");
+      if (!isNone) fireConfetti();
+      showToast(isNone ? "후기 없이 모임을 깔끔하게 마무리했어요." : "매너 후기를 보냈어요! (상대방 +0.5°C, 내 온도 +0.2°C)");
       render();
     }
 
     const state = {
       user_id: (function () {
         const saved = localStorage.getItem("uldaemo_uid") || "";
-        if (DEMO_USER_IDS.includes(saved)) return "";
-        if (ADMIN_STUDENT_IDS.includes(saved) && !isAdminAuthed()) return "";
+        if (DEMO_USER_IDS.includes(saved) || !getSessionToken()) return "";
         return saved;
       })(),
       login_tab: "login",
@@ -1174,6 +1288,9 @@
       state.user_id = String(uid).trim();
       localStorage.setItem("uldaemo_uid", state.user_id);
       document.cookie = `user_id=${state.user_id}; path=/; max-age=2592000`;
+      if (!window.location.hash || !window.location.hash.startsWith("#/")) {
+        try { window.history.replaceState({ uldaemoKey: "tab:홈:" }, "", "#/home"); } catch (e) {}
+      }
       render();
     }
 
@@ -1310,7 +1427,7 @@
       const uid = String(state.user_id || "");
       const tSid = String(targetSid || "").trim();
       if (!uid || !tSid || uid === tSid) return;
-      if (ADMIN_STUDENT_IDS.includes(tSid)) {
+      if (isTargetAdminUser(tSid)) {
         return showToast("운영진 계정은 차단할 수 없어요.");
       }
       const dispName = targetLabel || ((DB.users && DB.users[tSid] && DB.users[tSid].nickname) ? DB.users[tSid].nickname : "해당 학우");
@@ -1320,37 +1437,29 @@
         confirmText: "차단하기",
         cancelText: "돌아가기",
         isDanger: true,
-        onConfirm: () => {
-          const me = (DB.users || {})[uid];
+        onConfirm: async () => {
+          const res = await callApiAction("block_user", { target_user_id: tSid });
+          if (!res.ok) return showToast(res.message || "차단 처리에 실패했어요.");
           const nextList = Array.from(new Set([...getMyBlockedUsers(), tSid]));
-          if (me) {
-            me.blocked_users = nextList;
-            me.updated_at = Date.now();
-          }
           try { localStorage.setItem("uldaemo_blocked_" + uid, JSON.stringify(nextList)); } catch (e) {}
           if (state.active_modal === "detail") {
             const curPost = (DB.posts || []).find(p => Number(p.id) === Number(state.selected_post_id));
             if (curPost && String(curPost.author_id) === tSid) state.active_modal = null;
           }
-          saveDB(true);
           showToast(`🚫 ${dispName}님을 차단했어요. ([내 정보]에서 해제 가능)`);
           render();
         }
       });
     }
 
-    function unblockUser(targetSid) {
+    async function unblockUser(targetSid) {
       const uid = String(state.user_id || "");
       const tSid = String(targetSid || "").trim();
       if (!uid || !tSid) return;
+      const res = await callApiAction("unblock_user", { target_user_id: tSid });
+      if (!res.ok) return showToast(res.message || "차단 해제에 실패했어요.");
       const nextList = getMyBlockedUsers().filter(x => x !== tSid);
-      const me = (DB.users || {})[uid];
-      if (me) {
-        me.blocked_users = nextList;
-        me.updated_at = Date.now();
-      }
       try { localStorage.setItem("uldaemo_blocked_" + uid, JSON.stringify(nextList)); } catch (e) {}
-      saveDB(true);
       showToast("차단을 해제했어요.");
       render();
     }
@@ -1398,39 +1507,15 @@
 
     async function executeDeleteMyAccount() {
       const uid = String(state.user_id || "").trim();
-      if (!uid || ADMIN_STUDENT_IDS.includes(uid)) return;
-      const myPwHash = (DB.users && DB.users[uid] && DB.users[uid].pw_hash) ? DB.users[uid].pw_hash : "";
-      try {
-        const res = await fetch("/api/index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "delete_account",
-            student_id: uid,
-            session_token: getSessionToken(),
-            pw_hash: myPwHash
-          })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) {
-          return showToast(data.message || "본인 인증이 필요합니다. 다시 로그인 후 탈퇴를 진행해주세요.");
-        }
-      } catch (e) {
-        return showToast("네트워크 오류로 회원 탈퇴를 완료하지 못했습니다. 잠시 후 다시 시도해주세요.");
+      if (!uid || isCurrentUserAdmin()) return;
+      const res = await callApiAction("delete_account", {});
+      if (!res.ok) {
+        return showToast(res.message || "본인 인증이 필요합니다. 다시 로그인 후 탈퇴를 진행해주세요.");
       }
-      const myPostIds = (DB.posts || []).filter(p => p && String(p.author_id) === uid).map(p => p.id);
-      if (DB.users) delete DB.users[uid];
-      DB.deleted_users_map = DB.deleted_users_map || {};
-      DB.deleted_users_map[uid] = Date.now();
-      DB.posts = (DB.posts || []).filter(p => p && String(p.author_id) !== uid);
-      DB.applications = (DB.applications || []).filter(a => a && String(a.applicant_id) !== uid && !myPostIds.includes(a.post_id));
-      DB.messages = (DB.messages || []).filter(m => m && String(m.sender_id) !== uid && !myPostIds.includes(m.post_id));
-      DB.notifications = (DB.notifications || []).filter(n => n && String(n.user_id) !== uid);
-      DB.plaza_talks = (DB.plaza_talks || []).filter(t => t && String(t.author_id) !== uid);
       try {
         localStorage.removeItem("uldaemo_tt_" + uid);
         localStorage.removeItem("uldaemo_blocked_" + uid);
-        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+        localStorage.removeItem("uldaemo_db_v5");
       } catch (e) {}
       executeLogoutNow();
       showToast("회원 탈퇴 및 개인정보 파기가 완료되었습니다.");
@@ -1441,7 +1526,7 @@
       state.verified_email = null;
       state.auth_code_sent = false;
       localStorage.removeItem("uldaemo_uid");
-      localStorage.removeItem(ADMIN_AUTH_KEY);
+      localStorage.removeItem("uldaemo_admin_auth");
       setSessionToken("");
       document.cookie = "user_id=; path=/; max-age=0";
       render();
@@ -1449,12 +1534,12 @@
     }
 
     function isAdminSid(sid) {
-      return ADMIN_STUDENT_IDS.includes(String(sid || "").trim());
+      return isTargetAdminUser(sid);
     }
 
     function clearLogin() {
       const curUser = state.user_id ? DB.users[state.user_id] : null;
-      if (curUser && !isAdminSid(state.user_id) && !curUser.pw_hash) {
+      if (curUser && !isCurrentUserAdmin() && !curUser.has_pw && !curUser.pw_hash) {
         openConfirmSheet({
           title: "비밀번호 설정 안내",
           desc: "아직 로그인 비밀번호가 설정되지 않았어요. 안전한 계정 보호를 위해 지금 비밀번호를 설정할까요?",
@@ -2737,7 +2822,7 @@
               </span>
               <div style="min-width:0;">
                 <div style="font-size:15px; font-weight:800; color:#191F28;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</div>
-                <div style="font-size:12px; color:#6B7684; margin-top:2px;">연속 ${st.streakDays}일째</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:2px;">${(!_initialCloudSynced && getSessionToken()) ? `<span class="skeleton-bar" style="display:inline-block; width:56px; height:12px; border-radius:6px; background:#E5EAE7; vertical-align:middle;"></span>` : `연속 ${st.streakDays}일째`}</div>
               </div>
             </div>
             <span style="height:32px; padding:0 14px; border-radius:16px; background:${st.checkedInToday ? '#EEF8F3' : '#287D62'}; color:${st.checkedInToday ? '#287D62' : '#FFFFFF'}; font-size:12.5px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
@@ -2761,8 +2846,8 @@
                 ${activeChats.length > 0 ? `<button type="button" style="font-size:12px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="switchTab('채팅')">전체 ›</button>` : ''}
               </div>
               ${activeChats.length === 0 ? `
-                <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:8px;">아직 대화가 없어요</div>
-                <div style="font-size:12px; color:#6B7684; margin-top:4px;">번개에 참여하면 안심 채팅방이 열려요</div>
+                <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:8px;">${escHtml(COPY.chatEmptyTitle)}</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:4px;">${escHtml(COPY.chatEmptySub)}</div>
                 <button type="button" onclick="switchTab('홈')" style="margin-top:10px; padding:0; background:none; border:none; color:#287D62; font-size:13px; font-weight:800; cursor:pointer;">
                   번개 둘러보기 ›
                 </button>
@@ -2818,14 +2903,7 @@
           return;
         }
 
-        if (ADMIN_STUDENT_IDS.includes(String(state.user_id)) && currentUser.report_count > 0) {
-          currentUser.report_count = 0;
-          currentUser.reported_by = [];
-          if ((currentUser.manner_temp || 36.5) < 36.5) currentUser.manner_temp = 36.5;
-          localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
-        }
-
-        if (!ADMIN_STUDENT_IDS.includes(String(state.user_id)) && (currentUser.report_count >= 3 || currentUser.is_suspended)) {
+        if (!isCurrentUserAdmin() && (currentUser.report_count >= 3 || currentUser.is_suspended)) {
           root.className = "app-shell";
           root.innerHTML = `<div class="uldaemo-card" style="text-align:center; padding:30px;"><h3>🚨 계정 이용 정지</h3><p style="margin:10px 0; color:#6B7684;">운영진 조치 또는 누적 신고로 인해 계정 이용이 일시 정지되었습니다.</p><div class="row-2" style="margin-top:12px;"><button class="btn btn-primary" onclick="pullFromCloud(true)">🔄 정지 해제 확인</button><button class="btn" onclick="clearLogin()">로그아웃</button></div></div>`;
           return;
@@ -2919,7 +2997,12 @@
           </aside>
         `;
 
-        const hideRightPanel = (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "지도"));
+        const hideRightPanel = Boolean(
+          state.active_modal === "create"
+          || state.active_modal === "timetable"
+          || state.active_modal === "food_map"
+          || (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "지도"))
+        );
         const rightHtml = hideRightPanel ? "" : renderPcRightSidePanel(unreadCnt, newNoticeCnt);
 
         const routeKey = `${state.active_modal || 'tab'}:${state.nav_tab}:${state.active_chat_post_id || ''}`;
@@ -2983,6 +3066,8 @@
           </button>
           ${renderConfirmDialogHtml()}
           ${renderPolicyModalHtml()}
+          ${renderBlindPreviewModalHtml()}
+          ${renderBlindOnboardingHtml()}
         `;
 
         if (state.active_modal === "detail") {
@@ -3379,50 +3464,6 @@
       }
     }
 
-    async function handleAdminLogin(sid) {
-      const pwEl = document.getElementById("login_pw");
-      const pw = pwEl ? pwEl.value : "";
-      const lockUntil = Number(localStorage.getItem("uldaemo_admin_lock") || 0);
-      if (Date.now() < lockUntil) {
-        return showToast("비밀번호 오류가 누적되어 잠시 잠겼습니다. 5분 뒤 다시 시도해주세요.");
-      }
-      if (!pw) return showToast("관리자 전용 비밀번호를 입력해주세요.");
-      let h = "";
-      try { h = await hashAdminPw(pw); } catch (e) { return showToast("보안 연결(HTTPS)에서만 관리자 로그인이 가능합니다."); }
-      if (h !== ADMIN_PW_HASH) {
-        const fails = Number(localStorage.getItem("uldaemo_admin_fails") || 0) + 1;
-        localStorage.setItem("uldaemo_admin_fails", String(fails));
-        if (fails >= 5) {
-          localStorage.setItem("uldaemo_admin_lock", String(Date.now() + 5 * 60 * 1000));
-          localStorage.setItem("uldaemo_admin_fails", "0");
-        }
-        return showToast("비밀번호가 올바르지 않습니다.");
-      }
-      localStorage.setItem("uldaemo_admin_fails", "0");
-      localStorage.setItem(ADMIN_AUTH_KEY, h);
-      try {
-        const sRes = await fetch("/api/index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "issue_session", student_id: sid, admin_pw_hash: h })
-        });
-        const sData = await sRes.json();
-        if (sData && sData.ok && sData.session_token) setSessionToken(sData.session_token);
-      } catch (e) {}
-      state.user_id = sid;
-      await pullFromCloud(true);
-      if (!DB.users[sid]) {
-        DB.users[sid] = {
-          student_id: sid, email: "", nickname: "운영진", avatar: "🐶", gender: "남성",
-          department: "운영진", mbti: "모름/비공개", manner_temp: 36.5, report_count: 0,
-          bio: "울대모 운영진입니다.", keywords: [], updated_at: Date.now()
-        };
-        saveDB(true);
-      }
-      showToast("운영진 계정으로 로그인되었어요.");
-      persistLogin(sid);
-    }
-
     function openPwResetFlow(prefillSid = "") {
       const sidIn = document.getElementById("login_sid");
       const curSid = prefillSid || (sidIn ? sidIn.value.trim() : "");
@@ -3440,45 +3481,30 @@
       const sid = sidEl ? sidEl.value.trim() : "";
       const em = emEl ? emEl.value.trim() : "";
       if (!sid) return showToast("학번을 입력해주세요.");
-      if (ADMIN_STUDENT_IDS.includes(sid)) return showToast("관리자 계정은 전용 비밀번호로만 로그인할 수 있습니다.");
       const re = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
       if (!re.test(em)) return showToast("올바른 이메일 주소를 입력해주세요.");
 
-      if (!DB.users[sid]) {
-        await pullFromCloud(true);
-      }
-      const u = DB.users[sid];
-      if (!u) return showToast("등록되지 않은 학번입니다. [신규 학우 가입] 탭에서 가입해주세요!");
-
-      if (u.email && u.email.toLowerCase() !== em.toLowerCase()) {
-        const parts = u.email.split("@");
-        const hint = parts[0].slice(0, 2) + "***@" + (parts[1] || "");
-        return showToast(`가입 시 등록한 이메일(${hint})과 일치하지 않습니다.`);
-      }
-
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
       state.pw_reset_sid = sid;
       state.pw_reset_email = em;
-      state.pw_reset_otp = otp;
-      state.pw_reset_otp_sent = true;
+      state.pw_reset_otp_sent = false;
+      state.pw_reset_otp_token = "";
       showToast("이메일로 인증번호를 발송 중입니다...");
       try {
         const res = await fetch("/api/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "send_otp",
-            email: em,
-            otp: otp,
-            sender_email: state.smtp_sender,
-            app_password: state.smtp_pw
-          })
+          body: JSON.stringify({ action: "send_otp", email: em })
         });
         const data = await res.json();
-        if (data.ok) showToast("메일함으로 6자리 인증번호가 발송되었어요!");
-        else showToast(`인증번호 [${otp}] 생성 완료!`);
+        if (data && data.ok && data.otp_token) {
+          state.pw_reset_otp_token = data.otp_token;
+          state.pw_reset_otp_sent = true;
+          showToast("메일함으로 6자리 인증번호가 발송되었어요!");
+        } else {
+          showToast((data && data.message) || "인증번호 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
       } catch (e) {
-        showToast(`인증번호 [${otp}] 생성 완료!`);
+        showToast("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
       }
       render();
     }
@@ -3491,38 +3517,38 @@
       const code = codeEl ? codeEl.value.trim() : "";
       const newPw = pwEl ? pwEl.value : "";
 
-      if (!sid || !DB.users[sid]) return showToast("학번 정보를 다시 확인해주세요.");
-      if (!state.pw_reset_otp || code !== state.pw_reset_otp) {
-        return showToast("인증번호가 일치하지 않습니다.");
-      }
-      if (!newPw || newPw.length < 4) {
-        return showToast("새 비밀번호를 4자리 이상 입력해주세요.");
-      }
+      if (!sid) return showToast("학번 정보를 다시 확인해주세요.");
+      if (!code || code.length !== 6) return showToast("6자리 인증번호를 입력해주세요.");
+      if (!newPw || newPw.length < 4) return showToast("새 비밀번호를 4자리 이상 입력해주세요.");
 
       const newPwHash = await hashUserPw(sid, newPw);
-      const u = DB.users[sid] || { student_id: sid, nickname: "학우", department: "울산대", manner_temp: 36.5, report_count: 0, updated_at: Date.now() };
-      u.pw_hash = newPwHash;
-      if (!u.email && state.pw_reset_email) u.email = state.pw_reset_email;
-      u.updated_at = Date.now();
-      DB.users[sid] = u;
-      state.user_id = sid;
-      state.pw_reset_mode = false;
-      state.pw_reset_otp_sent = false;
-      state.pw_reset_otp = "";
-      localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
-      await syncToCloud(true);
       try {
-        const sRes = await fetch("/api/index", {
+        const res = await fetch("/api/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "issue_session", student_id: sid, pw_hash: newPwHash })
+          body: JSON.stringify({
+            action: "reset_password",
+            student_id: sid,
+            email: state.pw_reset_email,
+            otp: code,
+            otp_token: state.pw_reset_otp_token || "",
+            pw_hash: newPwHash
+          })
         });
-        const sData = await sRes.json();
-        if (sData && sData.ok && sData.session_token) setSessionToken(sData.session_token);
-      } catch (e) {}
-      await pullFromCloud(true);
-      showToast("비밀번호 설정 완료! 지금부터 30일간 자동 로그인이 유지됩니다.");
-      persistLogin(sid);
+        const data = await res.json();
+        if (!data || !data.ok) {
+          return showToast((data && data.message) || "비밀번호 설정에 실패했습니다.");
+        }
+        if (data.session_token) setSessionToken(data.session_token);
+        if (data.db) applyServerSnapshot(data.db);
+        state.pw_reset_mode = false;
+        state.pw_reset_otp_sent = false;
+        state.pw_reset_otp_token = "";
+        showToast("비밀번호 설정 완료! 지금부터 30일간 자동 로그인이 유지됩니다.");
+        persistLogin(sid);
+      } catch (e) {
+        showToast("서버 연결에 실패했습니다.");
+      }
     }
 
     async function handleLoginSubmit() {
@@ -3535,9 +3561,6 @@
 
       if (DEMO_USER_IDS.includes(sid)) {
         return showToast("등록되지 않은 학번입니다. [신규 학우 가입] 탭에서 가입해주세요!");
-      }
-      if (ADMIN_STUDENT_IDS.includes(sid)) {
-        return handleAdminLogin(sid);
       }
 
       // 비밀번호 잠금 확인 (5회 실패 시 5분 잠금)
@@ -3559,9 +3582,9 @@
         const vData = await res.json();
         if (vData && vData.ok) {
           if (vData.session_token) setSessionToken(vData.session_token);
-          if (vData.db) mergeCloudDBIntoLocal(vData.db);
+          if (vData.db) applyServerSnapshot(vData.db);
           localStorage.setItem(failKey, "0");
-          showToast("로그인 성공! 30일간 자동 로그인이 유지됩니다.");
+          showToast(vData.role === "admin" ? "운영진 계정으로 로그인되었어요." : "로그인 성공! 30일간 자동 로그인이 유지됩니다.");
           persistLogin(sid);
           return;
         }
@@ -3596,43 +3619,41 @@
       const em = document.getElementById("signup_email").value.trim();
       const re = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
       if (!re.test(em)) return showToast("올바른 이메일 주소(예: id@gmail.com, id@naver.com)를 입력해주세요.");
-      const otp = String(Math.floor(100000 + Math.random() * 900000));
       state.pending_email = em;
-      state.generated_otp = otp;
-      state.auth_code_sent = true;
+      state.signup_otp_token = "";
+      state.auth_code_sent = false;
       showToast("인증번호를 발송 중입니다...");
       try {
         const res = await fetch("/api/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "send_otp",
-            email: em,
-            otp: otp,
-            sender_email: state.smtp_sender,
-            app_password: state.smtp_pw
-          })
+          body: JSON.stringify({ action: "send_otp", email: em })
         });
         const data = await res.json();
-        state.smtp_sent_live = Boolean(data.ok);
-        if (data.ok) showToast("메일함으로 6자리 인증번호가 발송되었어요!");
-        else showToast(`인증번호 [${otp}] 생성 완료!`);
+        state.smtp_sent_live = Boolean(data && data.ok);
+        if (data && data.ok && data.otp_token) {
+          state.signup_otp_token = data.otp_token;
+          state.auth_code_sent = true;
+          showToast("메일함으로 6자리 인증번호가 발송되었어요!");
+        } else {
+          showToast((data && data.message) || "인증번호 발송에 실패했습니다.");
+        }
       } catch (e) {
         state.smtp_sent_live = false;
-        showToast(`인증번호 [${otp}] 생성 완료!`);
+        showToast("서버 연결에 실패했습니다.");
       }
       render();
     }
 
     function confirmEmailOtp() {
       const code = document.getElementById("signup_otp_code").value.trim();
-      if (state.generated_otp && code === state.generated_otp) {
-        state.verified_email = state.pending_email;
-        showToast("이메일 본인 인증이 완료되었어요!");
-        render();
-      } else {
-        showToast("인증번호가 일치하지 않습니다.");
+      if (!state.signup_otp_token || !/^\d{6}$/.test(code)) {
+        return showToast("메일로 받은 6자리 숫자 인증번호를 입력해주세요.");
       }
+      state.verified_otp_code = code;
+      state.verified_email = state.pending_email;
+      showToast("인증번호가 입력되었어요! 아래 프로필을 입력하고 가입을 완료하세요.");
+      render();
     }
 
     async function handleSignupSubmit() {
@@ -3651,56 +3672,50 @@
 
       if (!sid) return showToast("학번(필수 항목)을 입력해주세요.");
       if (!pw || pw.length < 4) return showToast("로그인 비밀번호를 4자리 이상 설정해주세요.");
-      if (!state.verified_email) return showToast("먼저 Step 1 이메일 본인 인증을 완료해주세요.");
+      if (!state.verified_email || !state.signup_otp_token || !state.verified_otp_code) {
+        return showToast("먼저 Step 1 이메일 본인 인증을 완료해주세요.");
+      }
       if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 모두 입력해주세요.");
       if (!agreeAge19) return showToast("[필수] 만 19세 이상 성인 학우 확인에 동의해주세요.");
       if (!agreeTerms || !agreePrivacy) return showToast("[필수] 서비스 이용약관 및 개인정보 수집·이용에 동의해주세요.");
-      if (ADMIN_STUDENT_IDS.includes(sid) || DEMO_USER_IDS.includes(sid)) {
+      if (DEMO_USER_IDS.includes(sid)) {
         return showToast("사용할 수 없는 학번입니다.");
-      }
-      if (DB.users[sid]) {
-        return showToast("이미 가입된 학번입니다. [기존 학우 로그인]을 이용해주세요.");
       }
 
       const pwHash = await hashUserPw(sid, pw);
-      const nowDt = new Date();
-      const joinedAtStr = `${nowDt.getFullYear()}-${String(nowDt.getMonth() + 1).padStart(2, '0')}-${String(nowDt.getDate()).padStart(2, '0')} ${String(nowDt.getHours()).padStart(2, '0')}:${String(nowDt.getMinutes()).padStart(2, '0')}`;
-      if (DB.deleted_users_map) delete DB.deleted_users_map[sid];
-      DB.users[sid] = {
-        student_id: sid,
-        email: state.verified_email,
-        joined_at: joinedAtStr,
-        created_at: Date.now(),
-        age_19_verified: true,
-        agreed_terms_at: joinedAtStr,
-        pw_hash: pwHash,
-        nickname: nick,
-        avatar: avatar.split(" ")[0],
-        gender,
-        department: dept,
-        mbti,
-        manner_temp: 36.5,
-        report_count: 0,
-        is_suspended: false,
-        bio: "반갑습니다! 공강 시간에 같이 소통해요.",
-        keywords: ["시간 약속을 잘 지켜요", "친절해요"],
-        updated_at: Date.now()
-      };
-      state.user_id = sid;
-      localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
-      await syncToCloud(true);
       try {
-        const sRes = await fetch("/api/index", {
+        const res = await fetch("/api/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "issue_session", student_id: sid, pw_hash: pwHash })
+          body: JSON.stringify({
+            action: "signup",
+            student_id: sid,
+            pw_hash: pwHash,
+            email: state.verified_email,
+            otp: state.verified_otp_code,
+            otp_token: state.signup_otp_token,
+            nickname: nick,
+            avatar: avatar.split(" ")[0],
+            gender,
+            department: dept,
+            mbti,
+            agree_age19: true,
+            agree_terms: true,
+            agree_privacy: true
+          })
         });
-        const sData = await sRes.json();
-        if (sData && sData.ok && sData.session_token) setSessionToken(sData.session_token);
-      } catch (e) {}
-      await pullFromCloud(true);
-      showToast("가입 완료! 지금부터 30일간 자동 로그인이 유지됩니다.");
-      persistLogin(sid);
+        const data = await res.json();
+        if (!data || !data.ok) {
+          return showToast((data && data.message) || "가입 처리에 실패했습니다.");
+        }
+        if (data.session_token) setSessionToken(data.session_token);
+        if (data.db) applyServerSnapshot(data.db);
+        openBlindOnboardingIfNew(sid);
+        showToast("가입 완료! 지금부터 30일간 자동 로그인이 유지됩니다.");
+        persistLogin(sid);
+      } catch (e) {
+        showToast("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
     }
 
     // =========================================================
@@ -4199,8 +4214,8 @@
         const qStr = String(state.search_q || "").trim();
         const catStr = (state.home_cat && state.home_cat !== "전체") ? state.home_cat : "";
         const hasAnyFilter = Boolean(qStr || catStr || curTimeFilter !== "전체");
-        let emptyTitle = "아직 열린 번개가 없어요";
-        let emptySub = "첫 번개를 열어볼까요?";
+        let emptyTitle = COPY.homeEmptyTitle;
+        let emptySub = COPY.homeEmptySub;
         if (qStr && catStr) {
           emptyTitle = `'${qStr}' ${catStr} 번개가 아직 없어요`;
           emptySub = "필터를 초기화하거나 직접 번개를 열어볼까요?";
@@ -4657,10 +4672,13 @@
           ${renderCategoryChips("home_cat")}
         </div>
 
-        <!-- 항상 보여주는 사생활 안심 안내 (피그마 ① 홈 개선안) -->
-        <div style="display:flex; align-items:center; gap:6px; margin: 2px 0 10px;">
-          <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
-          <span style="font-size:12px; font-weight:600; color:#287D62;">수락 전까지 내 이름·학과는 숨겨져요</span>
+        <!-- 항상 보여주는 사생활 안심 안내 (탭하면 블라인드 미리보기) -->
+        <div style="display:flex; align-items:center; margin: 2px 0 10px;">
+          <button type="button" onclick="openBlindPreviewModal()" style="border:none; background:none; padding:4px 2px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; text-align:left;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
+            <span style="font-size:12.5px; font-weight:700; color:#287D62;">${escHtml(COPY.blindNotice)}</span>
+            <span style="font-size:11.5px; font-weight:700; color:#6B7684; text-decoration:underline;">미리보기</span>
+          </button>
         </div>
 
         ${renderMugeoFoodMapSection()}
@@ -4688,26 +4706,11 @@
       `;
     }
 
-    function applyToPost(postId) {
+    async function applyToPost(postId) {
       const post = DB.posts.find(p => Number(p.id) === Number(postId));
       if (!post) return;
-      const exists = (DB.applications || []).find(a => Number(a.post_id) === Number(postId) && String(a.applicant_id) === String(state.user_id));
-      if (!exists) {
-        DB.applications.push({
-          id: Date.now(),
-          post_id: postId,
-          applicant_id: state.user_id,
-          status: "대기중",
-          updated_at: Date.now()
-        });
-      } else if (exists.status === "취소됨" || exists.status === "나감") {
-        exists.status = "대기중";
-        exists.updated_at = Date.now();
-      } else {
-        return;
-      }
-      notifyUser(post.author_id, `[${post.title}] 모임에 ${DB.users[state.user_id].nickname}님이 참여를 신청했어요`);
-      saveDB(true);
+      const res = await callApiAction("apply", { post_id: Number(postId) });
+      if (!res.ok) return showToast(res.message || "참여 신청에 실패했어요.");
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
       fireConfetti();
       showMeetupMatchCelebration(post, DB.users[state.user_id], "apply");
@@ -4716,7 +4719,6 @@
     }
 
     function cancelMyApplication(postId) {
-      const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
       const myApp = (DB.applications || []).find(a => Number(a.post_id) === Number(postId) && String(a.applicant_id) === String(state.user_id) && a.status === "대기중");
       if (!myApp) return;
       openConfirmDialog({
@@ -4725,14 +4727,9 @@
         confirmText: "신청 취소",
         cancelText: "유지하기",
         isDanger: true,
-        onConfirm: () => {
-          myApp.status = "취소됨";
-          myApp.updated_at = Date.now();
-          if (post) {
-            const meNick = (DB.users[state.user_id] && DB.users[state.user_id].nickname) ? DB.users[state.user_id].nickname : "학우";
-            notifyUser(post.author_id, `[${post.title}] 모임의 ${meNick}님이 참여 신청을 취소했어요`);
-          }
-          saveDB(true);
+        onConfirm: async () => {
+          const res = await callApiAction("cancel_application", { post_id: Number(postId) });
+          if (!res.ok) return showToast(res.message || "신청 취소에 실패했어요.");
           showToast("참여 신청을 취소했어요.");
           render();
         }
@@ -4855,7 +4852,7 @@
               <h1 style="margin:0; font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">번개 만들기</h1>
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span style="font-size:12px; font-weight:600; color:#287D62;">수락 전까지 내 이름·학과는 공개되지 않아요</span>
+              <button type="button" onclick="openBlindPreviewModal()" style="border:none; background:none; padding:2px 0; font-size:12px; font-weight:700; color:#287D62; cursor:pointer; text-decoration:underline;">${escHtml(COPY.blindNotice)}</button>
               <span style="font-size:11.5px; font-weight:700; color:#6B7684; background:#F7F9F8; padding:4px 10px; border-radius:999px;">오늘 ${rem}/${totalLimit}회 가능</span>
               ${boostCnt > 0 ? `<span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">부스트권 ${boostCnt}개</span>` : ""}
             </div>
@@ -4979,7 +4976,7 @@
       `;
     }
 
-    function submitCreatePost() {
+    async function submitCreatePost() {
       const title = document.getElementById("c_title").value.trim();
       const category = document.getElementById("c_cat").value.trim();
       const meet_date = document.getElementById("c_date").value;
@@ -5030,10 +5027,7 @@
         state.prefill_boost = false;
       }
 
-      const newId = Date.now();
-      DB.posts.unshift({
-        id: newId,
-        author_id: state.user_id,
+      const res = await callApiAction("create_post", {
         title,
         category,
         meet_date,
@@ -5041,19 +5035,14 @@
         location,
         max_participants: max_p,
         meeting_style: style,
-        is_official: is_official,
-        is_boosted: useBoost,
-        boosted_at: useBoost ? newId : null,
-        status: "모집중"
+        is_official,
+        use_boost: useBoost
       });
-      const createdPost = DB.posts[0];
-      notifyFavCategory(createdPost);
-      if (state.invite_mate_id && DB.users[state.invite_mate_id]) {
-        notifyUser(state.invite_mate_id, `🗓️ [공강 메이트 제안] 공강 시간이 겹치는 학우가 "${title}" 번개를 열었어요! · 📍${location} ${meet_time}`, newId);
-      }
+      if (!res.ok) return showToast(res.message || "번개 등록에 실패했어요.");
+      const newId = res.post_id || (DB.posts[0] && DB.posts[0].id);
+      const createdPost = (DB.posts || []).find(p => Number(p.id) === Number(newId)) || { title, location, meet_time, author_id: state.user_id };
       window._justCreatedPostId = newId;
       state.prefill_title = ""; state.prefill_loc = ""; state.prefill_date = ""; state.prefill_time = ""; state.invite_mate_id = null;
-      saveDB(true);
       state.active_modal = null;
       state.nav_tab = "홈";
       render();
@@ -5168,10 +5157,13 @@
       return `
         <div style="max-width:920px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-            <button type="button" onclick="state.active_modal=null; render();" style="display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:4px 0;">← 목록으로</button>
-            <span style="background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;">
-              ${escHtml(cleanCat)}${isFreeMatch ? ' · 내 공강 일치' : ''}${post.is_official ? ' · 공식' : ''}
-            </span>
+            <button type="button" onclick="state.active_modal=null; render();" style="display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:6px 4px; min-height:44px;">← 목록으로</button>
+            <div style="display:inline-flex; align-items:center; gap:8px;">
+              <button type="button" onclick="sharePostLink(${post.id})" style="height:34px; padding:0 12px; border-radius:17px; border:1px solid #E5E8EB; background:#FFFFFF; color:#4E5968; font-size:12px; font-weight:700; cursor:pointer;">🔗 링크 공유</button>
+              <span style="background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;">
+                ${escHtml(cleanCat)}${isFreeMatch ? ' · 내 공강 일치' : ''}${post.is_official ? ' · 공식' : ''}
+              </span>
+            </div>
           </div>
 
           <div class="pc-detail-2col">
@@ -5279,21 +5271,16 @@
       `;
     }
 
-    function acceptApplicant(appId) {
-      const app = DB.applications.find(a => a.id === appId);
-      if (!app) return;
-      app.status = "승인됨";
-      app.updated_at = Date.now();
-      const post = DB.posts.find(p => Number(p.id) === Number(app.post_id));
-      const apUser = DB.users[app.applicant_id] || { avatar: "🐱", nickname: "학우" };
+    async function acceptApplicant(appId) {
+      const app = (DB.applications || []).find(a => Number(a.id) === Number(appId));
+      const post = app ? DB.posts.find(p => Number(p.id) === Number(app.post_id)) : null;
+      const apUser = app ? (DB.users[app.applicant_id] || { avatar: "🐱", nickname: "학우" }) : { avatar: "🐱", nickname: "학우" };
+      const res = await callApiAction("accept", { app_id: Number(appId) });
+      if (!res.ok) return showToast(res.message || "신청 수락에 실패했어요.");
       if (post) {
-        notifyUser(app.applicant_id, `🎉 [${post.title}] 참여 신청이 수락되었어요! 안심 대화방을 확인해 보세요.`, post.id);
-        checkAndGrantFirstMeetupReward(post.author_id);
         state.active_chat_post_id = Number(post.id);
         state.chat_list_mode = false;
       }
-      checkAndGrantFirstMeetupReward(app.applicant_id);
-      saveDB(true);
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([30, 45, 50]); } catch (e) {}
       triggerLightningFlash();
       fireConfetti({ mode: "match" });
@@ -5302,19 +5289,22 @@
       render();
     }
 
-    function closePostEarly(postId) {
-      const post = DB.posts.find(p => Number(p.id) === Number(postId));
-      if (post) { post.status = "매칭완료"; post.updated_at = Date.now(); saveDB(true); showToast("모집이 마감 처리되었어요."); render(); }
+    async function closePostEarly(postId) {
+      const res = await callApiAction("close_post", { post_id: Number(postId) });
+      if (!res.ok) return showToast(res.message || "마감 처리에 실패했어요.");
+      showToast("모집이 마감 처리되었어요.");
+      render();
     }
 
     // =========================================================
     // 6-B. 🔥 캠퍼스 광장 탭 (오늘의 울대 밸런스 게임 & 24시간 한줄 잔디톡)
     // =========================================================
-    function voteBalancePoll(pollId, side) {
+    async function voteBalancePoll(pollId, side) {
       ensurePlazaDefaults(DB);
-      const poll = DB.polls.find(p => p.id === pollId);
+      const poll = DB.polls.find(p => Number(p.id) === Number(pollId));
       if (!poll) return;
       const uid = state.user_id;
+      const wasVoted = (poll.votes_a || []).includes(uid) || (poll.votes_b || []).includes(uid);
       poll.votes_a = (poll.votes_a || []).filter(u => u !== uid);
       poll.votes_b = (poll.votes_b || []).filter(u => u !== uid);
       if (side === "A") poll.votes_a.push(uid);
@@ -5322,18 +5312,33 @@
 
       // 첫 투표 보너스: 활동 리워드 점수 +2점 (매너온도는 실제 대면 만남 평가로만 변동)
       const me = DB.users[uid];
-      if (me && !window["_voted_" + pollId]) {
+      if (me && !wasVoted && !window["_voted_" + pollId]) {
         window["_voted_" + pollId] = true;
         me.bonus_score = (me.bonus_score || 0) + 2;
         showToast("투표 완료! 캠퍼스 소통 참여로 활동 리워드 점수 +2점 획득!");
       } else {
         showToast("투표가 반영되었어요!");
       }
-      saveDB(true);
+      saveDB(false);
       render();
+      if (getSessionToken()) {
+        await callApiAction("plaza_vote", {
+          poll_id: poll.id,
+          side,
+          poll_meta: {
+            id: poll.id,
+            tag: poll.tag || "",
+            question: poll.question || "",
+            opt_a: poll.opt_a || "",
+            opt_b: poll.opt_b || ""
+          }
+        });
+        ensurePlazaDefaults(DB);
+        render();
+      }
     }
 
-    function createNewBalancePoll() {
+    async function createNewBalancePoll() {
       const qEl = document.getElementById("plaza_poll_q");
       const aEl = document.getElementById("plaza_poll_a");
       const bEl = document.getElementById("plaza_poll_b");
@@ -5345,18 +5350,35 @@
       if (q.length < 3 || !a || !b) {
         return showToast("질문과 A, B 선택지를 모두 입력해주세요!");
       }
+      const formattedQ = q.startsWith("⚖️") ? q : `⚖️ ${q}`;
+      if (getSessionToken()) {
+        const res = await callApiAction("plaza_create_poll", {
+          tag,
+          question: formattedQ,
+          opt_a: a,
+          opt_b: b
+        });
+        if (!res.ok) return showToast(res.message || "투표 등록에 실패했어요.");
+        ensurePlazaDefaults(DB);
+        state.show_poll_form = false;
+        state.polls_show_all = true;
+        showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
+        render();
+        return;
+      }
       ensurePlazaDefaults(DB);
       DB.polls.unshift({
         id: Date.now(),
         tag,
-        question: q.startsWith("⚖️") ? q : `⚖️ ${q}`,
+        question: formattedQ,
         opt_a: a,
         opt_b: b,
         votes_a: [state.user_id],
         votes_b: []
       });
       state.show_poll_form = false;
-      saveDB(true);
+      state.polls_show_all = true;
+      saveDB(false);
       showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
       render();
     }
@@ -5975,7 +5997,7 @@
               <span style="font-size:16px; font-weight:800; color:#191F28;">7일 연속 출석 스탬프</span>
             </div>
             <span style="font-size:13px; font-weight:700; color:#287D62;">
-              연속 <b style="color:#191F28;">${st.streakDays}일째</b> 출석 중
+              ${(!_initialCloudSynced && getSessionToken()) ? `<span class="skeleton-bar" style="display:inline-block; width:82px; height:14px; border-radius:7px; background:#E5EAE7; vertical-align:middle;"></span>` : `연속 <b style="color:#191F28;">${st.streakDays}일째</b> 출석 중`}
             </span>
           </div>
 
@@ -6184,7 +6206,17 @@
       ensurePlazaDefaults(DB);
       state.plaza_view = state.plaza_view || "balance";
       const st = getUserStatsAndBadges(state.user_id);
-      const allPolls = DB.polls || [];
+      const cycleInfo = getBalancePollCycleInfo();
+      const rotatingIds = new Set(ROTATING_BALANCE_POLLS.map(p => Number(p.id)));
+      const allPolls = [...(DB.polls || [])].sort((a, b) => {
+        const aActive = Number(a.id) === Number(cycleInfo.activePollId) ? 1 : 0;
+        const bActive = Number(b.id) === Number(cycleInfo.activePollId) ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        const aCustom = rotatingIds.has(Number(a.id)) ? 0 : 1;
+        const bCustom = rotatingIds.has(Number(b.id)) ? 0 : 1;
+        if (aCustom !== bCustom) return bCustom - aCustom;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
       const curPollCat = state.plaza_poll_cat || "전체";
       const polls = curPollCat === "전체"
         ? allPolls
@@ -6201,7 +6233,7 @@
             <div style="display:flex; align-items:center; gap:8px;">
               <button type="button" onclick="handleDailyCheckin()" style="height:34px; padding:0 12px; border-radius:17px; border:none; background:#EEF8F3; color:#287D62; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-                <span>${st.streakDays}일째 출석</span>
+                <span>${(!_initialCloudSynced && getSessionToken()) ? '동기화 중...' : `${st.streakDays}일째 출석`}</span>
               </button>
               ${state.plaza_view === 'balance' ? `
                 <button type="button" onclick="state.show_poll_form=!state.show_poll_form; render();" title="새 밸런스 투표 만들기" style="width:34px; height:34px; border-radius:17px; border:none; background:${state.show_poll_form ? '#191F28' : '#F7F9F8'}; color:${state.show_poll_form ? '#FFFFFF' : '#191F28'}; font-size:18px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
@@ -6249,12 +6281,18 @@
               const pctB = total === 0 ? 50 : (100 - pctA);
               const cleanQ = String(p.question || "").replace(/^⚖️\s*/, "").trim();
               const progressPct = total >= 5 ? pctA : Math.min(100, Math.round((total / 5) * 100));
+              const isFeaturedCycle = Number(p.id) === Number(cycleInfo.activePollId);
+              const isCustomPoll = !rotatingIds.has(Number(p.id));
 
               return `
-                <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:20px; margin-bottom:20px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:12.5px; font-weight:700; color:#287D62;">오늘의 밸런스</span>
-                    <button type="button" style="font-size:12.5px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="drawRandomViralPoll()">다른 질문 ›</button>
+                <div style="background:#FFFFFF; border:1.5px solid ${isFeaturedCycle ? '#C5E6D6' : '#E5E8EB'}; border-radius:20px; padding:20px; margin-bottom:20px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span style="font-size:12.5px; font-weight:800; color:#287D62;">${isFeaturedCycle ? escHtml(COPY.balanceCycleBadge) : (isCustomPoll ? '학우가 만든 투표' : '지난 밸런스')}</span>
+                    ${isFeaturedCycle ? `
+                      <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">${escHtml(cycleInfo.countdownText)}</span>
+                    ` : `
+                      <span style="font-size:11.5px; font-weight:600; color:#8B95A1;">${escHtml(p.tag || '밸런스')}</span>
+                    `}
                   </div>
                   <div style="font-size:20px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:14px;">${escHtml(cleanQ)}</div>
 
@@ -6300,8 +6338,8 @@
             }).join("")}
 
             ${polls.length > 1 ? `
-              <button type="button" style="width:100%; height:40px; border:1px solid #E5E8EB; border-radius:12px; background:#FFFFFF; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
-                ${showAll ? '투표 접기' : `다른 밸런스 투표 ${hiddenCount}개 더보기`}
+              <button type="button" style="width:100%; height:44px; border:1px solid #E5E8EB; border-radius:12px; background:#FFFFFF; color:#4E5968; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
+                ${showAll ? escHtml(COPY.balanceCollapseBtn) : escHtml(COPY.balanceMoreBtn(hiddenCount))}
               </button>
             ` : ""}
 
@@ -6360,28 +6398,10 @@
       `;
     }
 
-    function deletePost(postId) {
-      const p = (DB.posts || []).find(x => x.id === postId);
-      const postTitle = p ? p.title : "모임";
-
-      // 모임에 참여 신청했던 학우들에게 '모임 취소' 알림 전송
-      (DB.applications || []).filter(a => a.post_id === postId).forEach(a => {
-        if (a.applicant_id !== state.user_id) {
-          notifyUser(a.applicant_id, `[${postTitle}] 번개 모임이 방장에 의해 취소되었어요.`);
-        }
-      });
-
+    async function deletePost(postId) {
       const numPostId = Number(postId);
-      if (p) {
-        p.status = "취소됨";
-        p.updated_at = Date.now();
-      }
-      if (!isNaN(numPostId) && !_deletedPostIds.includes(numPostId)) {
-        _deletedPostIds.push(numPostId);
-        saveDeletedPostIds();
-      }
-      DB.posts = (DB.posts || []).filter(x => Number(x.id) !== numPostId);
-      saveDB(true);
+      const res = await callApiAction("cancel_post", { post_id: numPostId });
+      if (!res.ok) return showToast(res.message || "번개 취소에 실패했어요.");
       if (state.selected_post_id === postId) state.active_modal = null;
       showToast("번개 모임이 취소되었어요.");
       render();
@@ -6769,27 +6789,11 @@
         confirmText: "나가기",
         cancelText: "돌아가기",
         isDanger: true,
-        onConfirm: () => {
-          if (isLeader) {
-            post.status = "매칭완료";
-            post.updated_at = Date.now();
-            (DB.applications || []).forEach(a => {
-              if (Number(a.post_id) === Number(postId) && a.status === "승인됨") {
-                a.status = "종료됨";
-                a.updated_at = Date.now();
-              }
-            });
-          } else {
-            (DB.applications || []).forEach(a => {
-              if (Number(a.post_id) === Number(postId) && String(a.applicant_id) === myId) {
-                a.status = "나감";
-                a.updated_at = Date.now();
-              }
-            });
-          }
+        onConfirm: async () => {
+          const res = await callApiAction("leave_chat", { post_id: Number(postId) });
+          if (!res.ok) return showToast(res.message || "대화방 나가기에 실패했어요.");
           state.chat_list_mode = true;
           state.active_chat_post_id = null;
-          saveDB(true);
           showToast("대화방에서 나갔습니다.");
           render();
         }
@@ -6815,8 +6819,8 @@
             <div style="width:88px; height:88px; border-radius:44px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg>
             </div>
-            <div style="font-size:20px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">아직 대화가 없어요</div>
-            <div style="font-size:14px; color:#6B7684; margin-top:4px; margin-bottom:18px;">번개에 참여하면 안심 채팅방이 열려요</div>
+            <div style="font-size:20px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">${escHtml(COPY.chatEmptyTitle)}</div>
+            <div style="font-size:14px; color:#6B7684; margin-top:4px; margin-bottom:18px;">${escHtml(COPY.chatEmptySub)}</div>
 
             <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px; text-align:left;">
               <div style="background:#F7F9F8; border-radius:16px; padding:12px 14px; display:flex; align-items:center; gap:14px;">
@@ -7080,10 +7084,15 @@
                 </div>
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
               ${timePassed ? `
                 <button type="button" onclick="openReviewModal(${post.id})" style="height:34px; padding:0 12px; border-radius:17px; border:1.5px solid #287D62; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; cursor:pointer;">
                   후기 쓰기
+                </button>
+              ` : ""}
+              ${partnerId && String(partnerId) !== myId ? `
+                <button type="button" onclick="reportContentOrUser('${escHtml(partnerId)}', '${escHtml(partner.nickname || '상대 학우')}')" style="height:34px; padding:0 11px; border-radius:17px; border:1px solid #FECACA; background:#FFF5F5; color:#D93025; font-size:12px; font-weight:700; cursor:pointer;" title="비매너·연락처 요구 신고">
+                  🚨 신고
                 </button>
               ` : ""}
               <button type="button" onclick="openDetailModal(${post.id})" style="height:36px; padding:0 14px; border-radius:18px; border:1.5px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:12.5px; font-weight:700; cursor:pointer;">
@@ -7294,7 +7303,15 @@
 
       return dateHeaderHtml + msgs.map((m, idx) => {
         if (m.sender_id === "AI_BOT") {
-          return `<div class="chat-bubble-ai">${m.text}</div>`;
+          const cleanAiText = String(m.text || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim();
+          const aiSuggestions = Array.isArray(m.suggestions) ? m.suggestions : [];
+          return `
+            <div class="chat-bubble-ai">
+              <div style="font-weight:800; color:#287D62; margin-bottom:4px;">✨ AI 대화 추천</div>
+              <div style="white-space:pre-line;">${escHtml(cleanAiText)}</div>
+              ${aiSuggestions.length ? `<div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">${aiSuggestions.map(s => `<div>• ${escHtml(s)}</div>`).join("")}</div>` : ""}
+            </div>
+          `;
         }
 
         const isMe = String(m.sender_id) === myId;
@@ -7454,12 +7471,13 @@
         return;
       }
 
-      const banned = ["카톡", "카카오톡", "톡디", "전번", "전화번호", "010-", "오픈채팅", "인스타", "kakao", "insta"];
-      const phoneRe = /01[016789][\s\-]?\d{3,4}[\s\-]?\d{4}/;
+      const banned = ["카톡", "카카오", "카카오톡", "톡디", "전번", "전화번호", "폰번", "연락처", "010-", "오픈채팅", "옵챗", "인스타", "디엠", "라인", "디스코드", "텔레그램", "텔그", "페북", "kakao", "insta", "discord", "telegram"];
+      const phoneRe = /(?:01[016789]|공일공)[\s.\-]*\d{3,4}[\s.\-]*\d{4}/;
       const emailRe = /[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/;
-      if (banned.some(b => txt.toLowerCase().includes(b)) || phoneRe.test(txt) || emailRe.test(txt)) {
+      const snsHandleRe = /(?:^|\s)@[a-zA-Z0-9_.]{3,30}\b|(?:ig|id|카톡|인스타)\s*[:=]\s*[a-zA-Z0-9_.]{3,30}/i;
+      if (banned.some(b => txt.toLowerCase().includes(b)) || phoneRe.test(txt) || emailRe.test(txt) || snsHandleRe.test(txt)) {
         input.focus();
-        return showToast("외부 연락처(카톡/전화번호/이메일) 공유는 안전을 위해 제한돼요.");
+        return showToast(COPY.chatContactWarn);
       }
 
       // 입력창 즉시 초기화 및 높이 리셋
@@ -7468,42 +7486,16 @@
       input.style.borderRadius = isPC() ? "12px" : "22px";
       input.focus();
 
-      const now = new Date();
-      const msgId = now.getTime();
-      const timeStr = formatMsgTime(msgId);
-      DB.messages.push({
-        id: msgId,
-        post_id: postId,
-        sender_id: state.user_id,
-        text: txt,
-        created_at: timeStr,
-        is_read: 0
-      });
-
-      // 내 화면에 0ms 즉시 렌더링 (낙관적 UI 업데이트)
+      const res = await callApiAction("send_message", { post_id: Number(postId), text: txt });
+      if (!res.ok) {
+        return showToast(res.message || "메시지 전송에 실패했어요.");
+      }
       if (!updateChatBoxDOM(postId, true)) {
         render();
         const restored = document.getElementById(`chat_in_${postId}`);
         if (restored) restored.focus();
       }
-      // 클라우드 즉시 업로드 (상대방에게 전달)
-      saveDB(true);
-      // 상대방 답장 및 읽음 반영을 위해 800ms 뒤 즉시 폴링
       scheduleNextCloudPull(800);
-
-      // AI 폴리스(유해 표현/외부 연락처 검사)는 메시지 전송을 차단/지연시키지 않고 백그라운드 비동기 실행
-      fetch("/api/index", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ai_police", text: txt })
-      }).then(res => res.json()).then(data => {
-        if (data && data.blocked) {
-          DB.messages = (DB.messages || []).filter(m => m.id !== msgId);
-          updateChatBoxDOM(postId, true);
-          saveDB(true);
-          showToast("부적절한 언행 또는 연락처 공유는 안전을 위해 제한돼요.");
-        }
-      }).catch(() => {});
 
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput && document.activeElement !== curInput) {
@@ -7519,10 +7511,7 @@
     function applyAiHintToInput(postId) {
       const hint = state['ai_hint_' + postId];
       if (!hint) return;
-      const tmp = document.createElement("div");
-      tmp.innerHTML = hint;
-      let plain = (tmp.textContent || tmp.innerText || "").trim();
-      // 큰따옴표로 둘러싸인 추천 문장만 깔끔하게 추출
+      let plain = String(hint).replace(/<[^>]+>/g, "").trim();
       const match = plain.match(/"([^"]+)"/);
       if (match) plain = match[1];
       const input = document.getElementById(`chat_in_${postId}`);
@@ -7643,7 +7632,7 @@
       const uid = String(targetSid || "").trim();
       if (!uid) return;
       if (String(state.user_id) === uid) return showToast("본인 계정은 신고할 수 없어요.");
-      if (ADMIN_STUDENT_IDS.includes(uid)) return showToast("운영진 공식 계정은 신고 대상에서 제외됩니다.");
+      if (isTargetAdminUser(uid)) return showToast("운영진 공식 계정은 신고 대상에서 제외됩니다.");
       openConfirmDialog({
         title: "🚨 비매너 · 불건전 콘텐츠 신고",
         desc: `${targetLabel || "해당 학우"}를 신고할까요?\n\n욕설·혐오·스팸·외부 연락처 강요 등 무관용 원칙 위반 시 매너온도 -3.0°C 차감 및 누적 3회 시 즉시 계정 정지 처리됩니다.`,
@@ -7654,30 +7643,18 @@
       });
     }
 
-    function reportNoShow(partnerId) {
+    async function reportNoShow(partnerId) {
       if (!state.user_id || !partnerId) return;
-      const myId = String(state.user_id);
       const targetId = String(partnerId);
-      if (myId === targetId) {
+      if (String(state.user_id) === targetId) {
         return showToast("본인 계정은 신고할 수 없어요.");
       }
-      if (ADMIN_STUDENT_IDS.includes(targetId)) {
+      if (isTargetAdminUser(targetId)) {
         return showToast("운영진 공식 계정은 신고 대상에서 제외됩니다.");
       }
-      const target = DB.users[targetId];
-      if (!target) return;
-
-      target.reported_by = Array.isArray(target.reported_by) ? target.reported_by.map(String) : [];
-      if (target.reported_by.includes(myId)) {
-        return showToast("동일한 학우에게 중복 신고할 수 없어요.");
-      }
-
-      target.reported_by.push(myId);
-      target.report_count = target.reported_by.length;
-      target.manner_temp = Math.max(0, Math.round(((target.manner_temp || 36.5) - 3.0) * 10) / 10);
-      target.updated_at = Date.now();
-      saveDB(true);
-      showToast(`신고가 접수되었습니다 (누적 ${target.report_count}/3회 · 매너온도 -3.0°C 차감 및 상대방 인증 뱃지 즉시 회수).`);
+      const res = await callApiAction("report", { target_user_id: targetId });
+      if (!res.ok) return showToast(res.message || "신고 처리에 실패했어요.");
+      showToast(`신고가 접수되었습니다 (누적 ${res.report_count || 1}/3회 · 매너온도 -3.0°C 차감 및 상대방 인증 뱃지 즉시 회수).`);
       render();
     }
 
@@ -7864,8 +7841,11 @@
                   <span style="font-size:12px; color:#CFEADF; font-weight:600;">매너온도</span>
                   <button type="button" onclick="state.show_temp_guide=!state.show_temp_guide; render();" style="border:1px solid rgba(255,255,255,0.45); background:rgba(255,255,255,0.16); color:#FFFFFF; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; cursor:pointer;">${state.show_temp_guide ? '안내 닫기 ▲' : '어떻게 오르나요? ?'}</button>
                 </div>
-                <div style="font-size:38px; font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em; margin-top:2px;">
-                  ${myTier.displayTemp}°C
+                <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-top:2px;">
+                  <div style="font-size:38px; font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em;">
+                    ${myTier.displayTemp}°C
+                  </div>
+                  <span style="font-size:12px; font-weight:600; color:#D8F3E5;">${escHtml(COPY.tempRecentReviews(myReviews.length))}</span>
                 </div>
               </div>
               <div style="font-size:12px; color:#FFFFFF; font-weight:600; padding-bottom:4px;">
@@ -7899,7 +7879,7 @@
             </button>
             <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'myposts' ? '#287D62' : '#E5E8EB'}; border-radius:16px; padding:14px 8px; text-align:center; cursor:pointer;">
               <div style="font-size:22px; font-weight:800; color:#191F28;">${myPosts.length}</div>
-              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">만든 번개</div>
+              <div style="font-size:12px; color:#6B7684; font-weight:600; margin-top:2px;">진행 중 번개${myPastPosts.length > 0 ? ` (지난 ${myPastPosts.length})` : ''}</div>
             </button>
           </div>
 
@@ -7964,7 +7944,7 @@
               <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('myposts')">
                 <span style="font-size:14.5px; font-weight:700;">내가 만든 번개</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
-                  <span style="font-size:13px; color:#8B95A1;">${myPosts.length}건</span>
+                  <span style="font-size:13px; color:#8B95A1;">진행 ${myPosts.length}건${myPastPosts.length > 0 ? ` · 지난 ${myPastPosts.length}건` : ''}</span>
                   <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
                 </span>
               </button>
@@ -8030,7 +8010,7 @@
             <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
               <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">내가 만든 번개</div>
               ${myPosts.length === 0
-                ? renderEmptyStateBox('plus', '아직 열린 번개가 없어요', '첫 번개를 열어볼까요?', '번개 열기', "state.active_modal='create'; render();")
+                ? renderEmptyStateBox('plus', COPY.homeEmptyTitle, COPY.homeEmptySub, '번개 열기', "state.active_modal='create'; render();")
                 : myPosts.map(p => `
                   <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
                     <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(p.title)}</span>
@@ -8521,7 +8501,7 @@
       `;
     }
 
-    function saveProfileEdit() {
+    async function saveProfileEdit() {
       const nick = document.getElementById("edit_nick").value.trim();
       const dept = document.getElementById("edit_dept").value.trim();
       const avatar = document.getElementById("edit_avatar").value;
@@ -8529,15 +8509,15 @@
       const bio = document.getElementById("edit_bio").value.trim().slice(0, 60);
       if (!nick || !dept) return showToast("닉네임과 학과(필수 항목)를 비워둘 수 없어요.");
 
-      const u = DB.users[state.user_id];
-      u.nickname = nick;
-      u.department = dept;
-      u.avatar = avatar.split(" ")[0];
-      u.mbti = mbti;
-      u.bio = bio;
-      u.updated_at = Date.now();
+      const res = await callApiAction("update_profile", {
+        nickname: nick,
+        department: dept,
+        avatar: avatar.split(" ")[0],
+        mbti,
+        bio
+      });
+      if (!res.ok) return showToast(res.message || "프로필 저장에 실패했어요.");
       state.profile_edit_draft = null;
-      saveDB(true);
       showToast("✅ 프로필이 수정되었어요!");
       render();
     }
@@ -8626,7 +8606,7 @@
           triggerLightningFlash();
           fireConfetti({ mode: "match" });
           showMeetupMatchCelebration(
-            { author_id: "20261275", title: "학생회관 밥약 메이트 (소규모 번개) 🍚" },
+            { author_id: "demo_host", title: "학생회관 밥약 메이트 (소규모 번개) 🍚" },
             { avatar: "🐱", nickname: "울대메이트" }
           );
         }, 250);
@@ -8634,25 +8614,126 @@
     } catch (e) {}
 
     let _isHandlingPopState = false;
+    function buildCurrentRouteHash() {
+      if (state.active_modal === "detail" && state.selected_post_id) return `#/post/${state.selected_post_id}`;
+      if (state.active_modal === "create") return "#/create";
+      if (state.active_modal === "timetable") return "#/timetable";
+      if (state.active_modal === "cafeteria") return "#/cafeteria";
+      if (state.active_modal === "notifications") return "#/notifications";
+      if (state.active_modal === "food_map") return "#/food-map";
+      if (state.active_modal === "review" && state.review_modal_post_id) return `#/review/${state.review_modal_post_id}`;
+      if (state.nav_tab === "지도") return "#/map";
+      if (state.nav_tab === "채팅") return (!state.chat_list_mode && state.active_chat_post_id) ? `#/chat/${state.active_chat_post_id}` : "#/chat";
+      if (state.nav_tab === "광장") return "#/plaza";
+      if (state.nav_tab === "마이") return "#/profile";
+      return "#/home";
+    }
+
+    function applyRouteFromHash(hashStr, shouldRender = true) {
+      const h = String(hashStr || window.location.hash || "").replace(/^#/, "");
+      if (!h || h === "/" || h === "/home") {
+        state.active_modal = null;
+        state.nav_tab = "홈";
+      } else if (h === "/map") {
+        state.active_modal = null;
+        state.nav_tab = "지도";
+      } else if (h === "/plaza") {
+        state.active_modal = null;
+        state.nav_tab = "광장";
+      } else if (h === "/profile") {
+        state.active_modal = null;
+        state.nav_tab = "마이";
+      } else if (h === "/chat") {
+        state.active_modal = null;
+        state.nav_tab = "채팅";
+        state.chat_list_mode = true;
+        state.active_chat_post_id = null;
+      } else if (h.startsWith("/chat/")) {
+        const pid = Number(h.slice(6));
+        if (!isNaN(pid) && pid > 0) {
+          state.active_modal = null;
+          state.nav_tab = "채팅";
+          state.chat_list_mode = false;
+          state.active_chat_post_id = pid;
+        }
+      } else if (h === "/create") {
+        state.active_modal = "create";
+      } else if (h === "/timetable") {
+        state.active_modal = "timetable";
+      } else if (h === "/cafeteria") {
+        state.active_modal = "cafeteria";
+      } else if (h === "/notifications") {
+        state.active_modal = "notifications";
+      } else if (h === "/food-map") {
+        state.active_modal = "food_map";
+      } else if (h.startsWith("/post/")) {
+        const pid = Number(h.slice(6));
+        if (!isNaN(pid) && pid > 0) {
+          state.selected_post_id = pid;
+          state.active_modal = "detail";
+        }
+      } else if (h.startsWith("/review/")) {
+        const pid = Number(h.slice(8));
+        if (!isNaN(pid) && pid > 0) {
+          state.review_modal_post_id = pid;
+          state.active_modal = "review";
+        }
+      }
+      if (shouldRender) render();
+    }
+
+    function sharePostLink(postId) {
+      const url = `${window.location.origin}${window.location.pathname}#/post/${postId}`;
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(url).then(() => showToast("🔗 번개 링크가 복사되었어요!"));
+          return;
+        }
+      } catch (e) {}
+      showToast(`🔗 공유 링크: ${url}`);
+    }
+
     function pushSpaHistoryState(key) {
       if (_isHandlingPopState || !window.history || typeof window.history.pushState !== "function") return;
       try {
-        const curKey = window.history.state && window.history.state.uldaemoKey;
-        if (curKey !== key) {
-          window.history.pushState({ uldaemoKey: key, nav_tab: state.nav_tab, active_modal: state.active_modal || null }, "");
+        const nextHash = buildCurrentRouteHash();
+        if (window.location.hash !== nextHash) {
+          window.history.pushState({ uldaemoKey: key, hash: nextHash }, "", nextHash);
         }
       } catch (e) {}
     }
+
+    window.addEventListener("hashchange", () => {
+      if (!state || !state.user_id) return;
+      _isHandlingPopState = true;
+      try {
+        applyRouteFromHash(window.location.hash, true);
+      } finally {
+        _isHandlingPopState = false;
+      }
+    });
 
     window.addEventListener("popstate", () => {
       if (!state || !state.user_id) return;
       _isHandlingPopState = true;
       try {
-        window.handleNativeBack();
+        if (window.location.hash) {
+          applyRouteFromHash(window.location.hash, true);
+        } else {
+          window.handleNativeBack();
+        }
       } finally {
         _isHandlingPopState = false;
       }
     });
+
+    // 초기 해시 라우트 복원 (새로고침 및 번개 공유 링크 #/post/123 지원)
+    if (state && state.user_id && window.location.hash && window.location.hash.startsWith("#/")) {
+      _isHandlingPopState = true;
+      try { applyRouteFromHash(window.location.hash, true); } finally { _isHandlingPopState = false; }
+    } else if (state && state.user_id && !window.location.hash) {
+      try { window.history.replaceState({ uldaemoKey: "tab:홈:" }, "", "#/home"); } catch (e) {}
+    }
 
     // PC 우측 패널 끝단 고정(X/트위터 방식): 패널이 화면보다 길면 맨 아래 카드가 보일 때 고정, 짧으면 상단 고정
     function syncPcRightStickyTop() {
