@@ -202,37 +202,54 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
     talks = [t for t in (db_obj.get("plaza_talks") or []) if isinstance(t, dict)]
     users = db_obj.get("users") or {}
 
-    # 1. 본인이 방장이거나 수락('승인됨')된 모임 ID 및 파트너 ID 계산
+    # 1. 본인이 방장이거나 수락('승인됨')된 모임 ID 및 활성 파트너 ID 계산 (운영진 예외 없음)
     hosted_post_ids = set()
     accepted_post_ids = set()
+    active_accepted_post_ids = set()
+    pending_host_ids = set()
     approved_counts = {}
+    posts_by_id = {}
     for p in raw_posts:
         pid = p.get("id")
         if pid is None:
             continue
         ipid = int(pid)
+        posts_by_id[ipid] = p
         if str(p.get("author_id") or "") == vid:
             hosted_post_ids.add(ipid)
             accepted_post_ids.add(ipid)
+            if str(p.get("status") or "모집중") == "모집중":
+                active_accepted_post_ids.add(ipid)
     for a in apps:
         pid = a.get("post_id")
         if pid is None:
             continue
         ipid = int(pid)
-        if a.get("status") == "승인됨":
+        st_a = str(a.get("status") or "")
+        if st_a == "승인됨":
             approved_counts[ipid] = approved_counts.get(ipid, 0) + 1
             if str(a.get("applicant_id") or "") == vid:
                 accepted_post_ids.add(ipid)
+                p_obj = posts_by_id.get(ipid)
+                if p_obj and str(p_obj.get("status") or "모집중") == "모집중":
+                    active_accepted_post_ids.add(ipid)
+        elif st_a == "대기중" and str(a.get("applicant_id") or "") == vid:
+            p_obj = posts_by_id.get(ipid)
+            if p_obj:
+                pending_host_ids.add(str(p_obj.get("author_id") or ""))
 
     accepted_partner_ids = {vid}
     for p in raw_posts:
         pid = p.get("id")
-        if pid is not None and int(pid) in accepted_post_ids:
+        if pid is not None and int(pid) in active_accepted_post_ids:
             accepted_partner_ids.add(str(p.get("author_id") or ""))
     for a in apps:
         pid = a.get("post_id")
-        if pid is not None and int(pid) in accepted_post_ids and a.get("status") == "승인됨":
+        if pid is not None and int(pid) in active_accepted_post_ids and a.get("status") == "승인됨":
             accepted_partner_ids.add(str(a.get("applicant_id") or ""))
+    # 신청 대기중(status='대기중')인 번개의 방장은 운영진 예외 없이 항상 비공개 처리
+    accepted_partner_ids -= pending_host_ids
+    accepted_partner_ids.add(vid)
 
     def pub_id(uid: str) -> str:
         return _mask_uid(uid, vid)
