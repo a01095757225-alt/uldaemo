@@ -2815,7 +2815,12 @@
           </aside>
         `;
 
-        const hideRightPanel = (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "지도"));
+        const hideRightPanel = Boolean(
+          state.active_modal === "create"
+          || state.active_modal === "timetable"
+          || state.active_modal === "food_map"
+          || (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "지도"))
+        );
         const rightHtml = hideRightPanel ? "" : renderPcRightSidePanel(unreadCnt, newNoticeCnt);
 
         const routeKey = `${state.active_modal || 'tab'}:${state.nav_tab}:${state.active_chat_post_id || ''}`;
