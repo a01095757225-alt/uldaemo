@@ -3287,7 +3287,7 @@
             <input id="login_sid" class="input" value="${escHtml(state.pending_login_sid || '')}" placeholder="학번 8자리 (예: 20240001)" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
             <label class="label">비밀번호</label>
             <input id="login_pw" type="password" class="input" placeholder="비밀번호 4자리 이상" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
-            <div style="font-size:11.5px; color:#8B95A1; margin:-2px 0 10px;">처음 설정하는 기존 학우는 비워두고 누르면 바로 설정할 수 있어요.</div>
+            <div style="font-size:11.5px; color:#8B95A1; margin:-2px 0 10px;">비밀번호가 없는 기존 계정은 아래 [비밀번호 최초 설정 · 재설정]에서 이메일 인증 후 설정해요.</div>
             <button class="btn btn-primary" style="min-height:46px;" onclick="handleLoginSubmit()">울대모 시작하기</button>
 
             <div style="margin-top:12px; padding-top:10px; border-top:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
@@ -3305,7 +3305,7 @@
                 <span style="font-size:14.5px; font-weight:800; color:#191F28;">기존 학우 비밀번호 최초 설정 · 재설정</span>
               </div>
               <div style="font-size:12px; color:#6B7684; margin-bottom:12px; line-height:1.45;">
-                타인의 학번 도용을 막기 위해 <b>가입 시 등록한 본인 이메일 인증</b> 후 새 비밀번호를 설정합니다.
+                타인의 학번 도용을 막기 위해 <b>가입 시 등록한 본인 이메일(미등록 계정은 @ulsan.ac.kr 학교 메일) 인증</b> 후에만 비밀번호를 설정할 수 있어요.
               </div>
 
               <label class="label">학번</label>
@@ -3571,7 +3571,11 @@
         return showToast("비밀번호 오류가 누적되어 5분간 잠겼습니다. 잠시 후 다시 시도해주세요.");
       }
 
-      const inputHash = pw ? await hashUserPw(sid, pw) : "";
+      if (!pw) {
+        return showToast("비밀번호를 입력해주세요. 미설정 계정은 아래 '비밀번호 최초 설정 · 재설정'에서 이메일 인증 후 설정해요.");
+      }
+
+      const inputHash = await hashUserPw(sid, pw);
       try {
         showToast("학번과 비밀번호를 확인하는 중입니다...");
         const res = await fetch("/api/index", {
@@ -3580,6 +3584,9 @@
           body: JSON.stringify({ action: "verify_login", student_id: sid, pw_hash: inputHash })
         });
         const vData = await res.json();
+        if (res.status === 429 || (vData && vData.reason === "rate_limited")) {
+          return showToast((vData && vData.message) || "로그인 시도 횟수가 초과되었습니다. 10분 후 다시 시도해주세요.");
+        }
         if (vData && vData.ok) {
           if (vData.session_token) setSessionToken(vData.session_token);
           if (vData.db) applyServerSnapshot(vData.db);

@@ -40,6 +40,47 @@ CONTACT_BANNED_KEYWORDS = (
 CONTACT_PHONE_RE = re.compile(r"(?:01[016789]|공일공)[\s.\-]*\d{3,4}[\s.\-]*\d{4}")
 CONTACT_EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 CONTACT_SNS_HANDLE_RE = re.compile(r"(?:^|\s)@[a-zA-Z0-9_.]{3,30}\b|(?:ig|id|카톡|인스타)\s*[:=]\s*[a-zA-Z0-9_.]{3,30}", re.I)
+ULSAN_UNIV_EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@(?:mail\.)?ulsan\.ac\.kr$", re.I)
+
+# 로그인·OTP 시도 횟수 제한 (학번 + IP 기준 슬라이딩 윈도우, 메모리 기반)
+_AUTH_RATE_BUCKETS = {}
+_AUTH_RATE_WINDOW_SEC = 600
+_AUTH_MAX_SID_IP_FAILS = 5
+_AUTH_MAX_IP_FAILS = 20
+_OTP_MAX_PER_WINDOW = 5
+
+
+def _prune_rate_bucket(key: str, now_ts: float):
+    arr = _AUTH_RATE_BUCKETS.get(key)
+    if not arr:
+        return []
+    cutoff = now_ts - _AUTH_RATE_WINDOW_SEC
+    pruned = [t for t in arr if t > cutoff]
+    if pruned:
+        _AUTH_RATE_BUCKETS[key] = pruned
+    else:
+        _AUTH_RATE_BUCKETS.pop(key, None)
+    return pruned
+
+
+def _check_rate_limit(key: str, limit: int):
+    now_ts = time.time()
+    arr = _prune_rate_bucket(key, now_ts)
+    if len(arr) >= limit:
+        retry_after = max(1, int(_AUTH_RATE_WINDOW_SEC - (now_ts - arr[0])))
+        return False, retry_after
+    return True, 0
+
+
+def _record_rate_hit(key: str):
+    now_ts = time.time()
+    arr = _prune_rate_bucket(key, now_ts)
+    arr.append(now_ts)
+    _AUTH_RATE_BUCKETS[key] = arr
+
+
+def _clear_rate_bucket(key: str):
+    _AUTH_RATE_BUCKETS.pop(key, None)
 
 
 def _contains_contact_info(text: str) -> bool:
@@ -1359,12 +1400,28 @@ class handler(BaseHTTPRequestHandler):
                 payload.update(extra)
             self._send_json(200 if ok else 500, payload)
 
+        # 클라이언트 IP 추출 (학번+IP 기반 로그인 시도 횟수 제한용)
+        fwd_for = str(self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        client_ip = fwd_for or str(self.headers.get("X-Real-IP") or "").strip() or str((self.client_address or ("unknown",))[0])
+
         # ---- 1) 공개 인증 API ----
         if action == "send_otp":
             recipient = str(data.get("email") or "").strip().lower()
             if not CONTACT_EMAIL_RE.match(recipient):
                 self._send_json(400, {"ok": False, "message": "올바른 이메일 주소를 입력해주세요."})
                 return
+            ok_ip, retry_ip = _check_rate_limit(f"otp_ip:{client_ip}", _AUTH_MAX_IP_FAILS)
+            ok_em, retry_em = _check_rate_limit(f"otp_em:{client_ip}:{recipient}", _OTP_MAX_PER_WINDOW)
+            if not ok_ip or not ok_em:
+                self._send_json(429, {
+                    "ok": False,
+                    "reason": "rate_limited",
+                    "retry_after": max(retry_ip, retry_em),
+                    "message": "인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+                })
+                return
+            _record_rate_hit(f"otp_ip:{client_ip}")
+            _record_rate_hit(f"otp_em:{client_ip}:{recipient}")
             otp_code = str(random.randint(100000, 999999))
             otp_token = _make_otp_token(recipient, otp_code)
             if LOCAL_TEST_DB_PATH:
@@ -1380,21 +1437,42 @@ class handler(BaseHTTPRequestHandler):
             if not sid:
                 self._send_json(400, {"ok": False, "reason": "missing_sid"})
                 return
+            rl_sid_key = f"login_sid:{client_ip}:{sid}"
+            rl_ip_key = f"login_ip:{client_ip}"
+            ok_sid, retry_sid = _check_rate_limit(rl_sid_key, _AUTH_MAX_SID_IP_FAILS)
+            ok_ip, retry_ip = _check_rate_limit(rl_ip_key, _AUTH_MAX_IP_FAILS)
+            if not ok_sid or not ok_ip:
+                self._send_json(429, {
+                    "ok": False,
+                    "reason": "rate_limited",
+                    "retry_after": max(retry_sid, retry_ip),
+                    "message": "로그인 시도 횟수가 초과되었습니다. 10분 후 다시 시도해주세요.",
+                })
+                return
             db_obj = load_cloud_db(force=True) or {}
             user = (db_obj.get("users") or {}).get(sid)
             if not isinstance(user, dict):
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "not_found"})
                 return
             stored_hash = str(user.get("pw_hash") or "").strip()
             if not stored_hash:
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "no_pw"})
                 return
             if not pw_hash:
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "missing_pw"})
                 return
             if not hmac.compare_digest(stored_hash, pw_hash):
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "wrong_pw"})
                 return
+            _clear_rate_bucket(rl_sid_key)
             is_adm = _is_admin_user(user)
             token = _make_session_token(sid, role="admin" if is_adm else "user")
             sanitized = _sanitize_db_for_viewer(db_obj, sid, is_adm)
@@ -1481,24 +1559,58 @@ class handler(BaseHTTPRequestHandler):
             otp_code = str(data.get("otp") or "").strip()
             otp_token = str(data.get("otp_token") or "").strip()
             new_pw_hash = str(data.get("pw_hash") or "").strip()
+            rl_reset_key = f"reset_sid:{client_ip}:{sid}"
+            ok_rs, retry_rs = _check_rate_limit(rl_reset_key, _AUTH_MAX_SID_IP_FAILS)
+            if not ok_rs:
+                self._send_json(429, {
+                    "ok": False,
+                    "reason": "rate_limited",
+                    "retry_after": retry_rs,
+                    "message": "비밀번호 설정 시도 횟수가 초과되었습니다. 10분 후 다시 시도해주세요.",
+                })
+                return
             if not sid or not new_pw_hash or len(new_pw_hash) < 32:
+                _record_rate_hit(rl_reset_key)
                 self._send_json(400, {"ok": False, "message": "학번과 새 비밀번호를 확인해주세요."})
                 return
             if not _verify_otp_token(otp_token, email, otp_code):
+                _record_rate_hit(rl_reset_key)
                 self._send_json(403, {"ok": False, "message": "이메일 6자리 인증번호가 일치하지 않거나 만료되었습니다."})
                 return
             db_obj = load_cloud_db(force=True)
-            user = (db_obj.get("users") or {}).get(sid) if isinstance(db_obj, dict) else None
+            users_map = (db_obj.get("users") or {}) if isinstance(db_obj, dict) else {}
+            user = users_map.get(sid)
             if not isinstance(user, dict):
+                _record_rate_hit(rl_reset_key)
                 self._send_json(404, {"ok": False, "message": "등록되지 않은 학번입니다."})
                 return
             stored_email = str(user.get("email") or "").strip().lower()
-            if stored_email and stored_email != email:
-                self._send_json(403, {"ok": False, "message": "가입 시 등록한 이메일 주소와 일치하지 않습니다."})
-                return
-            user["pw_hash"] = new_pw_hash
-            if not stored_email:
+            if stored_email:
+                if stored_email != email:
+                    _record_rate_hit(rl_reset_key)
+                    self._send_json(403, {"ok": False, "message": "가입 시 등록한 이메일 주소와 일치하지 않습니다."})
+                    return
+            else:
+                # 이메일 미등록(has_pw=false) 레거시 계정 선점 방지: 울산대 학교 메일(@ulsan.ac.kr) 본인 인증만 허용
+                if not ULSAN_UNIV_EMAIL_RE.match(email):
+                    _record_rate_hit(rl_reset_key)
+                    self._send_json(403, {
+                        "ok": False,
+                        "message": "등록된 이메일이 없는 계정은 울산대학교 학교 메일(@ulsan.ac.kr) 본인 인증으로만 최초 비밀번호를 설정할 수 있습니다.",
+                    })
+                    return
+                email_taken = any(
+                    str(other_sid) != sid and isinstance(other_u, dict) and str(other_u.get("email") or "").strip().lower() == email
+                    for other_sid, other_u in users_map.items()
+                )
+                if email_taken:
+                    _record_rate_hit(rl_reset_key)
+                    self._send_json(409, {"ok": False, "message": "이미 다른 계정에 등록된 학교 메일입니다."})
+                    return
                 user["email"] = email
+            _clear_rate_bucket(rl_reset_key)
+            _clear_rate_bucket(f"login_sid:{client_ip}:{sid}")
+            user["pw_hash"] = new_pw_hash
             user["updated_at"] = int(time.time() * 1000)
             is_adm = _is_admin_user(user)
             token = _make_session_token(sid, role="admin" if is_adm else "user")
