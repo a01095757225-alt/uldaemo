@@ -448,10 +448,66 @@
       return db;
     }
 
+    const DB_CACHE_KEY = "uldaemo_db_v6";
+    const LEGACY_CACHE_KEYS = [
+      "uldaemo_db",
+      "uldaemo_db_v1",
+      "uldaemo_db_v2",
+      "uldaemo_db_v3",
+      "uldaemo_db_v4",
+      "uldaemo_db_v5",
+      "uldaemo_admin_auth",
+      "uldaemo_admin_hash"
+    ];
+
+    function purgeLegacyLocalStorage() {
+      try {
+        LEGACY_CACHE_KEYS.forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+    }
+
+    function writeDbCache(dbObj) {
+      try {
+        if (!getSessionToken()) {
+          localStorage.removeItem(DB_CACHE_KEY);
+          return;
+        }
+        const safeUsers = {};
+        const myUid = (typeof state !== "undefined" && state && state.user_id)
+          ? String(state.user_id)
+          : String(localStorage.getItem("uldaemo_uid") || "");
+        Object.entries((dbObj && dbObj.users) || {}).forEach(([k, u]) => {
+          if (!u || typeof u !== "object") return;
+          if (myUid && String(k) === myUid) {
+            const selfCopy = Object.assign({}, u);
+            delete selfCopy.pw_hash;
+            safeUsers[k] = selfCopy;
+          } else {
+            // 캐시 저장 시에도 타인 개인정보(학번·이메일·성별·pw_hash) 저장 원천 차단
+            safeUsers[k] = {
+              nickname: u.nickname || "학우",
+              avatar: u.avatar || "🐶",
+              manner_temp: u.manner_temp != null ? u.manner_temp : 36.5,
+              keywords: Array.isArray(u.keywords) ? u.keywords : [],
+              report_count: Number(u.report_count || 0),
+              bonus_score: Number(u.bonus_score || 0),
+              streak_days: Number(u.streak_days || 1),
+              role: u.role === "admin" ? "admin" : "user",
+              ...(u.department ? { department: u.department } : {}),
+              ...(u.mbti ? { mbti: u.mbti } : {}),
+              ...(u.bio ? { bio: u.bio } : {})
+            };
+          }
+        });
+        const cachePayload = Object.assign({}, dbObj, { users: safeUsers });
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(cachePayload));
+      } catch (e) {}
+    }
+
     function loadDB() {
-      const today = getTodayStr();
-      const raw = localStorage.getItem("uldaemo_db_v5");
-      if (raw) {
+      purgeLegacyLocalStorage();
+      const raw = localStorage.getItem(DB_CACHE_KEY);
+      if (raw && localStorage.getItem("uldaemo_session_token")) {
         try {
           const parsed = JSON.parse(raw);
           // 아바타 텍스트 정규화 ('🐶 강아지' -> '🐶')
@@ -461,7 +517,7 @@
           return ensurePlazaDefaults(purgeDemoData(parsed));
         } catch (e) {}
       }
-      const initial = ensurePlazaDefaults({
+      return ensurePlazaDefaults({
         users: {},
         posts: [],
         applications: [],
@@ -469,8 +525,6 @@
         notifications: [],
         reviews: []
       });
-      localStorage.setItem("uldaemo_db_v5", JSON.stringify(initial));
-      return initial;
     }
 
     let _deletedPostIds = (() => {
@@ -621,7 +675,7 @@
 
       purgeDemoData(DB);
       if (changed) {
-        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+        writeDbCache(DB);
       }
       return changed;
     }
@@ -662,7 +716,7 @@
         saveDeletedPostIds();
       }
       purgeDemoData(DB);
-      try { localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB)); } catch (e) {}
+      writeDbCache(DB);
       return true;
     }
 
@@ -767,7 +821,7 @@
     }
 
     function saveDB(immediate = false) {
-      try { localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB)); } catch (e) {}
+      writeDbCache(DB);
     }
 
     let DB = loadDB();
@@ -1515,7 +1569,7 @@
       try {
         localStorage.removeItem("uldaemo_tt_" + uid);
         localStorage.removeItem("uldaemo_blocked_" + uid);
-        localStorage.removeItem("uldaemo_db_v5");
+        localStorage.removeItem(DB_CACHE_KEY);
       } catch (e) {}
       executeLogoutNow();
       showToast("회원 탈퇴 및 개인정보 파기가 완료되었습니다.");
@@ -1525,9 +1579,22 @@
       state.user_id = "";
       state.verified_email = null;
       state.auth_code_sent = false;
-      localStorage.removeItem("uldaemo_uid");
-      localStorage.removeItem("uldaemo_admin_auth");
+      _initialCloudSynced = false;
+      try {
+        localStorage.removeItem(DB_CACHE_KEY);
+        localStorage.removeItem("uldaemo_uid");
+        localStorage.removeItem("uldaemo_deleted_posts");
+        purgeLegacyLocalStorage();
+      } catch (e) {}
       setSessionToken("");
+      DB = ensurePlazaDefaults({
+        users: {},
+        posts: [],
+        applications: [],
+        messages: [],
+        notifications: [],
+        reviews: []
+      });
       document.cookie = "user_id=; path=/; max-age=0";
       render();
       try { window.scrollTo(0, 0); } catch (e) {}
