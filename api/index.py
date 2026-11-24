@@ -40,6 +40,48 @@ CONTACT_BANNED_KEYWORDS = (
 CONTACT_PHONE_RE = re.compile(r"(?:01[016789]|공일공)[\s.\-]*\d{3,4}[\s.\-]*\d{4}")
 CONTACT_EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 CONTACT_SNS_HANDLE_RE = re.compile(r"(?:^|\s)@[a-zA-Z0-9_.]{3,30}\b|(?:ig|id|카톡|인스타)\s*[:=]\s*[a-zA-Z0-9_.]{3,30}", re.I)
+CONTACT_SOLICIT_RE = re.compile(r"(?:번호|폰|아이디|계정|연락)\s*(?:좀|알려|교환|줘|주실|주세요|뭐|어떻게|보내|남겨)", re.I)
+ULSAN_UNIV_EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@(?:mail\.)?ulsan\.ac\.kr$", re.I)
+
+# 로그인·OTP 시도 횟수 제한 (학번 + IP 기준 슬라이딩 윈도우, 메모리 기반)
+_AUTH_RATE_BUCKETS = {}
+_AUTH_RATE_WINDOW_SEC = 600
+_AUTH_MAX_SID_IP_FAILS = 5
+_AUTH_MAX_IP_FAILS = 20
+_OTP_MAX_PER_WINDOW = 5
+
+
+def _prune_rate_bucket(key: str, now_ts: float):
+    arr = _AUTH_RATE_BUCKETS.get(key)
+    if not arr:
+        return []
+    cutoff = now_ts - _AUTH_RATE_WINDOW_SEC
+    pruned = [t for t in arr if t > cutoff]
+    if pruned:
+        _AUTH_RATE_BUCKETS[key] = pruned
+    else:
+        _AUTH_RATE_BUCKETS.pop(key, None)
+    return pruned
+
+
+def _check_rate_limit(key: str, limit: int):
+    now_ts = time.time()
+    arr = _prune_rate_bucket(key, now_ts)
+    if len(arr) >= limit:
+        retry_after = max(1, int(_AUTH_RATE_WINDOW_SEC - (now_ts - arr[0])))
+        return False, retry_after
+    return True, 0
+
+
+def _record_rate_hit(key: str):
+    now_ts = time.time()
+    arr = _prune_rate_bucket(key, now_ts)
+    arr.append(now_ts)
+    _AUTH_RATE_BUCKETS[key] = arr
+
+
+def _clear_rate_bucket(key: str):
+    _AUTH_RATE_BUCKETS.pop(key, None)
 
 
 def _contains_contact_info(text: str) -> bool:
@@ -47,7 +89,7 @@ def _contains_contact_info(text: str) -> bool:
     tl = t.lower()
     if any(k in tl for k in CONTACT_BANNED_KEYWORDS):
         return True
-    if CONTACT_PHONE_RE.search(t) or CONTACT_EMAIL_RE.search(t) or CONTACT_SNS_HANDLE_RE.search(t):
+    if CONTACT_PHONE_RE.search(t) or CONTACT_EMAIL_RE.search(t) or CONTACT_SNS_HANDLE_RE.search(t) or CONTACT_SOLICIT_RE.search(t):
         return True
     return False
 
@@ -193,24 +235,18 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             accepted_partner_ids.add(str(a.get("applicant_id") or ""))
 
     def pub_id(uid: str) -> str:
-        return str(uid) if is_admin else _mask_uid(uid, vid)
+        return _mask_uid(uid, vid)
 
-    # 2. 회원 응답 필터링:
+    # 2. 회원 응답 필터링 (일반 학생·관리자 공통 — 관리자도 일반 응답에서는 학생과 동일한 최소 범위만 수신):
     #    - 본인: 본인 프로필 전체(pw_hash 제외)
     #    - 타인(수락 전): 별명, 아바타, 매너온도, 인증 뱃지/키워드만 (학번·학과·성별·MBTI·이메일·소개 제외)
-    #    - 타인(수락 후 파트너): 학과·MBTI·소개만 추가 공개 (학번·성별·이메일은 여전히 제외)
+    #    - 타인(수락 후 파트너): 학과·MBTI·소개만 추가 공개 (학번·성별·이메일은 어떤 경우에도 타인에게 미노출)
     safe_users = {}
     for uid, u in users.items():
         if not isinstance(u, dict):
             continue
         uid_str = str(uid)
-        if is_admin:
-            su = dict(u)
-            su["has_pw"] = bool(u.get("pw_hash"))
-            su["role"] = "admin" if _is_admin_user(u) else "user"
-            su.pop("pw_hash", None)
-            safe_users[uid_str] = su
-        elif uid_str == vid:
+        if uid_str == vid:
             su = dict(u)
             su["has_pw"] = bool(u.get("pw_hash"))
             su["role"] = "admin" if _is_admin_user(u) else "user"
@@ -258,13 +294,13 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             "updated_at": p.get("updated_at"),
         })
 
-    # 4. 신청 내역: 본인이 신청한 건 + 본인이 만든 번개에 들어온 신청 (+ 수락된 채팅방의 참여자 목록)만 반환
+    # 4. 신청 내역: 본인이 신청한 건 + 본인이 만든 번개에 들어온 신청 (+ 수락된 채팅방의 참여자 목록)만 반환 (관리자 동일 적용)
     safe_apps = []
     for a in apps:
         pid = a.get("post_id")
         ipid = int(pid) if pid is not None else 0
         ap_id = str(a.get("applicant_id") or "")
-        if is_admin or ap_id == vid or ipid in hosted_post_ids or (ipid in accepted_post_ids and a.get("status") == "승인됨"):
+        if ap_id == vid or ipid in hosted_post_ids or (ipid in accepted_post_ids and a.get("status") == "승인됨"):
             safe_apps.append({
                 "id": a.get("id"),
                 "post_id": pid,
@@ -273,14 +309,14 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
                 "updated_at": a.get("updated_at"),
             })
 
-    # 5. 채팅: 수락된 참여자(방장 포함)에게만 해당 방 메시지 반환 + 레거시 AI HTML 구조화 변환
+    # 5. 채팅: 수락된 참여자(방장 포함)에게만 해당 방 메시지 반환 (관리자 일반 응답에도 타인 방 메시지 미포함)
     safe_msgs = []
     for m in msgs:
         pid = m.get("post_id")
         if pid is None:
             continue
         ipid = int(pid)
-        if not is_admin and ipid not in accepted_post_ids:
+        if ipid not in accepted_post_ids:
             continue
         sm = {
             "id": m.get("id"),
@@ -291,16 +327,18 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             "is_read": int(m.get("is_read") or 0),
             "reactions": m.get("reactions") if isinstance(m.get("reactions"), dict) else {},
         }
+        if m.get("flagged"):
+            sm["flagged"] = True
         if m.get("sender_id") == "AI_BOT":
             sm["kind"] = str(m.get("kind") or "ai_icebreaker")
             if isinstance(m.get("suggestions"), list):
                 sm["suggestions"] = [_strip_html_tags(x) for x in m["suggestions"]]
         safe_msgs.append(sm)
 
-    # 6. 알림: 본인 알림만 반환
+    # 6. 알림: 본인 알림만 반환 (관리자 동일 적용)
     safe_notifs = [
         n for n in notifs
-        if is_admin or str(n.get("user_id") or "") == vid
+        if str(n.get("user_id") or "") == vid
     ]
 
     # 7. 후기 · 투표 · 광장톡: 타인 학번 별칭화
@@ -1045,226 +1083,8 @@ def save_cloud_db(db_obj: dict, deleted_post_ids=None) -> bool:
     return False
 
 
-def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
-    s_ts = s_item.get("updated_at") or 0
-    c_ts = c_item.get("updated_at") or 0
-    if c_ts >= s_ts:
-        merged = dict(s_item)
-        merged.update(c_item)
-    else:
-        merged = dict(c_item)
-        merged.update(s_item)
-    # 취소된 번개는 이전 기기 캐시로 부활 금지, '승인됨'은 오래된 '대기중' 캐시로만 되돌아가지 않도록 보호
-    s_st = s_item.get("status")
-    c_st = c_item.get("status")
-    if s_st == "취소됨" or c_st == "취소됨":
-        merged["status"] = "취소됨"
-    elif (s_st == "승인됨" and c_st == "대기중") or (c_st == "승인됨" and s_st == "대기중"):
-        merged["status"] = "승인됨"
-    elif (s_st == "매칭완료" and c_st == "모집중") or (c_st == "매칭완료" and s_st == "모집중"):
-        merged["status"] = "매칭완료"
-    if s_item.get("is_read") == 1 or c_item.get("is_read") == 1:
-        merged["is_read"] = 1
-    if isinstance(s_item.get("replies"), list) or isinstance(c_item.get("replies"), list):
-        rmap = {}
-        for r in list(s_item.get("replies") or []) + list(c_item.get("replies") or []):
-            if not isinstance(r, dict) or not r.get("id"):
-                continue
-            prev = rmap.get(r["id"])
-            if prev:
-                nr = dict(prev)
-                nr.update(r)
-                nr["deleted"] = bool(prev.get("deleted") or r.get("deleted"))
-                rmap[r["id"]] = nr
-            else:
-                rmap[r["id"]] = r
-        merged["replies"] = sorted(rmap.values(), key=lambda x: x.get("id", 0))
-    return merged
-
-
-def _merge_list_by_id(server_list, client_list, deleted_ids=None):
-    deleted_set = set(deleted_ids or [])
-    by_id = {}
-    for item in (server_list or []):
-        if isinstance(item, dict) and item.get("id") not in deleted_set:
-            by_id[item.get("id")] = item
-    for item in (client_list or []):
-        if isinstance(item, dict) and item.get("id") not in deleted_set:
-            iid = item.get("id")
-            if iid in by_id:
-                by_id[iid] = _merge_item_dict(by_id[iid], item)
-            else:
-                by_id[iid] = item
-    return list(by_id.values())
-
-
-def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", is_admin: bool = False):
-    current = load_cloud_db(force=True)
-    if not isinstance(current, dict):
-        if _has_supabase():
-            return False, None
-        current = {
-            "users": {},
-            "posts": [],
-            "deleted_post_ids": [],
-            "applications": [],
-            "messages": [],
-            "notifications": [],
-            "reviews": [],
-        }
-    vid = str(viewer_id or "").strip()
-    if isinstance(client_db, dict):
-        # 1. Users 병합 (최신 updated_at 우선 + 서버 민감 필드(pw_hash/email/상세학과/시간표) 보호 + 탈퇴 계정 부활 방지)
-        deleted_users_map = current.setdefault("deleted_users_map", {})
-        c_users = client_db.get("users") or {}
-        if isinstance(c_users, dict):
-            s_users = current.setdefault("users", {})
-            for uid, c_u in c_users.items():
-                if not isinstance(c_u, dict):
-                    continue
-                del_ts = int(deleted_users_map.get(str(uid)) or 0)
-                if del_ts > 0 and not _is_admin_user(s_users.get(uid)):
-                    c_created = int(c_u.get("created_at") or 0)
-                    if c_created <= del_ts:
-                        s_users.pop(uid, None)
-                        continue
-                    else:
-                        deleted_users_map.pop(str(uid), None)
-                s_u = s_users.get(uid)
-                if not isinstance(s_u, dict):
-                    merged_u = dict(c_u)
-                else:
-                    if (c_u.get("updated_at") or 0) >= (s_u.get("updated_at") or 0):
-                        merged_u = dict(s_u)
-                        merged_u.update(c_u)
-                    else:
-                        merged_u = dict(c_u)
-                        merged_u.update(s_u)
-                    # 마스킹된 클라이언트가 서버의 pw_hash/email/상세정보를 빈 값으로 덮어쓰지 못하도록 보호
-                    if s_u.get("pw_hash") and not c_u.get("pw_hash"):
-                        merged_u["pw_hash"] = s_u["pw_hash"]
-                    if s_u.get("email") and not c_u.get("email"):
-                        merged_u["email"] = s_u["email"]
-                    if s_u.get("timetable") and not c_u.get("timetable") and str(uid) != vid:
-                        merged_u["timetable"] = s_u["timetable"]
-                    if s_u.get("blocked_users") and not c_u.get("blocked_users") and str(uid) != vid:
-                        merged_u["blocked_users"] = s_u["blocked_users"]
-                    if vid and not is_admin and str(uid) != vid:
-                        for prot_k in ("nickname", "department", "mbti", "bio", "avatar", "email", "pw_hash", "timetable", "fav_cats", "blocked_users"):
-                            if prot_k in s_u:
-                                merged_u[prot_k] = s_u[prot_k]
-                merged_u.pop("has_pw", None)
-
-                # 동일 계정의 중복 신고 방지 (reported_by 기준 1인 1회만 인정) 및 role=admin 계정 보호
-                if _is_admin_user(merged_u):
-                    merged_u["report_count"] = 0
-                    merged_u["reported_by"] = []
-                    if (merged_u.get("manner_temp") or 36.5) < 36.5:
-                        merged_u["manner_temp"] = 36.5
-                else:
-                    rep_list = []
-                    for r_uid in (s_u.get("reported_by") if isinstance(s_u, dict) else []) or []:
-                        if str(r_uid) not in rep_list and str(r_uid) != str(uid):
-                            rep_list.append(str(r_uid))
-                    for r_uid in (c_u.get("reported_by") or []):
-                        if str(r_uid) not in rep_list and str(r_uid) != str(uid):
-                            rep_list.append(str(r_uid))
-                    merged_u["reported_by"] = rep_list
-                    merged_u["report_count"] = len(rep_list)
-
-                s_users[uid] = merged_u
-
-    # 2. Posts 병합 (영구 삭제 목록 deleted_post_ids 누적 관리 + 임시 시드 번개 101/102/103 영구 제거)
-        all_deleted_posts = {101, 102, 103}
-        for raw_del_src in (current.get("deleted_post_ids") or [], client_db.get("deleted_post_ids") or [], deleted_post_ids or []):
-            for x in raw_del_src:
-                try:
-                    all_deleted_posts.add(int(x))
-                except Exception:
-                    pass
-        for p in list(current.get("posts") or []) + list(client_db.get("posts") or []):
-            if isinstance(p, dict) and p.get("status") == "취소됨" and p.get("id") is not None:
-                try:
-                    all_deleted_posts.add(int(p.get("id")))
-                except Exception:
-                    pass
-        current["deleted_post_ids"] = sorted(all_deleted_posts)[-500:]
-        prev_post_ids = {p.get("id") for p in (current.get("posts") or []) if isinstance(p, dict)}
-        merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), all_deleted_posts)
-        merged_posts = [p for p in merged_posts if isinstance(p, dict) and p.get("status") != "취소됨"]
-        merged_posts.sort(key=lambda x: x.get("id", 0), reverse=True)
-        current["posts"] = merged_posts
-
-        # 3. Applications, Messages, Notifications, Reviews, Polls, Plaza Talks 병합
-        current["applications"] = _merge_list_by_id(current.get("applications"), client_db.get("applications"))
-        current["messages"] = _merge_list_by_id(current.get("messages"), client_db.get("messages"))
-        merged_notifs = _merge_list_by_id(current.get("notifications"), client_db.get("notifications"))
-
-        # 새로 등록된 번개가 있다면 서버에서도 관심 카테고리 학우들에게 알림 보장 생성
-        def _cat_key(s):
-            return re.sub(r"^[^\w가-힣]+", "", str(s or "")).strip().lower()
-
-        def _cat_match(a, b):
-            x, y = _cat_key(a), _cat_key(b)
-            return bool(x and y and (x == y or x in y or y in x))
-
-        new_posts = [p for p in merged_posts if isinstance(p, dict) and p.get("id") not in prev_post_ids]
-        for np in new_posts:
-            p_id = np.get("id")
-            p_cat = np.get("category", "")
-            p_author = np.get("author_id", "")
-            for uid, u_obj in (current.get("users") or {}).items():
-                if not isinstance(u_obj, dict) or uid == p_author:
-                    continue
-                favs = u_obj.get("fav_cats") or []
-                muted = u_obj.get("fav_muted") or []
-                hit = any(_cat_match(f, p_cat) and not any(_cat_key(m) == _cat_key(f) for m in muted) for f in favs)
-                if hit and not any(n.get("user_id") == uid and n.get("post_id") == p_id for n in merged_notifs if isinstance(n, dict)):
-                    merged_notifs.append({
-                        "id": int(time.time() * 1000) + random.randint(1, 999),
-                        "user_id": uid,
-                        "post_id": p_id,
-                        "message": f"⭐ 관심 카테고리 [{p_cat}] 새 번개! \"{np.get('title', '')}\" · 📍{np.get('location', '')} {np.get('meet_time', '')}",
-                        "is_read": 0,
-                        "created_at": time.strftime("%Y-%m-%d %H:%M"),
-                    })
-
-        merged_notifs.sort(key=lambda x: x.get("id", 0), reverse=True)
-        current["notifications"] = merged_notifs[:200]
-        current["reviews"] = _merge_list_by_id(current.get("reviews"), client_db.get("reviews"))
-
-        merged_polls = _merge_list_by_id(current.get("polls"), client_db.get("polls"))
-        merged_polls.sort(key=lambda x: x.get("id", 0), reverse=True)
-        current["polls"] = merged_polls[:50]
-
-        merged_talks = _merge_list_by_id(current.get("plaza_talks"), client_db.get("plaza_talks"))
-        now_ms_talk = int(time.time() * 1000)
-        talk_ttl_ms = 3 * 24 * 60 * 60 * 1000
-        merged_talks = [
-            t for t in merged_talks
-            if isinstance(t, dict) and (
-                int(t.get("created_ts") or t.get("id") or 0) <= 1000000000000
-                or (now_ms_talk - int(t.get("created_ts") or t.get("id") or 0)) <= talk_ttl_ms
-            )
-        ]
-        merged_talks.sort(key=lambda x: x.get("id", 0), reverse=True)
-        current["plaza_talks"] = merged_talks[:100]
-
-    # 1순위: Supabase PostgreSQL DB에 저장 (설정되어 있으면 GitHub 구버전으로 폴백 금지)
-    if _has_supabase():
-        all_del_ids = current.get("deleted_post_ids") or deleted_post_ids or []
-        if _supabase_save_db(current, all_del_ids):
-            _DB_MEM_CACHE["db"] = current
-            _DB_MEM_CACHE["ts"] = time.time()
-            return True, current
-        return False, current
-
-    # 2순위(Supabase 미설정 환경 전용): GitHub Issue #1 클라우드 스토리지에 저장
-    if _github_save_db(current):
-        _DB_MEM_CACHE["db"] = current
-        _DB_MEM_CACHE["ts"] = time.time()
-        return True, current
-    return False, current
+# 보안 강화: 레거시 전체 DB 병합(sync_cloud_db / _merge_list_by_id / _merge_item_dict) 완전 삭제.
+# 모든 상태 변경은 session_token 기반 전용 액션 API를 통해서만 서버가 직접 검증 후 저장합니다.
 
 
 class handler(BaseHTTPRequestHandler):
@@ -1363,12 +1183,28 @@ class handler(BaseHTTPRequestHandler):
                 payload.update(extra)
             self._send_json(200 if ok else 500, payload)
 
+        # 클라이언트 IP 추출 (학번+IP 기반 로그인 시도 횟수 제한용)
+        fwd_for = str(self.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        client_ip = fwd_for or str(self.headers.get("X-Real-IP") or "").strip() or str((self.client_address or ("unknown",))[0])
+
         # ---- 1) 공개 인증 API ----
         if action == "send_otp":
             recipient = str(data.get("email") or "").strip().lower()
             if not CONTACT_EMAIL_RE.match(recipient):
                 self._send_json(400, {"ok": False, "message": "올바른 이메일 주소를 입력해주세요."})
                 return
+            ok_ip, retry_ip = _check_rate_limit(f"otp_ip:{client_ip}", _AUTH_MAX_IP_FAILS)
+            ok_em, retry_em = _check_rate_limit(f"otp_em:{client_ip}:{recipient}", _OTP_MAX_PER_WINDOW)
+            if not ok_ip or not ok_em:
+                self._send_json(429, {
+                    "ok": False,
+                    "reason": "rate_limited",
+                    "retry_after": max(retry_ip, retry_em),
+                    "message": "인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+                })
+                return
+            _record_rate_hit(f"otp_ip:{client_ip}")
+            _record_rate_hit(f"otp_em:{client_ip}:{recipient}")
             otp_code = str(random.randint(100000, 999999))
             otp_token = _make_otp_token(recipient, otp_code)
             if LOCAL_TEST_DB_PATH:
@@ -1384,21 +1220,42 @@ class handler(BaseHTTPRequestHandler):
             if not sid:
                 self._send_json(400, {"ok": False, "reason": "missing_sid"})
                 return
+            rl_sid_key = f"login_sid:{client_ip}:{sid}"
+            rl_ip_key = f"login_ip:{client_ip}"
+            ok_sid, retry_sid = _check_rate_limit(rl_sid_key, _AUTH_MAX_SID_IP_FAILS)
+            ok_ip, retry_ip = _check_rate_limit(rl_ip_key, _AUTH_MAX_IP_FAILS)
+            if not ok_sid or not ok_ip:
+                self._send_json(429, {
+                    "ok": False,
+                    "reason": "rate_limited",
+                    "retry_after": max(retry_sid, retry_ip),
+                    "message": "로그인 시도 횟수가 초과되었습니다. 10분 후 다시 시도해주세요.",
+                })
+                return
             db_obj = load_cloud_db(force=True) or {}
             user = (db_obj.get("users") or {}).get(sid)
             if not isinstance(user, dict):
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "not_found"})
                 return
             stored_hash = str(user.get("pw_hash") or "").strip()
             if not stored_hash:
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "no_pw"})
                 return
             if not pw_hash:
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "missing_pw"})
                 return
             if not hmac.compare_digest(stored_hash, pw_hash):
+                _record_rate_hit(rl_sid_key)
+                _record_rate_hit(rl_ip_key)
                 self._send_json(200, {"ok": False, "reason": "wrong_pw"})
                 return
+            _clear_rate_bucket(rl_sid_key)
             is_adm = _is_admin_user(user)
             token = _make_session_token(sid, role="admin" if is_adm else "user")
             sanitized = _sanitize_db_for_viewer(db_obj, sid, is_adm)
@@ -1485,24 +1342,58 @@ class handler(BaseHTTPRequestHandler):
             otp_code = str(data.get("otp") or "").strip()
             otp_token = str(data.get("otp_token") or "").strip()
             new_pw_hash = str(data.get("pw_hash") or "").strip()
+            rl_reset_key = f"reset_sid:{client_ip}:{sid}"
+            ok_rs, retry_rs = _check_rate_limit(rl_reset_key, _AUTH_MAX_SID_IP_FAILS)
+            if not ok_rs:
+                self._send_json(429, {
+                    "ok": False,
+                    "reason": "rate_limited",
+                    "retry_after": retry_rs,
+                    "message": "비밀번호 설정 시도 횟수가 초과되었습니다. 10분 후 다시 시도해주세요.",
+                })
+                return
             if not sid or not new_pw_hash or len(new_pw_hash) < 32:
+                _record_rate_hit(rl_reset_key)
                 self._send_json(400, {"ok": False, "message": "학번과 새 비밀번호를 확인해주세요."})
                 return
             if not _verify_otp_token(otp_token, email, otp_code):
+                _record_rate_hit(rl_reset_key)
                 self._send_json(403, {"ok": False, "message": "이메일 6자리 인증번호가 일치하지 않거나 만료되었습니다."})
                 return
             db_obj = load_cloud_db(force=True)
-            user = (db_obj.get("users") or {}).get(sid) if isinstance(db_obj, dict) else None
+            users_map = (db_obj.get("users") or {}) if isinstance(db_obj, dict) else {}
+            user = users_map.get(sid)
             if not isinstance(user, dict):
+                _record_rate_hit(rl_reset_key)
                 self._send_json(404, {"ok": False, "message": "등록되지 않은 학번입니다."})
                 return
             stored_email = str(user.get("email") or "").strip().lower()
-            if stored_email and stored_email != email:
-                self._send_json(403, {"ok": False, "message": "가입 시 등록한 이메일 주소와 일치하지 않습니다."})
-                return
-            user["pw_hash"] = new_pw_hash
-            if not stored_email:
+            if stored_email:
+                if stored_email != email:
+                    _record_rate_hit(rl_reset_key)
+                    self._send_json(403, {"ok": False, "message": "가입 시 등록한 이메일 주소와 일치하지 않습니다."})
+                    return
+            else:
+                # 이메일 미등록(has_pw=false) 레거시 계정 선점 방지: 울산대 학교 메일(@ulsan.ac.kr) 본인 인증만 허용
+                if not ULSAN_UNIV_EMAIL_RE.match(email):
+                    _record_rate_hit(rl_reset_key)
+                    self._send_json(403, {
+                        "ok": False,
+                        "message": "등록된 이메일이 없는 계정은 울산대학교 학교 메일(@ulsan.ac.kr) 본인 인증으로만 최초 비밀번호를 설정할 수 있습니다.",
+                    })
+                    return
+                email_taken = any(
+                    str(other_sid) != sid and isinstance(other_u, dict) and str(other_u.get("email") or "").strip().lower() == email
+                    for other_sid, other_u in users_map.items()
+                )
+                if email_taken:
+                    _record_rate_hit(rl_reset_key)
+                    self._send_json(409, {"ok": False, "message": "이미 다른 계정에 등록된 학교 메일입니다."})
+                    return
                 user["email"] = email
+            _clear_rate_bucket(rl_reset_key)
+            _clear_rate_bucket(f"login_sid:{client_ip}:{sid}")
+            user["pw_hash"] = new_pw_hash
             user["updated_at"] = int(time.time() * 1000)
             is_adm = _is_admin_user(user)
             token = _make_session_token(sid, role="admin" if is_adm else "user")
@@ -1796,7 +1687,7 @@ class handler(BaseHTTPRequestHandler):
                 isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id and a.get("status") == "승인됨"
                 for a in (db_obj.get("applications") or [])
             )
-            if not is_member and not is_adm:
+            if not is_member:
                 self._send_json(403, {"ok": False, "message": "수락된 참여자만 이 대화방에 접근할 수 있습니다."})
                 return
             now_ms = int(time.time() * 1000)
@@ -2169,6 +2060,145 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True})
             return
 
+        if action == "admin_dashboard_summary":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            if not is_adm:
+                self._send_json(403, {"ok": False, "message": "운영진 권한(role=admin)이 필요합니다."})
+                return
+            users_map = db_obj.get("users") or {}
+            admin_users = []
+            for uid_k, u in users_map.items():
+                if not isinstance(u, dict):
+                    continue
+                # 이메일·성별·MBTI·소개는 관리자 목록에도 포함하지 않음 (개인정보 최소화 원칙)
+                admin_users.append({
+                    "alias": _mask_uid(str(uid_k), actor_id),
+                    "nickname": str(u.get("nickname") or "학우"),
+                    "role": "admin" if _is_admin_user(u) else "user",
+                    "manner_temp": float(u.get("manner_temp") if u.get("manner_temp") is not None else 36.5),
+                    "report_count": int(u.get("report_count") or 0),
+                    "is_suspended": bool(u.get("is_suspended")),
+                    "has_pw": bool(u.get("pw_hash")),
+                    "joined_at": str(u.get("joined_at") or ""),
+                })
+            # 신고 또는 연락처 플래그가 있는 대화방만 집계
+            flagged_by_post = {}
+            for m in (db_obj.get("messages") or []):
+                if isinstance(m, dict) and (m.get("flagged") or _contains_contact_info(m.get("text"))):
+                    pid_i = int(m.get("post_id") or 0)
+                    flagged_by_post[pid_i] = flagged_by_post.get(pid_i, 0) + 1
+            reported_uids = {
+                str(uid_k) for uid_k, u in users_map.items()
+                if isinstance(u, dict) and int(u.get("report_count") or 0) > 0
+            }
+            reported_rooms = []
+            for p in (db_obj.get("posts") or []):
+                if not isinstance(p, dict) or p.get("id") is None:
+                    continue
+                pid_i = int(p.get("id"))
+                participants = {str(p.get("author_id") or "")}
+                for a in (db_obj.get("applications") or []):
+                    if isinstance(a, dict) and int(a.get("post_id") or 0) == pid_i and a.get("status") == "승인됨":
+                        participants.add(str(a.get("applicant_id") or ""))
+                has_rep_user = bool(participants & reported_uids)
+                flg_cnt = flagged_by_post.get(pid_i, 0)
+                if has_rep_user or flg_cnt > 0 or bool(p.get("reported")):
+                    reported_rooms.append({
+                        "post_id": pid_i,
+                        "title": str(p.get("title") or ""),
+                        "status": str(p.get("status") or ""),
+                        "has_reported_participant": has_rep_user,
+                        "flagged_message_count": flg_cnt,
+                    })
+            review_queue = [
+                {
+                    "message_id": item.get("message_id"),
+                    "post_id": item.get("post_id"),
+                    "flag_reason": str(item.get("flag_reason") or "contact_pattern"),
+                    "flagged_at": item.get("flagged_at"),
+                    "status": str(item.get("status") or "pending"),
+                }
+                for item in (db_obj.get("admin_review_queue") or [])
+                if isinstance(item, dict)
+            ]
+            audit_logs = (db_obj.get("admin_audit_logs") or [])[-30:]
+            self._send_json(200, {
+                "ok": True,
+                "users": admin_users,
+                "reported_rooms": reported_rooms,
+                "review_queue": review_queue,
+                "audit_logs": audit_logs,
+            })
+            return
+
+        if action == "admin_reported_room_messages":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            if not is_adm:
+                self._send_json(403, {"ok": False, "message": "운영진 권한(role=admin)이 필요합니다."})
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "올바른 대화방 ID를 입력해주세요."})
+                return
+            reason = str(data.get("reason") or "신고 검토").strip()[:100]
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post:
+                self._send_json(404, {"ok": False, "message": "대화방을 찾을 수 없습니다."})
+                return
+            users_map = db_obj.get("users") or {}
+            participants = {str(post.get("author_id") or "")}
+            for a in (db_obj.get("applications") or []):
+                if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and a.get("status") == "승인됨":
+                    participants.add(str(a.get("applicant_id") or ""))
+            has_rep_user = any(
+                isinstance(users_map.get(u), dict) and int(users_map[u].get("report_count") or 0) > 0
+                for u in participants
+            )
+            room_msgs = [
+                m for m in (db_obj.get("messages") or [])
+                if isinstance(m, dict) and int(m.get("post_id") or 0) == post_id
+            ]
+            has_flagged = any(bool(m.get("flagged")) or _contains_contact_info(m.get("text")) for m in room_msgs)
+            if not (has_rep_user or has_flagged or bool(post.get("reported"))):
+                self._send_json(403, {"ok": False, "message": "신고 또는 연락처 감지 기록이 있는 대화방만 열람할 수 있습니다."})
+                return
+            # 접근 감사 로그 영구 기록 (메시지 본문·이메일 등 개인정보 미기록)
+            now_ms = int(time.time() * 1000)
+            audit_entry = {
+                "id": now_ms,
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "admin_alias": _mask_uid(actor_id),
+                "action": "view_reported_room",
+                "post_id": post_id,
+                "reason": reason,
+            }
+            db_obj.setdefault("admin_audit_logs", []).append(audit_entry)
+            db_obj["admin_audit_logs"] = db_obj["admin_audit_logs"][-200:]
+            save_cloud_db(db_obj)
+            sanitized_room_msgs = [
+                {
+                    "id": m.get("id"),
+                    "post_id": post_id,
+                    "sender_alias": "AI_BOT" if m.get("sender_id") == "AI_BOT" else _mask_uid(str(m.get("sender_id") or ""), actor_id),
+                    "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
+                    "created_at": m.get("created_at"),
+                    "flagged": bool(m.get("flagged") or _contains_contact_info(m.get("text"))),
+                }
+                for m in room_msgs
+            ]
+            self._send_json(200, {
+                "ok": True,
+                "post_id": post_id,
+                "audit_logged": True,
+                "messages": sanitized_room_msgs,
+            })
+            return
+
         if action == "admin_action":
             db_obj, actor_id, is_adm = _require_auth()
             if not db_obj:
@@ -2179,17 +2209,32 @@ class handler(BaseHTTPRequestHandler):
             sub = str(data.get("sub_action") or "").strip()
             target_id = _resolve_uid(data.get("target_user_id"), db_obj.get("users") or {})
             target = (db_obj.get("users") or {}).get(target_id)
+            now_ms = int(time.time() * 1000)
             if sub == "suspend_user" and isinstance(target, dict) and not _is_admin_user(target):
                 target["is_suspended"] = True
-                target["updated_at"] = int(time.time() * 1000)
+                target["updated_at"] = now_ms
             elif sub == "unsuspend_user" and isinstance(target, dict):
                 target["is_suspended"] = False
                 target["report_count"] = 0
                 target["reported_by"] = []
-                target["updated_at"] = int(time.time() * 1000)
+                target["updated_at"] = now_ms
+            elif sub == "resolve_review_item":
+                msg_id = data.get("message_id")
+                for item in (db_obj.get("admin_review_queue") or []):
+                    if isinstance(item, dict) and str(item.get("message_id")) == str(msg_id):
+                        item["status"] = "resolved"
+                        item["resolved_at"] = now_ms
             else:
                 self._send_json(400, {"ok": False, "message": "지원하지 않는 관리자 동작입니다."})
                 return
+            db_obj.setdefault("admin_audit_logs", []).append({
+                "id": now_ms,
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "admin_alias": _mask_uid(actor_id),
+                "action": f"admin_{sub}",
+                "target_alias": _mask_uid(target_id) if target_id else "",
+            })
+            db_obj["admin_audit_logs"] = db_obj["admin_audit_logs"][-200:]
             _finish_mutation(db_obj, actor_id, is_adm)
             return
 

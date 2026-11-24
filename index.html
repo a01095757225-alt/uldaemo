@@ -448,10 +448,66 @@
       return db;
     }
 
+    const DB_CACHE_KEY = "uldaemo_db_v6";
+    const LEGACY_CACHE_KEYS = [
+      "uldaemo_db",
+      "uldaemo_db_v1",
+      "uldaemo_db_v2",
+      "uldaemo_db_v3",
+      "uldaemo_db_v4",
+      "uldaemo_db_v5",
+      "uldaemo_admin_auth",
+      "uldaemo_admin_hash"
+    ];
+
+    function purgeLegacyLocalStorage() {
+      try {
+        LEGACY_CACHE_KEYS.forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+    }
+
+    function writeDbCache(dbObj) {
+      try {
+        if (!getSessionToken()) {
+          localStorage.removeItem(DB_CACHE_KEY);
+          return;
+        }
+        const safeUsers = {};
+        const myUid = (typeof state !== "undefined" && state && state.user_id)
+          ? String(state.user_id)
+          : String(localStorage.getItem("uldaemo_uid") || "");
+        Object.entries((dbObj && dbObj.users) || {}).forEach(([k, u]) => {
+          if (!u || typeof u !== "object") return;
+          if (myUid && String(k) === myUid) {
+            const selfCopy = Object.assign({}, u);
+            delete selfCopy.pw_hash;
+            safeUsers[k] = selfCopy;
+          } else {
+            // 캐시 저장 시에도 타인 개인정보(학번·이메일·성별·pw_hash) 저장 원천 차단
+            safeUsers[k] = {
+              nickname: u.nickname || "학우",
+              avatar: u.avatar || "🐶",
+              manner_temp: u.manner_temp != null ? u.manner_temp : 36.5,
+              keywords: Array.isArray(u.keywords) ? u.keywords : [],
+              report_count: Number(u.report_count || 0),
+              bonus_score: Number(u.bonus_score || 0),
+              streak_days: Number(u.streak_days || 1),
+              role: u.role === "admin" ? "admin" : "user",
+              ...(u.department ? { department: u.department } : {}),
+              ...(u.mbti ? { mbti: u.mbti } : {}),
+              ...(u.bio ? { bio: u.bio } : {})
+            };
+          }
+        });
+        const cachePayload = Object.assign({}, dbObj, { users: safeUsers });
+        localStorage.setItem(DB_CACHE_KEY, JSON.stringify(cachePayload));
+      } catch (e) {}
+    }
+
     function loadDB() {
-      const today = getTodayStr();
-      const raw = localStorage.getItem("uldaemo_db_v5");
-      if (raw) {
+      purgeLegacyLocalStorage();
+      const raw = localStorage.getItem(DB_CACHE_KEY);
+      if (raw && localStorage.getItem("uldaemo_session_token")) {
         try {
           const parsed = JSON.parse(raw);
           // 아바타 텍스트 정규화 ('🐶 강아지' -> '🐶')
@@ -461,7 +517,7 @@
           return ensurePlazaDefaults(purgeDemoData(parsed));
         } catch (e) {}
       }
-      const initial = ensurePlazaDefaults({
+      return ensurePlazaDefaults({
         users: {},
         posts: [],
         applications: [],
@@ -469,8 +525,6 @@
         notifications: [],
         reviews: []
       });
-      localStorage.setItem("uldaemo_db_v5", JSON.stringify(initial));
-      return initial;
     }
 
     let _deletedPostIds = (() => {
@@ -621,7 +675,7 @@
 
       purgeDemoData(DB);
       if (changed) {
-        localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB));
+        writeDbCache(DB);
       }
       return changed;
     }
@@ -662,7 +716,7 @@
         saveDeletedPostIds();
       }
       purgeDemoData(DB);
-      try { localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB)); } catch (e) {}
+      writeDbCache(DB);
       return true;
     }
 
@@ -709,8 +763,10 @@
       }
     }
 
+    let _pullInFlight = false;
     async function pullFromCloud(force = false) {
-      if (!getSessionToken()) return false;
+      if (!getSessionToken() || _pullInFlight) return false;
+      _pullInFlight = true;
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -718,7 +774,8 @@
           body: JSON.stringify(Object.assign({ action: "load_db", force }, getApiAuthPayload()))
         });
         if (res.status === 401) {
-          if (state && state.user_id) executeLogoutNow();
+          setSessionToken("");
+          executeLogoutNow();
           return false;
         }
         const data = await res.json();
@@ -762,12 +819,14 @@
           }
           return true;
         }
-      } catch (e) {}
+      } catch (e) {} finally {
+        _pullInFlight = false;
+      }
       return false;
     }
 
     function saveDB(immediate = false) {
-      try { localStorage.setItem("uldaemo_db_v5", JSON.stringify(DB)); } catch (e) {}
+      writeDbCache(DB);
     }
 
     let DB = loadDB();
@@ -1515,7 +1574,7 @@
       try {
         localStorage.removeItem("uldaemo_tt_" + uid);
         localStorage.removeItem("uldaemo_blocked_" + uid);
-        localStorage.removeItem("uldaemo_db_v5");
+        localStorage.removeItem(DB_CACHE_KEY);
       } catch (e) {}
       executeLogoutNow();
       showToast("회원 탈퇴 및 개인정보 파기가 완료되었습니다.");
@@ -1525,9 +1584,22 @@
       state.user_id = "";
       state.verified_email = null;
       state.auth_code_sent = false;
-      localStorage.removeItem("uldaemo_uid");
-      localStorage.removeItem("uldaemo_admin_auth");
+      _initialCloudSynced = false;
+      try {
+        localStorage.removeItem(DB_CACHE_KEY);
+        localStorage.removeItem("uldaemo_uid");
+        localStorage.removeItem("uldaemo_deleted_posts");
+        purgeLegacyLocalStorage();
+      } catch (e) {}
       setSessionToken("");
+      DB = ensurePlazaDefaults({
+        users: {},
+        posts: [],
+        applications: [],
+        messages: [],
+        notifications: [],
+        reviews: []
+      });
       document.cookie = "user_id=; path=/; max-age=0";
       render();
       try { window.scrollTo(0, 0); } catch (e) {}
@@ -3287,7 +3359,7 @@
             <input id="login_sid" class="input" value="${escHtml(state.pending_login_sid || '')}" placeholder="학번 8자리 (예: 20240001)" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
             <label class="label">비밀번호</label>
             <input id="login_pw" type="password" class="input" placeholder="비밀번호 4자리 이상" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
-            <div style="font-size:11.5px; color:#8B95A1; margin:-2px 0 10px;">처음 설정하는 기존 학우는 비워두고 누르면 바로 설정할 수 있어요.</div>
+            <div style="font-size:11.5px; color:#8B95A1; margin:-2px 0 10px;">비밀번호가 없는 기존 계정은 아래 [비밀번호 최초 설정 · 재설정]에서 이메일 인증 후 설정해요.</div>
             <button class="btn btn-primary" style="min-height:46px;" onclick="handleLoginSubmit()">울대모 시작하기</button>
 
             <div style="margin-top:12px; padding-top:10px; border-top:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
@@ -3305,7 +3377,7 @@
                 <span style="font-size:14.5px; font-weight:800; color:#191F28;">기존 학우 비밀번호 최초 설정 · 재설정</span>
               </div>
               <div style="font-size:12px; color:#6B7684; margin-bottom:12px; line-height:1.45;">
-                타인의 학번 도용을 막기 위해 <b>가입 시 등록한 본인 이메일 인증</b> 후 새 비밀번호를 설정합니다.
+                타인의 학번 도용을 막기 위해 <b>가입 시 등록한 본인 이메일(미등록 계정은 @ulsan.ac.kr 학교 메일) 인증</b> 후에만 비밀번호를 설정할 수 있어요.
               </div>
 
               <label class="label">학번</label>
@@ -3571,7 +3643,11 @@
         return showToast("비밀번호 오류가 누적되어 5분간 잠겼습니다. 잠시 후 다시 시도해주세요.");
       }
 
-      const inputHash = pw ? await hashUserPw(sid, pw) : "";
+      if (!pw) {
+        return showToast("비밀번호를 입력해주세요. 미설정 계정은 아래 '비밀번호 최초 설정 · 재설정'에서 이메일 인증 후 설정해요.");
+      }
+
+      const inputHash = await hashUserPw(sid, pw);
       try {
         showToast("학번과 비밀번호를 확인하는 중입니다...");
         const res = await fetch("/api/index", {
@@ -3580,6 +3656,9 @@
           body: JSON.stringify({ action: "verify_login", student_id: sid, pw_hash: inputHash })
         });
         const vData = await res.json();
+        if (res.status === 429 || (vData && vData.reason === "rate_limited")) {
+          return showToast((vData && vData.message) || "로그인 시도 횟수가 초과되었습니다. 10분 후 다시 시도해주세요.");
+        }
         if (vData && vData.ok) {
           if (vData.session_token) setSessionToken(vData.session_token);
           if (vData.db) applyServerSnapshot(vData.db);
