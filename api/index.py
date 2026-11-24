@@ -40,6 +40,7 @@ CONTACT_BANNED_KEYWORDS = (
 CONTACT_PHONE_RE = re.compile(r"(?:01[016789]|공일공)[\s.\-]*\d{3,4}[\s.\-]*\d{4}")
 CONTACT_EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 CONTACT_SNS_HANDLE_RE = re.compile(r"(?:^|\s)@[a-zA-Z0-9_.]{3,30}\b|(?:ig|id|카톡|인스타)\s*[:=]\s*[a-zA-Z0-9_.]{3,30}", re.I)
+CONTACT_SOLICIT_RE = re.compile(r"(?:번호|폰|아이디|계정|연락)\s*(?:좀|알려|교환|줘|주실|주세요|뭐|어떻게|보내|남겨)", re.I)
 ULSAN_UNIV_EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@(?:mail\.)?ulsan\.ac\.kr$", re.I)
 
 # 로그인·OTP 시도 횟수 제한 (학번 + IP 기준 슬라이딩 윈도우, 메모리 기반)
@@ -88,7 +89,7 @@ def _contains_contact_info(text: str) -> bool:
     tl = t.lower()
     if any(k in tl for k in CONTACT_BANNED_KEYWORDS):
         return True
-    if CONTACT_PHONE_RE.search(t) or CONTACT_EMAIL_RE.search(t) or CONTACT_SNS_HANDLE_RE.search(t):
+    if CONTACT_PHONE_RE.search(t) or CONTACT_EMAIL_RE.search(t) or CONTACT_SNS_HANDLE_RE.search(t) or CONTACT_SOLICIT_RE.search(t):
         return True
     return False
 
