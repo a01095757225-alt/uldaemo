@@ -5654,8 +5654,11 @@
         return state.custom_roulette_menus.slice(0, 6);
       }
 
-      if (!forceShuffle && Array.isArray(state.active_menu_board) && state.active_menu_board.length === 6 && state.active_menu_board_theme === curTheme) {
-        return state.active_menu_board;
+      state.menu_boards_by_theme = state.menu_boards_by_theme || {};
+      if (!forceShuffle && Array.isArray(state.menu_boards_by_theme[curTheme]) && state.menu_boards_by_theme[curTheme].length === 6) {
+        state.active_menu_board = state.menu_boards_by_theme[curTheme];
+        state.active_menu_board_theme = curTheme;
+        return state.menu_boards_by_theme[curTheme];
       }
 
       const fullPool = getAllCampusRouletteMenuPool();
@@ -5680,6 +5683,7 @@
       if (todayCafe && (curTheme === "solo" || curTheme === "all") && !picked.some(x => x.short === "오늘의학식")) {
         picked[0] = todayCafe;
       }
+      state.menu_boards_by_theme[curTheme] = picked;
       state.active_menu_board = picked;
       state.active_menu_board_theme = curTheme;
       return picked;
@@ -5696,13 +5700,22 @@
       state.last_roulette_menu = null;
     }
 
+    function refreshRouletteCardInPlace() {
+      const wrap = document.getElementById("plaza-roulette-card-wrap");
+      if (wrap && typeof renderStampAndRouletteCard === "function") {
+        wrap.innerHTML = renderStampAndRouletteCard();
+        return;
+      }
+      render();
+    }
+
     function changeMenuTheme(themeKey) {
+      const cur = state.menu_people_filter || "all";
+      if (cur === themeKey) return;
       state.menu_people_filter = themeKey;
       resetRouletteResultState();
-      state.menu_just_shuffled = true;
-      setTimeout(() => { state.menu_just_shuffled = false; }, 520);
-      buildMenuBoardForTheme(themeKey, true);
-      render();
+      buildMenuBoardForTheme(themeKey, false);
+      refreshRouletteCardInPlace();
     }
 
     function shuffleMenuRoulette() {
@@ -5712,7 +5725,7 @@
       buildMenuBoardForTheme(state.menu_people_filter || "all", true);
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate(12); } catch (e) {}
       showToast("🎲 새로운 공강 메뉴 6가지로 메뉴판을 바꿨어요!");
-      render();
+      refreshRouletteCardInPlace();
     }
 
     function updateCustomMenuSlot(idx, val) {
@@ -6204,7 +6217,7 @@
             </button>
           </div>
 
-          ${state.plaza_view === 'roulette' ? renderStampAndRouletteCard() : `
+          ${state.plaza_view === 'roulette' ? `<div id="plaza-roulette-card-wrap">${renderStampAndRouletteCard()}</div>` : `
             ${state.show_poll_form ? `
               <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:18px; padding:18px; margin-bottom:16px;">
                 <div style="font-size:15px; font-weight:800; margin-bottom:10px; color:#191F28;">새로운 밸런스 투표 만들기</div>
