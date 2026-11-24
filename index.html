@@ -1105,6 +1105,9 @@
       state.user_id = String(uid).trim();
       localStorage.setItem("uldaemo_uid", state.user_id);
       document.cookie = `user_id=${state.user_id}; path=/; max-age=2592000`;
+      if (!window.location.hash || !window.location.hash.startsWith("#/")) {
+        try { window.history.replaceState({ uldaemoKey: "tab:홈:" }, "", "#/home"); } catch (e) {}
+      }
       render();
     }
 
