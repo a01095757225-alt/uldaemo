@@ -46,6 +46,137 @@
       }
     };
     // =========================================================
+    // 0. UX 카피 중앙 관리 상수 (토스·당근 톤, 해요체, 서버 실제 동작 일치)
+    // =========================================================
+    const COPY = {
+      homeEmptyTitle: "지금 열린 번개가 없어요",
+      homeEmptySub: "공강이면 첫 번개, 10초면 돼요",
+      blindNotice: "수락하기 전엔 이름도 학과도 비밀이에요",
+      blindPreviewTitle: "수락 전, 상대에게는 이렇게 보여요",
+      blindPreviewNote: "서버에서도 수락 전엔 학번·학과·MBTI·이메일을 아예 보내지 않아요.",
+      chatEmptyTitle: "아직 대화가 없어요",
+      chatEmptySub: "신청 한 번이면 채팅방이 열려요",
+      chatContactWarn: "연락처는 만나서 직접 주고받아요. 지금은 앱 안에서만 이야기해요",
+      tempRecentReviews: (cnt) => cnt > 0 ? `최근 후기 ${cnt}개 반영` : "첫 후기를 기다리고 있어요",
+      onboardingCards: [
+        {
+          step: "1 / 3",
+          badge: "블라인드 보호",
+          title: "수락 전엔 이름도 학과도 비밀이에요",
+          desc: "별명과 매너온도만으로 가볍게 신청해요. 방장이 수락할 때만 서로의 학과가 열려요."
+        },
+        {
+          step: "2 / 3",
+          badge: "인앱 안심 채팅",
+          title: "연락처 없이 앱 안에서만 이야기해요",
+          desc: "전화번호나 SNS 아이디 공유는 자동으로 막아드려요. 만나서 직접 주고받으세요."
+        },
+        {
+          step: "3 / 3",
+          badge: "매너온도 신뢰",
+          title: "만남 후 매너온도로 신뢰를 쌓아요",
+          desc: "따뜻한 후기엔 온도가 올라가고, 노쇼·비매너는 신고 누적으로 바로 제한돼요."
+        }
+      ]
+    };
+
+    function openBlindPreviewModal() {
+      state.blind_preview_open = true;
+      render();
+    }
+    function closeBlindPreviewModal() {
+      state.blind_preview_open = false;
+      render();
+    }
+    function renderBlindPreviewModalHtml() {
+      if (!state.blind_preview_open || !state.user_id || !DB.users[state.user_id]) return "";
+      const me = DB.users[state.user_id];
+      const myTemp = resolveUserTempForTier(state.user_id);
+      const myTier = getTierByTemp(myTemp);
+      const myAvatar = (me.avatar || "🐶").split(" ")[0];
+      return `
+        <div class="modal-backdrop" style="position:fixed; inset:0; z-index:99998; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,0.52); backdrop-filter:blur(4px);" onclick="if(event.target===this) closeBlindPreviewModal();">
+          <div style="background:#FFFFFF; width:100%; max-width:360px; border-radius:24px; padding:22px 20px; box-shadow:0 16px 36px rgba(0,0,0,0.22);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <span style="font-size:16px; font-weight:800; color:#191F28;">${escHtml(COPY.blindPreviewTitle)}</span>
+              <button type="button" onclick="closeBlindPreviewModal()" style="border:none; background:none; font-size:18px; color:#6B7684; cursor:pointer; min-width:36px; min-height:36px;">✕</button>
+            </div>
+            <div style="background:#F7F9F8; border:1.5px solid #E5EAE7; border-radius:18px; padding:16px; margin-bottom:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="width:48px; height:48px; border-radius:24px; background:#EEF8F3; font-size:24px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(myAvatar)}</span>
+                <div style="min-width:0; flex:1;">
+                  <div style="font-size:15.5px; font-weight:800; color:#191F28;">${escHtml(myTier.name)} · ${myTier.displayTemp}°C</div>
+                  <div style="font-size:12.5px; color:#6B7684; margin-top:2px;">이름·학과·MBTI 비공개</div>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:12px;">
+                <span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">별명·아바타 공개</span>
+                <span style="font-size:11.5px; font-weight:700; color:#6B7684; background:#FFFFFF; border:1px solid #E5E8EB; padding:4px 10px; border-radius:999px;">학번·학과·이메일 비밀</span>
+              </div>
+            </div>
+            <div style="font-size:12.5px; color:#4E5968; line-height:1.5; margin-bottom:16px;">
+              ${escHtml(COPY.blindPreviewNote)}
+            </div>
+            <button type="button" class="btn btn-primary" style="min-height:44px; border-radius:14px; font-weight:800;" onclick="closeBlindPreviewModal()">확인했어요</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function openBlindOnboardingIfNew(uid) {
+      try {
+        const k = "uldaemo_onboarded_" + String(uid || "");
+        if (!localStorage.getItem(k)) {
+          state.onboarding_step = 0;
+          state.onboarding_open = true;
+        }
+      } catch (e) {}
+    }
+    function closeBlindOnboarding() {
+      try {
+        if (state.user_id) localStorage.setItem("uldaemo_onboarded_" + String(state.user_id), "1");
+      } catch (e) {}
+      state.onboarding_open = false;
+      state.onboarding_step = 0;
+      render();
+    }
+    function nextBlindOnboardingStep() {
+      const cur = Number(state.onboarding_step || 0);
+      if (cur + 1 >= COPY.onboardingCards.length) {
+        closeBlindOnboarding();
+        return;
+      }
+      state.onboarding_step = cur + 1;
+      render();
+    }
+    function renderBlindOnboardingHtml() {
+      if (!state.onboarding_open || !state.user_id) return "";
+      const idx = Math.max(0, Math.min(COPY.onboardingCards.length - 1, Number(state.onboarding_step || 0)));
+      const card = COPY.onboardingCards[idx];
+      const isLast = (idx === COPY.onboardingCards.length - 1);
+      return `
+        <div class="modal-backdrop" style="position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(15,23,42,0.56); backdrop-filter:blur(4px);">
+          <div style="background:#FFFFFF; width:100%; max-width:360px; border-radius:26px; padding:22px 20px; box-shadow:0 18px 40px rgba(0,0,0,0.24);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <span style="font-size:12px; font-weight:800; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">${escHtml(card.badge)} · ${escHtml(card.step)}</span>
+              <button type="button" onclick="closeBlindOnboarding()" style="border:none; background:none; color:#8B95A1; font-size:13px; font-weight:700; cursor:pointer; padding:6px 8px; min-height:36px;">건너뛰기</button>
+            </div>
+            <div style="font-size:19px; font-weight:800; color:#191F28; line-height:1.35; letter-spacing:-0.02em; margin-bottom:10px;">
+              ${escHtml(card.title)}
+            </div>
+            <div style="font-size:13.5px; color:#4E5968; line-height:1.55; margin-bottom:20px;">
+              ${escHtml(card.desc)}
+            </div>
+            <div style="display:flex; justify-content:center; gap:6px; margin-bottom:16px;">
+              ${COPY.onboardingCards.map((_, i) => `<span style="width:${i === idx ? '18px' : '6px'}; height:6px; border-radius:3px; background:${i === idx ? '#287D62' : '#D0D5DD'}; transition:all 0.2s;"></span>`).join("")}
+            </div>
+            <button type="button" class="btn btn-primary" style="min-height:46px; border-radius:14px; font-size:15px; font-weight:800;" onclick="nextBlindOnboardingStep()">
+              ${isLast ? '울대모 시작하기' : '다음'}
+            </button>
+          </div>
+        </div>
+      `;
+    }
 
     function getTodayStr() {
       const d = new Date();
@@ -2663,8 +2794,8 @@
                 ${activeChats.length > 0 ? `<button type="button" style="font-size:12px; font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="switchTab('채팅')">전체 ›</button>` : ''}
               </div>
               ${activeChats.length === 0 ? `
-                <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:8px;">아직 대화가 없어요</div>
-                <div style="font-size:12px; color:#6B7684; margin-top:4px;">번개에 참여하면 안심 채팅방이 열려요</div>
+                <div style="font-size:15px; font-weight:800; color:#191F28; margin-top:8px;">${escHtml(COPY.chatEmptyTitle)}</div>
+                <div style="font-size:12px; color:#6B7684; margin-top:4px;">${escHtml(COPY.chatEmptySub)}</div>
                 <button type="button" onclick="switchTab('홈')" style="margin-top:10px; padding:0; background:none; border:none; color:#287D62; font-size:13px; font-weight:800; cursor:pointer;">
                   번개 둘러보기 ›
                 </button>
@@ -2883,6 +3014,8 @@
           </button>
           ${renderConfirmDialogHtml()}
           ${renderPolicyModalHtml()}
+          ${renderBlindPreviewModalHtml()}
+          ${renderBlindOnboardingHtml()}
         `;
 
         if (state.active_modal === "detail") {
@@ -3525,6 +3658,7 @@
         }
         if (data.session_token) setSessionToken(data.session_token);
         if (data.db) applyServerSnapshot(data.db);
+        openBlindOnboardingIfNew(sid);
         showToast("가입 완료! 지금부터 30일간 자동 로그인이 유지됩니다.");
         persistLogin(sid);
       } catch (e) {
@@ -4028,8 +4162,8 @@
         const qStr = String(state.search_q || "").trim();
         const catStr = (state.home_cat && state.home_cat !== "전체") ? state.home_cat : "";
         const hasAnyFilter = Boolean(qStr || catStr || curTimeFilter !== "전체");
-        let emptyTitle = "아직 열린 번개가 없어요";
-        let emptySub = "첫 번개를 열어볼까요?";
+        let emptyTitle = COPY.homeEmptyTitle;
+        let emptySub = COPY.homeEmptySub;
         if (qStr && catStr) {
           emptyTitle = `'${qStr}' ${catStr} 번개가 아직 없어요`;
           emptySub = "필터를 초기화하거나 직접 번개를 열어볼까요?";
@@ -4486,10 +4620,13 @@
           ${renderCategoryChips("home_cat")}
         </div>
 
-        <!-- 항상 보여주는 사생활 안심 안내 (피그마 ① 홈 개선안) -->
-        <div style="display:flex; align-items:center; gap:6px; margin: 2px 0 10px;">
-          <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
-          <span style="font-size:12px; font-weight:600; color:#287D62;">수락 전까지 내 이름·학과는 숨겨져요</span>
+        <!-- 항상 보여주는 사생활 안심 안내 (탭하면 블라인드 미리보기) -->
+        <div style="display:flex; align-items:center; margin: 2px 0 10px;">
+          <button type="button" onclick="openBlindPreviewModal()" style="border:none; background:none; padding:4px 2px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; text-align:left;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
+            <span style="font-size:12.5px; font-weight:700; color:#287D62;">${escHtml(COPY.blindNotice)}</span>
+            <span style="font-size:11.5px; font-weight:700; color:#6B7684; text-decoration:underline;">미리보기</span>
+          </button>
         </div>
 
         ${renderMugeoFoodMapSection()}
@@ -4663,7 +4800,7 @@
               <h1 style="margin:0; font-size:24px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">번개 만들기</h1>
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span style="font-size:12px; font-weight:600; color:#287D62;">수락 전까지 내 이름·학과는 공개되지 않아요</span>
+              <button type="button" onclick="openBlindPreviewModal()" style="border:none; background:none; padding:2px 0; font-size:12px; font-weight:700; color:#287D62; cursor:pointer; text-decoration:underline;">${escHtml(COPY.blindNotice)}</button>
               <span style="font-size:11.5px; font-weight:700; color:#6B7684; background:#F7F9F8; padding:4px 10px; border-radius:999px;">오늘 ${rem}/${totalLimit}회 가능</span>
               ${boostCnt > 0 ? `<span style="font-size:11.5px; font-weight:700; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:999px;">부스트권 ${boostCnt}개</span>` : ""}
             </div>
@@ -6581,8 +6718,8 @@
             <div style="width:88px; height:88px; border-radius:44px; background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg>
             </div>
-            <div style="font-size:20px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">아직 대화가 없어요</div>
-            <div style="font-size:14px; color:#6B7684; margin-top:4px; margin-bottom:18px;">번개에 참여하면 안심 채팅방이 열려요</div>
+            <div style="font-size:20px; font-weight:800; color:#191F28; letter-spacing:-0.02em;">${escHtml(COPY.chatEmptyTitle)}</div>
+            <div style="font-size:14px; color:#6B7684; margin-top:4px; margin-bottom:18px;">${escHtml(COPY.chatEmptySub)}</div>
 
             <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px; text-align:left;">
               <div style="background:#F7F9F8; border-radius:16px; padding:12px 14px; display:flex; align-items:center; gap:14px;">
@@ -7239,7 +7376,7 @@
       const snsHandleRe = /(?:^|\s)@[a-zA-Z0-9_.]{3,30}\b|(?:ig|id|카톡|인스타)\s*[:=]\s*[a-zA-Z0-9_.]{3,30}/i;
       if (banned.some(b => txt.toLowerCase().includes(b)) || phoneRe.test(txt) || emailRe.test(txt) || snsHandleRe.test(txt)) {
         input.focus();
-        return showToast("🔒 사생활 보호를 위해 전화번호·카톡·SNS 아이디는 전송할 수 없어요.");
+        return showToast(COPY.chatContactWarn);
       }
 
       // 입력창 즉시 초기화 및 높이 리셋
@@ -7603,8 +7740,11 @@
                   <span style="font-size:12px; color:#CFEADF; font-weight:600;">매너온도</span>
                   <button type="button" onclick="state.show_temp_guide=!state.show_temp_guide; render();" style="border:1px solid rgba(255,255,255,0.45); background:rgba(255,255,255,0.16); color:#FFFFFF; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; cursor:pointer;">${state.show_temp_guide ? '안내 닫기 ▲' : '어떻게 오르나요? ?'}</button>
                 </div>
-                <div style="font-size:38px; font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em; margin-top:2px;">
-                  ${myTier.displayTemp}°C
+                <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-top:2px;">
+                  <div style="font-size:38px; font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em;">
+                    ${myTier.displayTemp}°C
+                  </div>
+                  <span style="font-size:12px; font-weight:600; color:#D8F3E5;">${escHtml(COPY.tempRecentReviews(myReviews.length))}</span>
                 </div>
               </div>
               <div style="font-size:12px; color:#FFFFFF; font-weight:600; padding-bottom:4px;">
@@ -7769,7 +7909,7 @@
             <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:16px; padding:16px; margin-bottom:12px;">
               <div style="font-size:14px; font-weight:800; color:#191F28; margin-bottom:8px;">내가 만든 번개</div>
               ${myPosts.length === 0
-                ? renderEmptyStateBox('plus', '아직 열린 번개가 없어요', '첫 번개를 열어볼까요?', '번개 열기', "state.active_modal='create'; render();")
+                ? renderEmptyStateBox('plus', COPY.homeEmptyTitle, COPY.homeEmptySub, '번개 열기', "state.active_modal='create'; render();")
                 : myPosts.map(p => `
                   <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
                     <span style="font-size:14px; font-weight:600; color:#191F28;">${escHtml(p.title)}</span>

@@ -1785,7 +1785,7 @@ class handler(BaseHTTPRequestHandler):
                     self._send_json(400, {"ok": False, "message": "메시지를 입력해주세요."})
                     return
                 if _contains_contact_info(txt):
-                    self._send_json(400, {"ok": False, "blocked": True, "message": "사생활 보호를 위해 전화번호·카톡·SNS 아이디는 전송할 수 없어요."})
+                    self._send_json(400, {"ok": False, "blocked": True, "message": "연락처는 만나서 직접 주고받아요. 지금은 앱 안에서만 이야기해요"})
                     return
                 db_obj.setdefault("messages", []).append({
                     "id": now_ms,
