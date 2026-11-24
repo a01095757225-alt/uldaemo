@@ -7,13 +7,344 @@ import html
 import time
 import random
 import urllib.request
+import urllib.parse
+import hmac
+import hashlib
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.header import Header
+from email.utils import formataddr, formatdate, make_msgid
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 DEFAULT_SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "uldaemo.official@gmail.com")
-DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "knxqjnrestyggctq")
+DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "울대모 <noreply@uladaemo.app>").strip()
+SESSION_SECRET = (
+    os.environ.get("SESSION_SECRET")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("GITHUB_TOKEN")
+    or "uldaemo-dev-session-secret-only"
+).encode("utf-8")
+
+# 전화번호·SNS 아이디·외부 연락처 탐지 정규식 (서버·클라이언트 공통 보안 기준)
+CONTACT_BANNED_KEYWORDS = (
+    "카톡", "카카오", "카카오톡", "톡디", "전번", "전화번호", "폰번", "연락처",
+    "오픈채팅", "옵챗", "인스타", "인스타그램", "디엠", "라인", "디스코드",
+    "텔레그램", "텔그", "페북", "페이스북", "kakao", "kakaotalk", "open.kakao",
+    "insta", "instagram", "discord", "telegram",
+)
+CONTACT_PHONE_RE = re.compile(r"(?:01[016789]|공일공)[\s.\-]*\d{3,4}[\s.\-]*\d{4}")
+CONTACT_EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+CONTACT_SNS_HANDLE_RE = re.compile(r"(?:^|\s)@[a-zA-Z0-9_.]{3,30}\b|(?:ig|id|카톡|인스타)\s*[:=]\s*[a-zA-Z0-9_.]{3,30}", re.I)
+
+
+def _contains_contact_info(text: str) -> bool:
+    t = str(text or "")
+    tl = t.lower()
+    if any(k in tl for k in CONTACT_BANNED_KEYWORDS):
+        return True
+    if CONTACT_PHONE_RE.search(t) or CONTACT_EMAIL_RE.search(t) or CONTACT_SNS_HANDLE_RE.search(t):
+        return True
+    return False
+
+
+def _strip_html_tags(text: str) -> str:
+    s = str(text or "")
+    s = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
+    s = re.sub(r"<[^>]+>", "", s)
+    return html.unescape(s).strip()
+
+
+def _is_admin_user(u) -> bool:
+    return isinstance(u, dict) and str(u.get("role") or "user").strip().lower() == "admin"
+
+
+def _make_session_token(student_id: str, role: str = "user") -> str:
+    exp = int(time.time()) + 30 * 24 * 3600
+    r = "admin" if str(role).lower() == "admin" else "user"
+    payload = f"{str(student_id).strip()}|{exp}|{r}"
+    sig = hmac.new(SESSION_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    raw = f"{payload}|{sig}".encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _verify_session_token(token: str, expected_sid: str = ""):
+    if not token or not isinstance(token, str):
+        return None
+    try:
+        decoded = base64.urlsafe_b64decode(token.encode("ascii")).decode("utf-8")
+        parts = decoded.split("|")
+        if len(parts) != 4:
+            return None
+        sid, exp_str, role_flag, sig = parts
+        if int(exp_str) < int(time.time()):
+            return None
+        expected_sig = hmac.new(
+            SESSION_SECRET,
+            f"{sid}|{exp_str}|{role_flag}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        if expected_sid and str(sid) != str(expected_sid).strip():
+            return None
+        return {"student_id": sid, "role": "admin" if role_flag in ("1", "admin") else "user"}
+    except Exception:
+        return None
+
+
+def _make_otp_token(email: str, otp: str) -> str:
+    exp = int(time.time()) + 600
+    norm_email = str(email or "").strip().lower()
+    payload = f"otp|{norm_email}|{str(otp).strip()}|{exp}"
+    sig = hmac.new(SESSION_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return base64.urlsafe_b64encode(f"{exp}|{sig}".encode("utf-8")).decode("ascii")
+
+
+def _verify_otp_token(token: str, email: str, otp: str) -> bool:
+    if not token or not email or not otp:
+        return False
+    try:
+        decoded = base64.urlsafe_b64decode(str(token).encode("ascii")).decode("utf-8")
+        exp_str, sig = decoded.split("|", 1)
+        if int(exp_str) < int(time.time()):
+            return False
+        norm_email = str(email).strip().lower()
+        payload = f"otp|{norm_email}|{str(otp).strip()}|{exp_str}"
+        expected = hmac.new(SESSION_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(sig, expected)
+    except Exception:
+        return False
+
+
+def _mask_uid(uid: str, viewer_id: str = "") -> str:
+    s = str(uid or "").strip()
+    if not s or s == "AI_BOT":
+        return s
+    if viewer_id and s == str(viewer_id).strip():
+        return s
+    digest = hmac.new(SESSION_SECRET, f"pub:{s}".encode("utf-8"), hashlib.sha256).hexdigest()[:10]
+    return f"u_{digest}"
+
+
+def _resolve_uid(raw_id: str, users_dict: dict) -> str:
+    s = str(raw_id or "").strip()
+    if not s:
+        return ""
+    if s in (users_dict or {}):
+        return s
+    if s.startswith("u_"):
+        for real_uid in (users_dict or {}).keys():
+            if _mask_uid(real_uid) == s:
+                return str(real_uid)
+    return s
+
+
+def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = False):
+    if not isinstance(db_obj, dict):
+        return None
+    vid = str(viewer_id or "").strip()
+    if not vid:
+        return None
+
+    raw_posts = [p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and p.get("id") not in (101, 102, 103)]
+    apps = [a for a in (db_obj.get("applications") or []) if isinstance(a, dict)]
+    msgs = [m for m in (db_obj.get("messages") or []) if isinstance(m, dict)]
+    notifs = [n for n in (db_obj.get("notifications") or []) if isinstance(n, dict)]
+    reviews = [r for r in (db_obj.get("reviews") or []) if isinstance(r, dict)]
+    polls = [pl for pl in (db_obj.get("polls") or []) if isinstance(pl, dict)]
+    talks = [t for t in (db_obj.get("plaza_talks") or []) if isinstance(t, dict)]
+    users = db_obj.get("users") or {}
+
+    # 1. 본인이 방장이거나 수락('승인됨')된 모임 ID 및 파트너 ID 계산
+    hosted_post_ids = set()
+    accepted_post_ids = set()
+    approved_counts = {}
+    for p in raw_posts:
+        pid = p.get("id")
+        if pid is None:
+            continue
+        ipid = int(pid)
+        if str(p.get("author_id") or "") == vid:
+            hosted_post_ids.add(ipid)
+            accepted_post_ids.add(ipid)
+    for a in apps:
+        pid = a.get("post_id")
+        if pid is None:
+            continue
+        ipid = int(pid)
+        if a.get("status") == "승인됨":
+            approved_counts[ipid] = approved_counts.get(ipid, 0) + 1
+            if str(a.get("applicant_id") or "") == vid:
+                accepted_post_ids.add(ipid)
+
+    accepted_partner_ids = {vid}
+    for p in raw_posts:
+        pid = p.get("id")
+        if pid is not None and int(pid) in accepted_post_ids:
+            accepted_partner_ids.add(str(p.get("author_id") or ""))
+    for a in apps:
+        pid = a.get("post_id")
+        if pid is not None and int(pid) in accepted_post_ids and a.get("status") == "승인됨":
+            accepted_partner_ids.add(str(a.get("applicant_id") or ""))
+
+    def pub_id(uid: str) -> str:
+        return str(uid) if is_admin else _mask_uid(uid, vid)
+
+    # 2. 회원 응답 필터링:
+    #    - 본인: 본인 프로필 전체(pw_hash 제외)
+    #    - 타인(수락 전): 별명, 아바타, 매너온도, 인증 뱃지/키워드만 (학번·학과·성별·MBTI·이메일·소개 제외)
+    #    - 타인(수락 후 파트너): 학과·MBTI·소개만 추가 공개 (학번·성별·이메일은 여전히 제외)
+    safe_users = {}
+    for uid, u in users.items():
+        if not isinstance(u, dict):
+            continue
+        uid_str = str(uid)
+        if is_admin:
+            su = dict(u)
+            su["has_pw"] = bool(u.get("pw_hash"))
+            su["role"] = "admin" if _is_admin_user(u) else "user"
+            su.pop("pw_hash", None)
+            safe_users[uid_str] = su
+        elif uid_str == vid:
+            su = dict(u)
+            su["has_pw"] = bool(u.get("pw_hash"))
+            su["role"] = "admin" if _is_admin_user(u) else "user"
+            su.pop("pw_hash", None)
+            safe_users[vid] = su
+        else:
+            alias = _mask_uid(uid_str, vid)
+            su = {
+                "nickname": str(u.get("nickname") or "학우"),
+                "avatar": str(u.get("avatar") or "🐶"),
+                "manner_temp": float(u.get("manner_temp") if u.get("manner_temp") is not None else 36.5),
+                "keywords": list(u.get("keywords") or []),
+                "report_count": int(u.get("report_count") or 0),
+                "bonus_score": int(u.get("bonus_score") or 0),
+                "streak_days": int(u.get("streak_days") or 1),
+                "role": "admin" if _is_admin_user(u) else "user",
+            }
+            if uid_str in accepted_partner_ids:
+                su["department"] = str(u.get("department") or "울산대")
+                su["mbti"] = str(u.get("mbti") or "모름/비공개")
+                su["bio"] = str(u.get("bio") or "")
+            safe_users[alias] = su
+
+    # 3. 번개: 공개 필드만 반환 + 작성자 ID 별칭화 + 수락 인원수(accepted_count) 포함
+    safe_posts = []
+    for p in raw_posts:
+        pid = p.get("id")
+        ipid = int(pid) if pid is not None else 0
+        safe_posts.append({
+            "id": pid,
+            "author_id": pub_id(p.get("author_id")),
+            "title": str(p.get("title") or ""),
+            "category": str(p.get("category") or ""),
+            "location": str(p.get("location") or ""),
+            "meet_date": str(p.get("meet_date") or ""),
+            "meet_time": str(p.get("meet_time") or ""),
+            "max_participants": int(p.get("max_participants") or 2),
+            "accepted_count": 1 + approved_counts.get(ipid, 0),
+            "meeting_style": str(p.get("meeting_style") or ""),
+            "status": str(p.get("status") or "모집중"),
+            "is_official": bool(p.get("is_official")),
+            "is_boosted": bool(p.get("is_boosted")),
+            "boosted_at": p.get("boosted_at"),
+            "created_at": p.get("created_at"),
+            "updated_at": p.get("updated_at"),
+        })
+
+    # 4. 신청 내역: 본인이 신청한 건 + 본인이 만든 번개에 들어온 신청 (+ 수락된 채팅방의 참여자 목록)만 반환
+    safe_apps = []
+    for a in apps:
+        pid = a.get("post_id")
+        ipid = int(pid) if pid is not None else 0
+        ap_id = str(a.get("applicant_id") or "")
+        if is_admin or ap_id == vid or ipid in hosted_post_ids or (ipid in accepted_post_ids and a.get("status") == "승인됨"):
+            safe_apps.append({
+                "id": a.get("id"),
+                "post_id": pid,
+                "applicant_id": pub_id(ap_id),
+                "status": str(a.get("status") or "대기중"),
+                "updated_at": a.get("updated_at"),
+            })
+
+    # 5. 채팅: 수락된 참여자(방장 포함)에게만 해당 방 메시지 반환 + 레거시 AI HTML 구조화 변환
+    safe_msgs = []
+    for m in msgs:
+        pid = m.get("post_id")
+        if pid is None:
+            continue
+        ipid = int(pid)
+        if not is_admin and ipid not in accepted_post_ids:
+            continue
+        sm = {
+            "id": m.get("id"),
+            "post_id": pid,
+            "sender_id": "AI_BOT" if m.get("sender_id") == "AI_BOT" else pub_id(m.get("sender_id")),
+            "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
+            "created_at": m.get("created_at"),
+            "is_read": int(m.get("is_read") or 0),
+            "reactions": m.get("reactions") if isinstance(m.get("reactions"), dict) else {},
+        }
+        if m.get("sender_id") == "AI_BOT":
+            sm["kind"] = str(m.get("kind") or "ai_icebreaker")
+            if isinstance(m.get("suggestions"), list):
+                sm["suggestions"] = [_strip_html_tags(x) for x in m["suggestions"]]
+        safe_msgs.append(sm)
+
+    # 6. 알림: 본인 알림만 반환
+    safe_notifs = [
+        n for n in notifs
+        if is_admin or str(n.get("user_id") or "") == vid
+    ]
+
+    # 7. 후기 · 투표 · 광장톡: 타인 학번 별칭화
+    safe_reviews = []
+    for r in reviews:
+        sr = dict(r)
+        sr["from_id"] = pub_id(r.get("from_id"))
+        sr["to_id"] = pub_id(r.get("to_id"))
+        safe_reviews.append(sr)
+
+    safe_polls = []
+    for pl in polls:
+        sp = dict(pl)
+        sp["votes_a"] = [pub_id(u) for u in (pl.get("votes_a") or [])]
+        sp["votes_b"] = [pub_id(u) for u in (pl.get("votes_b") or [])]
+        if isinstance(pl.get("replies"), list):
+            sp["replies"] = [
+                {**rep, "author_id": pub_id(rep.get("author_id"))}
+                for rep in pl["replies"] if isinstance(rep, dict)
+            ]
+        safe_polls.append(sp)
+
+    safe_talks = []
+    for t in talks:
+        st = dict(t)
+        st["author_id"] = pub_id(t.get("author_id"))
+        st["likes"] = [pub_id(u) for u in (t.get("likes") or [])]
+        if isinstance(t.get("replies"), list):
+            st["replies"] = [
+                {**rep, "author_id": pub_id(rep.get("author_id"))}
+                for rep in t["replies"] if isinstance(rep, dict)
+            ]
+        safe_talks.append(st)
+
+    return {
+        "users": safe_users,
+        "posts": safe_posts,
+        "deleted_post_ids": db_obj.get("deleted_post_ids") or [],
+        "applications": safe_apps,
+        "messages": safe_msgs,
+        "notifications": safe_notifs,
+        "reviews": safe_reviews,
+        "polls": safe_polls,
+        "plaza_talks": safe_talks,
+    }
 
 
 def call_gemini_api(prompt: str) -> str:
@@ -37,6 +368,63 @@ def call_gemini_api(prompt: str) -> str:
 
 
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
+    plain_body = (
+        f"[울대모] 이메일 본인 확인 안내\n\n"
+        f"안녕하세요, 울산대학교 캠퍼스 안심 번개 매칭 플랫폼 울대모(https://www.uladaemo.app)입니다.\n"
+        f"요청하신 본인 확인 6자리 인증번호는 아래와 같습니다.\n\n"
+        f"인증번호: {otp_code}\n\n"
+        f"화면에 위 6자리 숫자를 입력해 주세요.\n"
+        f"본인이 요청하지 않은 경우 이 메일을 무시하셔도 됩니다."
+    )
+    html_body = f"""<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>울대모 이메일 본인 확인</title></head>
+<body style="margin:0; padding:20px 12px; background-color:#F7F9F8; font-family:'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;">
+  <div style="max-width:460px; margin:0 auto; padding:28px 24px; border:1px solid #E5EAE7; border-radius:16px; background-color:#FFFFFF;">
+    <div style="font-size:18px; font-weight:800; color:#287D62; margin-bottom:10px;">울대모 이메일 본인 확인 안내</div>
+    <p style="font-size:14px; color:#333D4B; line-height:1.6; margin:0 0 18px;">
+      안녕하세요! 울산대학교 캠퍼스 안심 번개 매칭 플랫폼 <b>울대모</b>입니다.<br>
+      아래 6자리 인증번호를 인증 화면에 입력해 주세요.
+    </p>
+    <div style="background-color:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:16px; text-align:center; margin-bottom:18px;">
+      <div style="font-size:11px; font-weight:700; color:#287D62; margin-bottom:4px;">본인 확인 인증번호</div>
+      <span style="font-size:28px; font-weight:800; letter-spacing:6px; color:#191F28;">{otp_code}</span>
+    </div>
+    <p style="font-size:12px; color:#6B7684; line-height:1.5; margin:0;">
+      본 메일은 울대모(uladaemo.app) 본인 확인 요청에 의해 발송되었습니다.<br>
+      타인에게 인증번호를 공유하지 마세요.
+    </p>
+  </div>
+</body>
+</html>"""
+
+    # 1순위: 무료 도메인 이메일 API (Resend - 월 3,000통 무료, DKIM/SPF 정식 서명으로 스팸함 방지)
+    if RESEND_API_KEY and not sender_email:
+        try:
+            payload = json.dumps({
+                "from": RESEND_FROM_EMAIL,
+                "to": [recipient_email],
+                "subject": "[울대모] 이메일 본인 확인 인증번호 안내",
+                "text": plain_body,
+                "html": html_body,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "uldaemo-mailer/1.0",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                if 200 <= resp.status < 300:
+                    return True, "공식 도메인 메일로 6자리 인증번호가 발송되었습니다!"
+        except Exception:
+            pass
+
+    # 2순위: Gmail / Naver SMTP 발송 (RFC-5322 표준 헤더 + Plain/HTML 멀티파트 구성으로 스팸 점수 최소화)
     sender = (sender_email or DEFAULT_SMTP_EMAIL).strip()
     pw = (app_password or DEFAULT_SMTP_PASSWORD).strip().replace(" ", "")
     if not sender or not pw:
@@ -51,23 +439,16 @@ def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", a
         smtp_host, smtp_port = "smtp.gmail.com", 465
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[울대모] 이메일 본인 확인 인증번호 [{otp_code}]"
-    msg["From"] = sender
+    msg["Subject"] = Header("[울대모] 이메일 본인 확인 인증번호 안내", "utf-8")
+    msg["From"] = formataddr((str(Header("울대모", "utf-8")), sender))
     msg["To"] = recipient_email
+    msg["Reply-To"] = sender
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg["Auto-Submitted"] = "auto-generated"
 
-    html_body = f"""
-    <div style="font-family: 'Pretendard', -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px 24px; border: 1px solid #E5E8EB; border-radius: 16px; background-color: #FFFFFF;">
-        <div style="font-size: 20px; font-weight: 800; color: #287D62; margin-bottom: 8px;">🌱 울대모 이메일 인증 안내</div>
-        <p style="font-size: 14px; color: #4E5968; line-height: 1.6; margin-bottom: 20px;">
-            안녕하세요! 캠퍼스 안심 번개 매칭 플랫폼 <b>울대모</b> 회원가입을 위한 본인 확인 인증번호입니다.<br>
-            아래 6자리 인증번호를 가입 화면에 입력해 주세요.
-        </p>
-        <div style="background-color: #EEF8F3; border: 1px solid #C5E6D6; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px;">
-            <span style="font-size: 28px; font-weight: 800; letter-spacing: 6px; color: #1E634C;">{otp_code}</span>
-        </div>
-        <p style="font-size: 12px; color: #8B95A1;">본 메일은 발신 전용이며, 타인에게 인증번호를 공유하지 마세요.</p>
-    </div>
-    """
+    # 반드시 text/plain 파트를 먼저 첨부하고 text/html 파트를 뒤에 첨부해야 스팸 필터 감점을 피할 수 있음
+    msg.attach(MIMEText(plain_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
@@ -192,8 +573,21 @@ def _fetch_board(code: str, label: str):
     return items
 
 
+STUDENT_KEYWORDS = ["장학", "수강", "계절", "등록", "시험", "성적", "교환", "축제", "동아리", "봉사", "채용", "인턴", "대회", "학식"]
+
+
+def filter_student_notices(items, max_count=5):
+    """학생 관련 핵심 키워드 공지만 엄선, 0건 시 최신순 방어 반환"""
+    if not items:
+        return []
+    filtered = [it for it in items if any(k in it.get("title", "") for k in STUDENT_KEYWORDS)]
+    if filtered:
+        return filtered[:max_count]
+    return items[:max_count]
+
+
 def get_ulsan_notices():
-    """울산대 게시판에서 만남·모집·행사 위주 공지를 병렬로 수집(5분 캐시)."""
+    """울산대 게시판에서 학생 맞춤형 공지를 병렬로 수집(최대 5건, 5분 캐시)."""
     now = time.time()
     if _NOTICE_CACHE["items"] and now - _NOTICE_CACHE["ts"] < 300:
         return _NOTICE_CACHE["items"]
@@ -209,10 +603,9 @@ def get_ulsan_notices():
             seen.add(key)
             items.append(it)
     items.sort(key=lambda x: (1 if x["important"] else 0, x["date"]), reverse=True)
-    if items:
-        _NOTICE_CACHE.update({"ts": now, "items": items})
-        return items
-    return FALLBACK_NOTICES
+    selected = filter_student_notices(items if items else FALLBACK_NOTICES, 5)
+    _NOTICE_CACHE.update({"ts": now, "items": selected})
+    return selected
 
 
 _CAFETERIA_CACHE = {"ts": 0.0, "data": None}
@@ -275,20 +668,79 @@ def get_ulsan_cafeteria_menu():
     return _CAFETERIA_CACHE.get("data")
 
 
-_CLOUD_REPO = "a01095757225-alt/uldaemo"
-_CLOUD_ISSUE = 1
-_DEFAULT_GH_TOKEN = "".join(["ghp_", "C2YNaOoKnR71EdnuaOnKD", "00AE4FaAZ2C6l54"])
+_CLOUD_REPO = os.environ.get("ULDAEMO_CLOUD_REPO", "a01095757225-alt/uldaemo")
+_CLOUD_ISSUE = int(os.environ.get("ULDAEMO_CLOUD_ISSUE", "1"))
 _DB_MEM_CACHE = {"ts": 0.0, "db": None}
+LOCAL_TEST_DB_PATH = os.environ.get("ULDAEMO_LOCAL_TEST_DB", "").strip()
+
+# Supabase 연결 설정 (환경변수 전용 — 코드 내 서비스 키 하드코딩 금지)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_KEY = (
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("SUPABASE_KEY")
+    or ""
+).strip()
 
 
 def _gh_token() -> str:
-    return os.environ.get("GITHUB_TOKEN", _DEFAULT_GH_TOKEN).strip()
+    return os.environ.get("GITHUB_TOKEN", "").strip()
 
 
-def load_cloud_db(force: bool = False):
-    now = time.time()
-    if not force and _DB_MEM_CACHE["db"] and (now - _DB_MEM_CACHE["ts"] < 2.0):
-        return _DB_MEM_CACHE["db"]
+def _has_supabase() -> bool:
+    return bool(not LOCAL_TEST_DB_PATH and SUPABASE_URL and SUPABASE_KEY and SUPABASE_URL.startswith("http"))
+
+
+def _local_test_load_db():
+    if not LOCAL_TEST_DB_PATH:
+        return None
+    try:
+        if os.path.exists(LOCAL_TEST_DB_PATH):
+            with open(LOCAL_TEST_DB_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "users" in data:
+                    return data
+    except Exception:
+        pass
+    return {
+        "users": {},
+        "posts": [],
+        "deleted_post_ids": [],
+        "applications": [],
+        "messages": [],
+        "notifications": [],
+        "reviews": [],
+        "polls": [],
+        "plaza_talks": [],
+    }
+
+
+def _local_test_save_db(db_obj: dict) -> bool:
+    if not LOCAL_TEST_DB_PATH:
+        return False
+    try:
+        with open(LOCAL_TEST_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(db_obj, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+def _supabase_headers(prefer: str = "") -> dict:
+    hdrs = {
+        "apikey": SUPABASE_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "uldaemo-supabase-client/1.0",
+    }
+    # Legacy JWT(eyJ...) 키인 경우에만 Authorization: Bearer 헤더 추가 (sb_secret_/sb_publishable_ 키는 apikey 헤더만 사용)
+    if SUPABASE_KEY.startswith("eyJ"):
+        hdrs["Authorization"] = f"Bearer {SUPABASE_KEY}"
+    if prefer:
+        hdrs["Prefer"] = prefer
+    return hdrs
+
+
+def _github_load_db():
     try:
         url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
         req = urllib.request.Request(
@@ -304,12 +756,292 @@ def load_cloud_db(force: bool = False):
             issue = json.loads(resp.read().decode("utf-8"))
             db_obj = json.loads(issue.get("body") or "{}")
             if isinstance(db_obj, dict) and "users" in db_obj:
-                _DB_MEM_CACHE["db"] = db_obj
-                _DB_MEM_CACHE["ts"] = now
                 return db_obj
     except Exception:
         pass
+    return None
+
+
+def _github_save_db(db_obj: dict) -> bool:
+    try:
+        url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
+        payload = {"body": json.dumps(db_obj, ensure_ascii=False)}
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"token {_gh_token()}",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "uldaemo-cloud-db",
+                "Content-Type": "application/json",
+            },
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req, timeout=7) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def _supabase_fetch_table(query_path: str):
+    url = f"{SUPABASE_URL}/rest/v1/{query_path}"
+    req = urllib.request.Request(url, headers=_supabase_headers(), method="GET")
+    with urllib.request.urlopen(req, timeout=6) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _supabase_load_db():
+    if not _has_supabase():
+        return None
+    try:
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_state = ex.submit(_supabase_fetch_table, "uldaemo_state?id=eq.main&select=data,updated_at")
+            f_users = ex.submit(_supabase_fetch_table, "uldaemo_users?select=*")
+            state_rows = f_state.result()
+            user_rows = f_users.result()
+
+        db_obj = None
+        if isinstance(state_rows, list) and len(state_rows) > 0:
+            raw_state = state_rows[0].get("data")
+            if isinstance(raw_state, dict) and "users" in raw_state:
+                db_obj = raw_state
+
+        # 최초 Supabase 연결 시 데이터가 비어 있다면 기존 GitHub DB에서 자동 마이그레이션 수행
+        if not db_obj:
+            gh_db = _github_load_db()
+            if isinstance(gh_db, dict) and "users" in gh_db:
+                _supabase_save_db(gh_db)
+                return gh_db
+            db_obj = {
+                "users": {},
+                "posts": [],
+                "applications": [],
+                "messages": [],
+                "notifications": [],
+                "reviews": [],
+                "polls": [],
+                "plaza_talks": [],
+            }
+
+        # uldaemo_users 테이블의 행(Row) 데이터를 병합 (Table Editor에서 직접 수정·삭제한 값 즉시 반영)
+        if isinstance(user_rows, list) and len(user_rows) > 0:
+            users_map = db_obj.setdefault("users", {})
+            deleted_users_map = db_obj.setdefault("deleted_users_map", {})
+            now_ms = int(time.time() * 1000)
+            table_sids = {str(r.get("student_id") or "").strip() for r in user_rows if isinstance(r, dict)}
+            for existing_sid in list(users_map.keys()):
+                if existing_sid not in table_sids and not _is_admin_user(users_map.get(existing_sid)):
+                    users_map.pop(existing_sid, None)
+                    deleted_users_map[str(existing_sid)] = now_ms
+            for row in user_rows:
+                if not isinstance(row, dict):
+                    continue
+                sid = str(row.get("student_id") or "").strip()
+                if not sid:
+                    continue
+                raw_u = row.get("raw_data") if isinstance(row.get("raw_data"), dict) else {}
+                base_u = dict(users_map.get(sid) or {})
+                base_u.update(raw_u)
+
+                # 관리자가 Supabase Table Editor에서 컬럼 값을 직접 수정했는지 감지 (role 포함)
+                col_checks = [
+                    ("role", str, "user"),
+                    ("email", str, ""),
+                    ("joined_at", str, ""),
+                    ("is_suspended", bool, False),
+                    ("nickname", str, ""),
+                    ("department", str, "울산대"),
+                    ("mbti", str, ""),
+                    ("manner_temp", float, 36.5),
+                    ("report_count", int, 0),
+                    ("coffee_tickets", int, 0),
+                    ("boost_coupons", int, 0),
+                    ("extra_post_coupons", int, 0),
+                    ("bonus_score", int, 0),
+                    ("streak_days", int, 1),
+                ]
+                admin_edited = False
+                for col_key, cast_fn, default_val in col_checks:
+                    if row.get(col_key) is not None:
+                        try:
+                            col_val = cast_fn(row.get(col_key))
+                            raw_val = cast_fn(raw_u.get(col_key, default_val))
+                            if col_val != raw_val:
+                                base_u[col_key] = col_val
+                                if col_key == "is_suspended" and col_val is False:
+                                    base_u["report_count"] = 0
+                                    base_u["reported_by"] = []
+                                admin_edited = True
+                        except Exception:
+                            pass
+
+                if admin_edited:
+                    base_u["updated_at"] = now_ms
+                users_map[sid] = base_u
+
+        return db_obj
+    except Exception:
+        return None
+
+
+def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
+    if not _has_supabase() or not isinstance(db_obj, dict):
+        return False
+    now_ms = int(time.time() * 1000)
+    ok_state = False
+    try:
+        # 1. uldaemo_state 업서트
+        state_payload = [{"id": "main", "data": db_obj, "updated_at": now_ms}]
+        req_state = urllib.request.Request(
+            f"{SUPABASE_URL}/rest/v1/uldaemo_state?on_conflict=id",
+            data=json.dumps(state_payload, ensure_ascii=False).encode("utf-8"),
+            headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+            method="POST",
+        )
+        with urllib.request.urlopen(req_state, timeout=6) as resp:
+            ok_state = 200 <= resp.status < 300
+    except Exception:
+        ok_state = False
+
+    # 2. uldaemo_users 테이블 행(Row) 단위 업서트
+    try:
+        users_dict = db_obj.get("users") or {}
+        if isinstance(users_dict, dict) and len(users_dict) > 0:
+            user_rows = []
+            for sid, u in users_dict.items():
+                if not isinstance(u, dict):
+                    continue
+                user_rows.append({
+                    "student_id": str(sid),
+                    "role": "admin" if _is_admin_user(u) else "user",
+                    "email": str(u.get("email") or ""),
+                    "joined_at": str(u.get("joined_at") or ""),
+                    "is_suspended": bool(u.get("is_suspended") or int(u.get("report_count") or 0) >= 3),
+                    "nickname": str(u.get("nickname") or ""),
+                    "department": str(u.get("department") or "울산대"),
+                    "mbti": str(u.get("mbti") or ""),
+                    "manner_temp": float(u.get("manner_temp") if u.get("manner_temp") is not None else 36.5),
+                    "report_count": int(u.get("report_count") or 0),
+                    "coffee_tickets": int(u.get("coffee_tickets") or 0),
+                    "boost_coupons": int(u.get("boost_coupons") or 0),
+                    "extra_post_coupons": int(u.get("extra_post_coupons") or 0),
+                    "bonus_score": int(u.get("bonus_score") or 0),
+                    "streak_days": int(u.get("streak_days") or 1),
+                    "raw_data": u,
+                    "updated_at": int(u.get("updated_at") or now_ms),
+                })
+            if user_rows:
+                try:
+                    req_users = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
+                        data=json.dumps(user_rows, ensure_ascii=False).encode("utf-8"),
+                        headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req_users, timeout=6):
+                        pass
+                except Exception:
+                    # DB에 role/email/joined_at/is_suspended 컬럼이 아직 추가되지 않은 환경에서도 무중단 유지
+                    fallback_rows = [{k: v for k, v in r.items() if k not in ("role", "email", "joined_at", "is_suspended")} for r in user_rows]
+                    req_users_fb = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
+                        data=json.dumps(fallback_rows, ensure_ascii=False).encode("utf-8"),
+                        headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req_users_fb, timeout=6):
+                        pass
+    except Exception:
+        pass
+
+    # 3. uldaemo_posts 테이블 행(Row) 단위 업서트 및 삭제 반영
+    try:
+        posts_list = db_obj.get("posts") or []
+        if isinstance(posts_list, list) and len(posts_list) > 0:
+            post_rows = []
+            for p in posts_list:
+                if not isinstance(p, dict) or not p.get("id"):
+                    continue
+                post_rows.append({
+                    "id": int(p.get("id")),
+                    "author_id": str(p.get("author_id") or ""),
+                    "title": str(p.get("title") or ""),
+                    "category": str(p.get("category") or ""),
+                    "location": str(p.get("location") or ""),
+                    "meet_date": str(p.get("meet_date") or ""),
+                    "meet_time": str(p.get("meet_time") or ""),
+                    "max_participants": int(p.get("max_participants") or 2),
+                    "status": str(p.get("status") or "모집중"),
+                    "is_official": bool(p.get("is_official")),
+                    "raw_data": p,
+                    "updated_at": int(p.get("updated_at") or now_ms),
+                })
+            if post_rows:
+                req_posts = urllib.request.Request(
+                    f"{SUPABASE_URL}/rest/v1/uldaemo_posts?on_conflict=id",
+                    data=json.dumps(post_rows, ensure_ascii=False).encode("utf-8"),
+                    headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                    method="POST",
+                )
+                with urllib.request.urlopen(req_posts, timeout=6):
+                    pass
+        if deleted_post_ids:
+            ids_csv = ",".join(str(int(x)) for x in deleted_post_ids if str(x).isdigit())
+            if ids_csv:
+                req_del = urllib.request.Request(
+                    f"{SUPABASE_URL}/rest/v1/uldaemo_posts?id=in.({ids_csv})",
+                    headers=_supabase_headers("return=minimal"),
+                    method="DELETE",
+                )
+                with urllib.request.urlopen(req_del, timeout=5):
+                    pass
+    except Exception:
+        pass
+
+    return ok_state
+
+
+def load_cloud_db(force: bool = False):
+    if LOCAL_TEST_DB_PATH:
+        return _local_test_load_db()
+    now = time.time()
+    if not force and _DB_MEM_CACHE["db"] and (now - _DB_MEM_CACHE["ts"] < 2.0):
+        return _DB_MEM_CACHE["db"]
+
+    # 1순위: Supabase PostgreSQL DB (설정되어 있으면 오래된 GitHub 스냅샷으로 절대 폴백하지 않음)
+    if _has_supabase():
+        sb_db = _supabase_load_db()
+        if isinstance(sb_db, dict) and "users" in sb_db:
+            _DB_MEM_CACHE["db"] = sb_db
+            _DB_MEM_CACHE["ts"] = now
+            return sb_db
+        return _DB_MEM_CACHE["db"]
+
+    # 2순위(Supabase 미설정 환경 전용): GitHub Issue #1 클라우드 스토리지
+    gh_db = _github_load_db()
+    if isinstance(gh_db, dict) and "users" in gh_db:
+        _DB_MEM_CACHE["db"] = gh_db
+        _DB_MEM_CACHE["ts"] = now
+        return gh_db
+
     return _DB_MEM_CACHE["db"]
+
+
+def save_cloud_db(db_obj: dict, deleted_post_ids=None) -> bool:
+    if LOCAL_TEST_DB_PATH:
+        return _local_test_save_db(db_obj)
+    if _has_supabase():
+        all_del_ids = db_obj.get("deleted_post_ids") or deleted_post_ids or []
+        if _supabase_save_db(db_obj, all_del_ids):
+            _DB_MEM_CACHE["db"] = db_obj
+            _DB_MEM_CACHE["ts"] = time.time()
+            return True
+        return False
+    if _github_save_db(db_obj):
+        _DB_MEM_CACHE["db"] = db_obj
+        _DB_MEM_CACHE["ts"] = time.time()
+        return True
+    return False
 
 
 def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
@@ -321,13 +1053,31 @@ def _merge_item_dict(s_item: dict, c_item: dict) -> dict:
     else:
         merged = dict(c_item)
         merged.update(s_item)
-    # 한 번 '승인됨' 또는 '매칭완료'가 된 상태는 이전 기기의 '대기중'/'모집중' 캐시로 절대 되돌아가지 않도록 보호
-    if s_item.get("status") == "승인됨" or c_item.get("status") == "승인됨":
+    # 취소된 번개는 이전 기기 캐시로 부활 금지, '승인됨'은 오래된 '대기중' 캐시로만 되돌아가지 않도록 보호
+    s_st = s_item.get("status")
+    c_st = c_item.get("status")
+    if s_st == "취소됨" or c_st == "취소됨":
+        merged["status"] = "취소됨"
+    elif (s_st == "승인됨" and c_st == "대기중") or (c_st == "승인됨" and s_st == "대기중"):
         merged["status"] = "승인됨"
-    elif s_item.get("status") == "매칭완료" or c_item.get("status") == "매칭완료":
+    elif (s_st == "매칭완료" and c_st == "모집중") or (c_st == "매칭완료" and s_st == "모집중"):
         merged["status"] = "매칭완료"
     if s_item.get("is_read") == 1 or c_item.get("is_read") == 1:
         merged["is_read"] = 1
+    if isinstance(s_item.get("replies"), list) or isinstance(c_item.get("replies"), list):
+        rmap = {}
+        for r in list(s_item.get("replies") or []) + list(c_item.get("replies") or []):
+            if not isinstance(r, dict) or not r.get("id"):
+                continue
+            prev = rmap.get(r["id"])
+            if prev:
+                nr = dict(prev)
+                nr.update(r)
+                nr["deleted"] = bool(prev.get("deleted") or r.get("deleted"))
+                rmap[r["id"]] = nr
+            else:
+                rmap[r["id"]] = r
+        merged["replies"] = sorted(rmap.values(), key=lambda x: x.get("id", 0))
     return merged
 
 
@@ -347,23 +1097,38 @@ def _merge_list_by_id(server_list, client_list, deleted_ids=None):
     return list(by_id.values())
 
 
-def sync_cloud_db(client_db: dict, deleted_post_ids=None):
-    current = load_cloud_db(force=True) or {
-        "users": {},
-        "posts": [],
-        "applications": [],
-        "messages": [],
-        "notifications": [],
-        "reviews": [],
-    }
+def sync_cloud_db(client_db: dict, deleted_post_ids=None, viewer_id: str = "", is_admin: bool = False):
+    current = load_cloud_db(force=True)
+    if not isinstance(current, dict):
+        if _has_supabase():
+            return False, None
+        current = {
+            "users": {},
+            "posts": [],
+            "deleted_post_ids": [],
+            "applications": [],
+            "messages": [],
+            "notifications": [],
+            "reviews": [],
+        }
+    vid = str(viewer_id or "").strip()
     if isinstance(client_db, dict):
-        # 1. Users 병합 (최신 updated_at 우선 반영하여 다른 기기의 관심 카테고리/프로필 보호)
+        # 1. Users 병합 (최신 updated_at 우선 + 서버 민감 필드(pw_hash/email/상세학과/시간표) 보호 + 탈퇴 계정 부활 방지)
+        deleted_users_map = current.setdefault("deleted_users_map", {})
         c_users = client_db.get("users") or {}
         if isinstance(c_users, dict):
             s_users = current.setdefault("users", {})
             for uid, c_u in c_users.items():
                 if not isinstance(c_u, dict):
                     continue
+                del_ts = int(deleted_users_map.get(str(uid)) or 0)
+                if del_ts > 0 and not _is_admin_user(s_users.get(uid)):
+                    c_created = int(c_u.get("created_at") or 0)
+                    if c_created <= del_ts:
+                        s_users.pop(uid, None)
+                        continue
+                    else:
+                        deleted_users_map.pop(str(uid), None)
                 s_u = s_users.get(uid)
                 if not isinstance(s_u, dict):
                     merged_u = dict(c_u)
@@ -374,9 +1139,23 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
                     else:
                         merged_u = dict(c_u)
                         merged_u.update(s_u)
+                    # 마스킹된 클라이언트가 서버의 pw_hash/email/상세정보를 빈 값으로 덮어쓰지 못하도록 보호
+                    if s_u.get("pw_hash") and not c_u.get("pw_hash"):
+                        merged_u["pw_hash"] = s_u["pw_hash"]
+                    if s_u.get("email") and not c_u.get("email"):
+                        merged_u["email"] = s_u["email"]
+                    if s_u.get("timetable") and not c_u.get("timetable") and str(uid) != vid:
+                        merged_u["timetable"] = s_u["timetable"]
+                    if s_u.get("blocked_users") and not c_u.get("blocked_users") and str(uid) != vid:
+                        merged_u["blocked_users"] = s_u["blocked_users"]
+                    if vid and not is_admin and str(uid) != vid:
+                        for prot_k in ("nickname", "department", "mbti", "bio", "avatar", "email", "pw_hash", "timetable", "fav_cats", "blocked_users"):
+                            if prot_k in s_u:
+                                merged_u[prot_k] = s_u[prot_k]
+                merged_u.pop("has_pw", None)
 
-                # 동일 계정의 중복 신고 방지 (reported_by 기준 1인 1회만 인정) 및 운영진 계정(20261275 등) 정지 해제 보장
-                if str(uid) in ("20261275", "20241001", "admin"):
+                # 동일 계정의 중복 신고 방지 (reported_by 기준 1인 1회만 인정) 및 role=admin 계정 보호
+                if _is_admin_user(merged_u):
                     merged_u["report_count"] = 0
                     merged_u["reported_by"] = []
                     if (merged_u.get("manner_temp") or 36.5) < 36.5:
@@ -394,9 +1173,24 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
 
                 s_users[uid] = merged_u
 
-        # 2. Posts 병합 (최신 글이 위로 오도록 정렬)
+    # 2. Posts 병합 (영구 삭제 목록 deleted_post_ids 누적 관리 + 임시 시드 번개 101/102/103 영구 제거)
+        all_deleted_posts = {101, 102, 103}
+        for raw_del_src in (current.get("deleted_post_ids") or [], client_db.get("deleted_post_ids") or [], deleted_post_ids or []):
+            for x in raw_del_src:
+                try:
+                    all_deleted_posts.add(int(x))
+                except Exception:
+                    pass
+        for p in list(current.get("posts") or []) + list(client_db.get("posts") or []):
+            if isinstance(p, dict) and p.get("status") == "취소됨" and p.get("id") is not None:
+                try:
+                    all_deleted_posts.add(int(p.get("id")))
+                except Exception:
+                    pass
+        current["deleted_post_ids"] = sorted(all_deleted_posts)[-500:]
         prev_post_ids = {p.get("id") for p in (current.get("posts") or []) if isinstance(p, dict)}
-        merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), deleted_post_ids)
+        merged_posts = _merge_list_by_id(current.get("posts"), client_db.get("posts"), all_deleted_posts)
+        merged_posts = [p for p in merged_posts if isinstance(p, dict) and p.get("status") != "취소됨"]
         merged_posts.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["posts"] = merged_posts
 
@@ -443,30 +1237,32 @@ def sync_cloud_db(client_db: dict, deleted_post_ids=None):
         current["polls"] = merged_polls[:50]
 
         merged_talks = _merge_list_by_id(current.get("plaza_talks"), client_db.get("plaza_talks"))
+        now_ms_talk = int(time.time() * 1000)
+        talk_ttl_ms = 3 * 24 * 60 * 60 * 1000
+        merged_talks = [
+            t for t in merged_talks
+            if isinstance(t, dict) and (
+                int(t.get("created_ts") or t.get("id") or 0) <= 1000000000000
+                or (now_ms_talk - int(t.get("created_ts") or t.get("id") or 0)) <= talk_ttl_ms
+            )
+        ]
         merged_talks.sort(key=lambda x: x.get("id", 0), reverse=True)
         current["plaza_talks"] = merged_talks[:100]
 
-    try:
-        url = f"https://api.github.com/repos/{_CLOUD_REPO}/issues/{_CLOUD_ISSUE}"
-        payload = {"body": json.dumps(current, ensure_ascii=False)}
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"token {_gh_token()}",
-                "Accept": "application/vnd.github+json",
-                "User-Agent": "uldaemo-cloud-db",
-                "Content-Type": "application/json",
-            },
-            method="PATCH",
-        )
-        with urllib.request.urlopen(req, timeout=7) as resp:
-            if resp.status == 200:
-                _DB_MEM_CACHE["db"] = current
-                _DB_MEM_CACHE["ts"] = time.time()
-                return True, current
-    except Exception:
-        pass
+    # 1순위: Supabase PostgreSQL DB에 저장 (설정되어 있으면 GitHub 구버전으로 폴백 금지)
+    if _has_supabase():
+        all_del_ids = current.get("deleted_post_ids") or deleted_post_ids or []
+        if _supabase_save_db(current, all_del_ids):
+            _DB_MEM_CACHE["db"] = current
+            _DB_MEM_CACHE["ts"] = time.time()
+            return True, current
+        return False, current
+
+    # 2순위(Supabase 미설정 환경 전용): GitHub Issue #1 클라우드 스토리지에 저장
+    if _github_save_db(current):
+        _DB_MEM_CACHE["db"] = current
+        _DB_MEM_CACHE["ts"] = time.time()
+        return True, current
     return False, current
 
 
@@ -485,7 +1281,18 @@ class handler(BaseHTTPRequestHandler):
         self._send_json(200, {"ok": True})
 
     def do_GET(self):
-        self._send_json(200, {"status": "ok", "service": "uldaemo-vercel-api"})
+        # GET 호출 시 Supabase 무료 플랜 7일 절전 방지를 위한 가벼운 Keep-Alive 핑 겸용 동작
+        storage_mode = "supabase" if _has_supabase() else "github_fallback"
+        if _has_supabase():
+            try:
+                _supabase_fetch_table("uldaemo_state?id=eq.main&select=id")
+            except Exception:
+                pass
+        self._send_json(200, {
+            "status": "ok",
+            "service": "uldaemo-vercel-api",
+            "storage": storage_mode,
+        })
 
     def do_POST(self):
         try:
@@ -496,18 +1303,221 @@ class handler(BaseHTTPRequestHandler):
             data = {}
 
         action = data.get("action", "")
-        if action == "load_db":
-            db_obj = load_cloud_db(force=bool(data.get("force")))
-            self._send_json(200, {"ok": bool(db_obj), "db": db_obj})
+        if action in ("keepalive", "db_status"):
+            storage_mode = "supabase" if _has_supabase() else "github_fallback"
+            db_obj = load_cloud_db(force=False)
+            user_cnt = len((db_obj or {}).get("users") or {}) if isinstance(db_obj, dict) else 0
+            post_cnt = len((db_obj or {}).get("posts") or []) if isinstance(db_obj, dict) else 0
+            self._send_json(200, {
+                "ok": True,
+                "storage": storage_mode,
+                "users_count": user_cnt,
+                "posts_count": post_cnt,
+            })
             return
 
+        def _require_auth(allow_suspended: bool = False):
+            tok = str(data.get("session_token") or "").strip()
+            sess = _verify_session_token(tok)
+            if not sess:
+                self._send_json(401, {"ok": False, "error": "AUTH_REQUIRED", "message": "로그인이 필요합니다."})
+                return None, None, False
+            db_obj = load_cloud_db(force=True)
+            if not isinstance(db_obj, dict):
+                self._send_json(503, {"ok": False, "error": "DB_UNAVAILABLE", "message": "데이터베이스에 연결할 수 없습니다."})
+                return None, None, False
+            uid = str(sess["student_id"]).strip()
+            actor = (db_obj.get("users") or {}).get(uid)
+            if not isinstance(actor, dict):
+                self._send_json(401, {"ok": False, "error": "INVALID_SESSION", "message": "유효하지 않은 세션입니다. 다시 로그인해주세요."})
+                return None, None, False
+            is_adm = _is_admin_user(actor)
+            if not allow_suspended and not is_adm and (actor.get("is_suspended") or int(actor.get("report_count") or 0) >= 3):
+                self._send_json(403, {"ok": False, "error": "ACCOUNT_SUSPENDED", "message": "이용이 정지된 계정입니다."})
+                return None, None, False
+            return db_obj, uid, is_adm
+
+        def _add_notif(db_obj: dict, target_uid: str, message: str, post_id=None):
+            if not target_uid or not message:
+                return
+            notifs = db_obj.setdefault("notifications", [])
+            notifs.insert(0, {
+                "id": int(time.time() * 1000) + random.randint(1, 999),
+                "user_id": str(target_uid),
+                "post_id": post_id,
+                "message": str(message)[:240],
+                "is_read": 0,
+                "created_at": time.strftime("%Y-%m-%d %H:%M"),
+            })
+            db_obj["notifications"] = notifs[:200]
+
+        def _finish_mutation(db_obj: dict, actor_id: str, is_adm: bool, extra=None, deleted_post_ids=None):
+            ok = save_cloud_db(db_obj, deleted_post_ids)
+            payload = {
+                "ok": ok,
+                "storage": "local_test" if LOCAL_TEST_DB_PATH else ("supabase" if _has_supabase() else "github_fallback"),
+                "db": _sanitize_db_for_viewer(db_obj, actor_id, is_adm),
+            }
+            if isinstance(extra, dict):
+                payload.update(extra)
+            self._send_json(200 if ok else 500, payload)
+
+        # ---- 1) 공개 인증 API ----
+        if action == "send_otp":
+            recipient = str(data.get("email") or "").strip().lower()
+            if not CONTACT_EMAIL_RE.match(recipient):
+                self._send_json(400, {"ok": False, "message": "올바른 이메일 주소를 입력해주세요."})
+                return
+            otp_code = str(random.randint(100000, 999999))
+            otp_token = _make_otp_token(recipient, otp_code)
+            if LOCAL_TEST_DB_PATH:
+                self._send_json(200, {"ok": True, "message": "테스트 모드 OTP 발급 완료", "otp_token": otp_token})
+                return
+            ok, msg = send_smtp_otp(recipient, otp_code)
+            self._send_json(200, {"ok": ok, "message": msg, "otp_token": otp_token if ok else ""})
+            return
+
+        if action == "verify_login":
+            sid = str(data.get("student_id") or "").strip()
+            pw_hash = str(data.get("pw_hash") or "").strip()
+            if not sid:
+                self._send_json(400, {"ok": False, "reason": "missing_sid"})
+                return
+            db_obj = load_cloud_db(force=True) or {}
+            user = (db_obj.get("users") or {}).get(sid)
+            if not isinstance(user, dict):
+                self._send_json(200, {"ok": False, "reason": "not_found"})
+                return
+            stored_hash = str(user.get("pw_hash") or "").strip()
+            if not stored_hash:
+                self._send_json(200, {"ok": False, "reason": "no_pw"})
+                return
+            if not pw_hash:
+                self._send_json(200, {"ok": False, "reason": "missing_pw"})
+                return
+            if not hmac.compare_digest(stored_hash, pw_hash):
+                self._send_json(200, {"ok": False, "reason": "wrong_pw"})
+                return
+            is_adm = _is_admin_user(user)
+            token = _make_session_token(sid, role="admin" if is_adm else "user")
+            sanitized = _sanitize_db_for_viewer(db_obj, sid, is_adm)
+            self._send_json(200, {
+                "ok": True,
+                "session_token": token,
+                "role": "admin" if is_adm else "user",
+                "db": sanitized,
+            })
+            return
+
+        if action == "signup":
+            sid = str(data.get("student_id") or "").strip()
+            pw_hash = str(data.get("pw_hash") or "").strip()
+            email = str(data.get("email") or "").strip().lower()
+            otp_code = str(data.get("otp") or "").strip()
+            otp_token = str(data.get("otp_token") or "").strip()
+            nick = str(data.get("nickname") or "").strip()[:12]
+            dept = str(data.get("department") or "").strip()[:24]
+            avatar = str(data.get("avatar") or "🐶").split(" ")[0][:4]
+            gender = str(data.get("gender") or "").strip()
+            mbti = str(data.get("mbti") or "모름/비공개").strip()[:12]
+            if not sid or len(sid) < 4 or len(sid) > 20:
+                self._send_json(400, {"ok": False, "message": "올바른 학번을 입력해주세요."})
+                return
+            if not pw_hash or len(pw_hash) < 32:
+                self._send_json(400, {"ok": False, "message": "비밀번호를 4자리 이상 설정해주세요."})
+                return
+            if not nick or not dept:
+                self._send_json(400, {"ok": False, "message": "닉네임과 학과를 모두 입력해주세요."})
+                return
+            if not data.get("agree_age19") or not data.get("agree_terms") or not data.get("agree_privacy"):
+                self._send_json(400, {"ok": False, "message": "필수 약관 및 만 19세 이상 확인에 동의해주세요."})
+                return
+            if not _verify_otp_token(otp_token, email, otp_code):
+                self._send_json(403, {"ok": False, "message": "이메일 6자리 본인 인증이 유효하지 않거나 만료되었습니다."})
+                return
+            db_obj = load_cloud_db(force=True)
+            if not isinstance(db_obj, dict):
+                self._send_json(503, {"ok": False, "message": "서버 저장소에 연결할 수 없습니다."})
+                return
+            users = db_obj.setdefault("users", {})
+            if sid in users:
+                self._send_json(409, {"ok": False, "message": "이미 가입된 학번입니다. 로그인을 이용해주세요."})
+                return
+            now_ms = int(time.time() * 1000)
+            joined_str = time.strftime("%Y-%m-%d %H:%M")
+            users[sid] = {
+                "student_id": sid,
+                "role": "user",
+                "email": email,
+                "joined_at": joined_str,
+                "created_at": now_ms,
+                "age_19_verified": True,
+                "agreed_terms_at": joined_str,
+                "pw_hash": pw_hash,
+                "nickname": nick,
+                "avatar": avatar,
+                "gender": gender,
+                "department": dept,
+                "mbti": mbti,
+                "manner_temp": 36.5,
+                "report_count": 0,
+                "reported_by": [],
+                "is_suspended": False,
+                "bio": "반갑습니다! 공강 시간에 같이 소통해요.",
+                "keywords": ["시간 약속을 잘 지켜요", "친절해요"],
+                "coffee_tickets": 0,
+                "boost_coupons": 0,
+                "extra_post_coupons": 0,
+                "bonus_score": 0,
+                "streak_days": 1,
+                "updated_at": now_ms,
+            }
+            if isinstance(db_obj.get("deleted_users_map"), dict):
+                db_obj["deleted_users_map"].pop(sid, None)
+            token = _make_session_token(sid, role="user")
+            _finish_mutation(db_obj, sid, False, extra={"session_token": token, "role": "user"})
+            return
+
+        if action == "reset_password":
+            sid = str(data.get("student_id") or "").strip()
+            email = str(data.get("email") or "").strip().lower()
+            otp_code = str(data.get("otp") or "").strip()
+            otp_token = str(data.get("otp_token") or "").strip()
+            new_pw_hash = str(data.get("pw_hash") or "").strip()
+            if not sid or not new_pw_hash or len(new_pw_hash) < 32:
+                self._send_json(400, {"ok": False, "message": "학번과 새 비밀번호를 확인해주세요."})
+                return
+            if not _verify_otp_token(otp_token, email, otp_code):
+                self._send_json(403, {"ok": False, "message": "이메일 6자리 인증번호가 일치하지 않거나 만료되었습니다."})
+                return
+            db_obj = load_cloud_db(force=True)
+            user = (db_obj.get("users") or {}).get(sid) if isinstance(db_obj, dict) else None
+            if not isinstance(user, dict):
+                self._send_json(404, {"ok": False, "message": "등록되지 않은 학번입니다."})
+                return
+            stored_email = str(user.get("email") or "").strip().lower()
+            if stored_email and stored_email != email:
+                self._send_json(403, {"ok": False, "message": "가입 시 등록한 이메일 주소와 일치하지 않습니다."})
+                return
+            user["pw_hash"] = new_pw_hash
+            if not stored_email:
+                user["email"] = email
+            user["updated_at"] = int(time.time() * 1000)
+            is_adm = _is_admin_user(user)
+            token = _make_session_token(sid, role="admin" if is_adm else "user")
+            _finish_mutation(db_obj, sid, is_adm, extra={"session_token": token, "role": "admin" if is_adm else "user"})
+            return
+
+        # ---- 2) 전체 동기화(sync_db) 영구 폐지 ----
         if action == "sync_db":
-            client_db = data.get("db") or {}
-            deleted_post_ids = data.get("deleted_post_ids") or []
-            ok, merged = sync_cloud_db(client_db, deleted_post_ids)
-            self._send_json(200, {"ok": ok, "db": merged})
+            self._send_json(410, {
+                "ok": False,
+                "error": "SYNC_DB_DISABLED",
+                "message": "보안을 위해 전체 DB 동기화(sync_db)가 폐지되었습니다. 전용 API를 사용하세요.",
+            })
             return
 
+        # ---- 3) 공개 학교 정보 API ----
         if action == "ulsan_notices":
             items = get_ulsan_notices()
             self._send_json(200, {"ok": bool(items), "items": items[:40]})
@@ -518,13 +1528,626 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": bool(menu_data), "data": menu_data})
             return
 
-        if action == "send_otp":
-            recipient = str(data.get("email", "")).strip()
-            otp_code = str(data.get("otp", "")).strip()
-            sender_email = str(data.get("sender_email", "")).strip()
-            app_password = str(data.get("app_password", "")).strip()
-            ok, msg = send_smtp_otp(recipient, otp_code, sender_email, app_password)
-            self._send_json(200, {"ok": ok, "message": msg})
+        # ---- 4) 인증 필수 조회 API (비로그인 호출 시 401 거부) ----
+        if action == "load_db":
+            db_obj, actor_id, is_adm = _require_auth(allow_suspended=True)
+            if not db_obj:
+                return
+            self._send_json(200, {
+                "ok": True,
+                "storage": "local_test" if LOCAL_TEST_DB_PATH else ("supabase" if _has_supabase() else "github_fallback"),
+                "role": "admin" if is_adm else "user",
+                "db": _sanitize_db_for_viewer(db_obj, actor_id, is_adm),
+            })
+            return
+
+        # ---- 5) 동작별 전용 API (모든 actor_id는 session_token에서만 추출) ----
+        if action == "create_post":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            title = str(data.get("title") or "").strip()[:80]
+            category = str(data.get("category") or "").strip()[:30]
+            location = str(data.get("location") or "").strip()[:60]
+            meet_date = str(data.get("meet_date") or "").strip()
+            meet_time = str(data.get("meet_time") or "").strip()
+            style = str(data.get("meeting_style") or "").strip()[:40]
+            try:
+                max_p = int(data.get("max_participants") or 3)
+            except Exception:
+                max_p = 3
+            if len(title) < 2 or not category or not location or not meet_date or not meet_time:
+                self._send_json(400, {"ok": False, "message": "필수 항목을 모두 입력해주세요."})
+                return
+            if max_p < 2 or max_p > 30:
+                self._send_json(400, {"ok": False, "message": "모집 인원은 2명 이상 30명 이하로 설정해주세요."})
+                return
+            actor = db_obj["users"][actor_id]
+            use_boost = False
+            if data.get("use_boost") and int(actor.get("boost_coupons") or 0) > 0:
+                actor["boost_coupons"] = max(0, int(actor.get("boost_coupons") or 0) - 1)
+                use_boost = True
+            now_ms = int(time.time() * 1000)
+            new_post = {
+                "id": now_ms,
+                "author_id": actor_id,
+                "title": title,
+                "category": category,
+                "meet_date": meet_date,
+                "meet_time": meet_time,
+                "location": location,
+                "max_participants": max_p,
+                "meeting_style": style or "가볍게 소통해요",
+                "is_official": bool(is_adm and data.get("is_official")),
+                "is_boosted": use_boost,
+                "boosted_at": now_ms if use_boost else None,
+                "status": "모집중",
+                "created_at": now_ms,
+                "updated_at": now_ms,
+            }
+            db_obj.setdefault("posts", []).insert(0, new_post)
+            _finish_mutation(db_obj, actor_id, is_adm, extra={"post_id": now_ms})
+            return
+
+        if action in ("cancel_post", "close_post", "boost_post"):
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 번개 ID입니다."})
+                return
+            posts = db_obj.get("posts") or []
+            post = next((p for p in posts if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post:
+                self._send_json(404, {"ok": False, "message": "번개를 찾을 수 없습니다."})
+                return
+            if str(post.get("author_id")) != actor_id and not is_adm:
+                self._send_json(403, {"ok": False, "message": "본인이 만든 번개만 수정/취소할 수 있습니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            deleted_ids = None
+            if action == "cancel_post":
+                post["status"] = "취소됨"
+                post["updated_at"] = now_ms
+                for a in (db_obj.get("applications") or []):
+                    if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) != actor_id:
+                        _add_notif(db_obj, a.get("applicant_id"), f"[{post.get('title')}] 번개 모임이 방장에 의해 취소되었어요.", post_id)
+                del_list = list(db_obj.get("deleted_post_ids") or [])
+                if post_id not in del_list:
+                    del_list.append(post_id)
+                db_obj["deleted_post_ids"] = del_list[-500:]
+                db_obj["posts"] = [p for p in posts if isinstance(p, dict) and int(p.get("id") or 0) != post_id]
+                deleted_ids = [post_id]
+            elif action == "close_post":
+                post["status"] = "매칭완료"
+                post["updated_at"] = now_ms
+            elif action == "boost_post":
+                actor = db_obj["users"][actor_id]
+                if int(actor.get("boost_coupons") or 0) <= 0:
+                    self._send_json(400, {"ok": False, "message": "보유한 상단 부스트권이 없습니다."})
+                    return
+                actor["boost_coupons"] = int(actor.get("boost_coupons") or 0) - 1
+                post["is_boosted"] = True
+                post["boosted_at"] = now_ms
+                post["updated_at"] = now_ms
+            _finish_mutation(db_obj, actor_id, is_adm, deleted_post_ids=deleted_ids)
+            return
+
+        if action == "apply":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 번개 ID입니다."})
+                return
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post or post.get("status") != "모집중":
+                self._send_json(400, {"ok": False, "message": "모집 중인 번개가 아닙니다."})
+                return
+            if str(post.get("author_id")) == actor_id:
+                self._send_json(400, {"ok": False, "message": "본인이 만든 번개에는 신청할 수 없습니다."})
+                return
+            apps = db_obj.setdefault("applications", [])
+            approved_cnt = sum(1 for a in apps if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and a.get("status") == "승인됨")
+            if 1 + approved_cnt >= int(post.get("max_participants") or 2):
+                self._send_json(400, {"ok": False, "message": "정원이 마감된 번개입니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            existing = next((a for a in apps if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id), None)
+            if existing:
+                if existing.get("status") in ("취소됨", "나감"):
+                    existing["status"] = "대기중"
+                    existing["updated_at"] = now_ms
+                else:
+                    self._send_json(409, {"ok": False, "message": "이미 신청한 번개입니다."})
+                    return
+            else:
+                apps.append({
+                    "id": now_ms,
+                    "post_id": post_id,
+                    "applicant_id": actor_id,
+                    "status": "대기중",
+                    "updated_at": now_ms,
+                })
+            nick = db_obj["users"][actor_id].get("nickname") or "학우"
+            _add_notif(db_obj, post.get("author_id"), f"[{post.get('title')}] 모임에 {nick}님이 참여를 신청했어요", post_id)
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action == "cancel_application":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 번개 ID입니다."})
+                return
+            app = next((a for a in (db_obj.get("applications") or []) if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id and a.get("status") == "대기중"), None)
+            if not app:
+                self._send_json(404, {"ok": False, "message": "취소할 대기 중인 신청을 찾을 수 없습니다."})
+                return
+            app["status"] = "취소됨"
+            app["updated_at"] = int(time.time() * 1000)
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if post:
+                nick = db_obj["users"][actor_id].get("nickname") or "학우"
+                _add_notif(db_obj, post.get("author_id"), f"[{post.get('title')}] 모임의 {nick}님이 참여 신청을 취소했어요", post_id)
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action in ("accept", "reject"):
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                app_id = int(data.get("app_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 신청 ID입니다."})
+                return
+            app = next((a for a in (db_obj.get("applications") or []) if isinstance(a, dict) and int(a.get("id") or 0) == app_id), None)
+            if not app:
+                self._send_json(404, {"ok": False, "message": "신청 내역을 찾을 수 없습니다."})
+                return
+            post_id = int(app.get("post_id") or 0)
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post or (str(post.get("author_id")) != actor_id and not is_adm):
+                self._send_json(403, {"ok": False, "message": "해당 번개의 방장만 수락/거절할 수 있습니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            if action == "accept":
+                app["status"] = "승인됨"
+                app["updated_at"] = now_ms
+                _add_notif(db_obj, app.get("applicant_id"), f"🎉 [{post.get('title')}] 참여 신청이 수락되었어요! 안심 대화방을 확인해 보세요.", post_id)
+            else:
+                app["status"] = "거절됨"
+                app["updated_at"] = now_ms
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action == "leave_chat":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 번개 ID입니다."})
+                return
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post:
+                self._send_json(404, {"ok": False, "message": "대화방을 찾을 수 없습니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            if str(post.get("author_id")) == actor_id:
+                post["status"] = "매칭완료"
+                post["updated_at"] = now_ms
+                for a in (db_obj.get("applications") or []):
+                    if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and a.get("status") == "승인됨":
+                        a["status"] = "종료됨"
+                        a["updated_at"] = now_ms
+            else:
+                for a in (db_obj.get("applications") or []):
+                    if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id:
+                        a["status"] = "나감"
+                        a["updated_at"] = now_ms
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action in ("send_message", "react_message", "mark_read"):
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 대화방 ID입니다."})
+                return
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post:
+                self._send_json(404, {"ok": False, "message": "대화방을 찾을 수 없습니다."})
+                return
+            is_member = (str(post.get("author_id")) == actor_id) or any(
+                isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id and a.get("status") == "승인됨"
+                for a in (db_obj.get("applications") or [])
+            )
+            if not is_member and not is_adm:
+                self._send_json(403, {"ok": False, "message": "수락된 참여자만 이 대화방에 접근할 수 있습니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            if action == "send_message":
+                txt = str(data.get("text") or "").strip()[:500]
+                if not txt:
+                    self._send_json(400, {"ok": False, "message": "메시지를 입력해주세요."})
+                    return
+                if _contains_contact_info(txt):
+                    self._send_json(400, {"ok": False, "blocked": True, "message": "사생활 보호를 위해 전화번호·카톡·SNS 아이디는 전송할 수 없어요."})
+                    return
+                db_obj.setdefault("messages", []).append({
+                    "id": now_ms,
+                    "post_id": post_id,
+                    "sender_id": actor_id,
+                    "text": txt,
+                    "created_at": time.strftime("%H:%M"),
+                    "is_read": 0,
+                    "reactions": {},
+                })
+                _finish_mutation(db_obj, actor_id, is_adm, extra={"message_id": now_ms})
+                return
+            elif action == "react_message":
+                try:
+                    msg_id = int(data.get("message_id"))
+                except Exception:
+                    self._send_json(400, {"ok": False})
+                    return
+                emoji = str(data.get("emoji") or "").strip()[:4]
+                msg = next((m for m in (db_obj.get("messages") or []) if isinstance(m, dict) and int(m.get("id") or 0) == msg_id and int(m.get("post_id") or 0) == post_id), None)
+                if msg and emoji:
+                    reac = msg.setdefault("reactions", {})
+                    lst = list(reac.get(emoji) or [])
+                    if actor_id in lst:
+                        lst = [x for x in lst if x != actor_id]
+                    else:
+                        lst.append(actor_id)
+                    if lst:
+                        reac[emoji] = lst
+                    else:
+                        reac.pop(emoji, None)
+                _finish_mutation(db_obj, actor_id, is_adm)
+                return
+            else:
+                for m in (db_obj.get("messages") or []):
+                    if isinstance(m, dict) and int(m.get("post_id") or 0) == post_id and str(m.get("sender_id")) != actor_id and m.get("sender_id") != "AI_BOT":
+                        m["is_read"] = 1
+                _finish_mutation(db_obj, actor_id, is_adm)
+                return
+
+        if action == "submit_review":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 모임 ID입니다."})
+                return
+            target_id = _resolve_uid(data.get("target_user_id"), db_obj.get("users") or {})
+            if not target_id or target_id == actor_id or target_id not in (db_obj.get("users") or {}):
+                self._send_json(400, {"ok": False, "message": "평가 대상을 찾을 수 없습니다."})
+                return
+            reviews = db_obj.setdefault("reviews", [])
+            if any(isinstance(r, dict) and int(r.get("post_id") or 0) == post_id and str(r.get("from_id")) == actor_id and str(r.get("to_id")) == target_id for r in reviews):
+                self._send_json(409, {"ok": False, "message": "이미 평가를 완료한 학우입니다."})
+                return
+            is_none = bool(data.get("is_none"))
+            keyword = str(data.get("keyword") or "친절해요").strip()[:40]
+            detail = str(data.get("detail") or "").strip()[:150]
+            if detail and _contains_contact_info(detail):
+                self._send_json(400, {"ok": False, "message": "후기에는 연락처나 SNS 아이디를 적을 수 없습니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            reviews.append({
+                "id": now_ms,
+                "post_id": post_id,
+                "from_id": actor_id,
+                "to_id": target_id,
+                "keyword": "후기없음" if is_none else keyword,
+                "detail": "" if is_none else detail,
+                "is_none": is_none,
+                "created_at": time.strftime("%Y-%m-%d"),
+            })
+            if not is_none:
+                partner = db_obj["users"][target_id]
+                actor = db_obj["users"][actor_id]
+                partner["manner_temp"] = min(60.0, round(float(partner.get("manner_temp") or 36.5) + 0.5, 1))
+                kws = list(partner.get("keywords") or [])
+                if keyword and keyword not in kws:
+                    kws.append(keyword)
+                partner["keywords"] = kws
+                partner["updated_at"] = now_ms
+                actor["manner_temp"] = min(60.0, round(float(actor.get("manner_temp") or 36.5) + 0.2, 1))
+                actor["updated_at"] = now_ms
+                _add_notif(db_obj, target_id, f"{actor.get('nickname') or '학우'}님이 [{keyword}] 매너 후기를 남겨 매너온도가 0.5°C 올랐어요", post_id)
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action == "report":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            target_id = _resolve_uid(data.get("target_user_id"), db_obj.get("users") or {})
+            if not target_id or target_id == actor_id:
+                self._send_json(400, {"ok": False, "message": "본인 계정은 신고할 수 없습니다."})
+                return
+            target = (db_obj.get("users") or {}).get(target_id)
+            if not isinstance(target, dict):
+                self._send_json(404, {"ok": False, "message": "신고 대상을 찾을 수 없습니다."})
+                return
+            if _is_admin_user(target):
+                self._send_json(403, {"ok": False, "message": "운영진 계정은 신고 대상에서 제외됩니다."})
+                return
+            rep_by = [str(x) for x in (target.get("reported_by") or [])]
+            if actor_id in rep_by:
+                self._send_json(409, {"ok": False, "message": "동일한 학우에게 중복 신고할 수 없어요."})
+                return
+            rep_by.append(actor_id)
+            target["reported_by"] = rep_by
+            target["report_count"] = len(rep_by)
+            target["manner_temp"] = max(0.0, round(float(target.get("manner_temp") or 36.5) - 3.0, 1))
+            if target["report_count"] >= 3:
+                target["is_suspended"] = True
+            target["updated_at"] = int(time.time() * 1000)
+            _finish_mutation(db_obj, actor_id, is_adm, extra={"report_count": target["report_count"]})
+            return
+
+        if action in ("block_user", "unblock_user"):
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            target_id = _resolve_uid(data.get("target_user_id"), db_obj.get("users") or {})
+            if not target_id or target_id == actor_id:
+                self._send_json(400, {"ok": False, "message": "잘못된 대상입니다."})
+                return
+            actor = db_obj["users"][actor_id]
+            bl = [str(x) for x in (actor.get("blocked_users") or [])]
+            if action == "block_user":
+                if _is_admin_user((db_obj.get("users") or {}).get(target_id)):
+                    self._send_json(403, {"ok": False, "message": "운영진 계정은 차단할 수 없습니다."})
+                    return
+                if target_id not in bl:
+                    bl.append(target_id)
+            else:
+                bl = [x for x in bl if x != target_id]
+            actor["blocked_users"] = bl
+            actor["updated_at"] = int(time.time() * 1000)
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action == "checkin":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            actor = db_obj["users"][actor_id]
+            today = time.strftime("%Y-%m-%d")
+            if actor.get("last_checkin") == today:
+                self._send_json(200, {"ok": True, "already": True, "db": _sanitize_db_for_viewer(db_obj, actor_id, is_adm)})
+                return
+            actor["last_checkin"] = today
+            actor["streak_days"] = int(actor.get("streak_days") or 0) + 1
+            actor["coffee_tickets"] = int(actor.get("coffee_tickets") or 0) + 1
+            actor["bonus_score"] = int(actor.get("bonus_score") or 0) + 5
+            actor["updated_at"] = int(time.time() * 1000)
+            _finish_mutation(db_obj, actor_id, is_adm, extra={"streak_days": actor["streak_days"], "tickets": actor["coffee_tickets"]})
+            return
+
+        if action == "spin_reward_roulette":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            actor = db_obj["users"][actor_id]
+            if int(actor.get("coffee_tickets") or 0) <= 0:
+                self._send_json(400, {"ok": False, "message": "보유한 룰렛 티켓이 없습니다."})
+                return
+            actor["coffee_tickets"] = int(actor.get("coffee_tickets") or 0) - 1
+            win_idx = random.randint(0, 5)
+            if win_idx == 0:
+                actor["boost_coupons"] = int(actor.get("boost_coupons") or 0) + 1
+            elif win_idx == 1:
+                actor["extra_post_coupons"] = int(actor.get("extra_post_coupons") or 0) + 1
+            elif win_idx == 2:
+                actor["manner_temp"] = min(60.0, round(float(actor.get("manner_temp") or 36.5) + 0.1, 1))
+            elif win_idx == 3:
+                actor["coffee_tickets"] = int(actor.get("coffee_tickets") or 0) + 2
+            elif win_idx == 4:
+                actor["boost_coupons"] = int(actor.get("boost_coupons") or 0) + 1
+                actor["bonus_score"] = int(actor.get("bonus_score") or 0) + 10
+            else:
+                actor["coffee_tickets"] = int(actor.get("coffee_tickets") or 0) + 1
+            actor["updated_at"] = int(time.time() * 1000)
+            _finish_mutation(db_obj, actor_id, is_adm, extra={"win_idx": win_idx})
+            return
+
+        if action == "update_profile":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            # 타인의 프로필 ID 수정 시도 차단
+            req_target = str(data.get("target_user_id") or data.get("student_id") or "").strip()
+            if req_target and req_target != actor_id and not is_adm:
+                self._send_json(403, {"ok": False, "message": "본인 프로필만 수정할 수 있습니다."})
+                return
+            actor = db_obj["users"][actor_id]
+            if "nickname" in data and str(data["nickname"]).strip():
+                actor["nickname"] = str(data["nickname"]).strip()[:12]
+            if "department" in data and str(data["department"]).strip():
+                actor["department"] = str(data["department"]).strip()[:24]
+            if "avatar" in data and str(data["avatar"]).strip():
+                actor["avatar"] = str(data["avatar"]).split(" ")[0][:4]
+            if "mbti" in data:
+                actor["mbti"] = str(data["mbti"] or "모름/비공개").strip()[:12]
+            if "bio" in data:
+                actor["bio"] = str(data["bio"] or "").strip()[:80]
+            if "fav_cats" in data and isinstance(data["fav_cats"], list):
+                actor["fav_cats"] = [str(x)[:20] for x in data["fav_cats"][:12]]
+            if "fav_muted" in data and isinstance(data["fav_muted"], list):
+                actor["fav_muted"] = [str(x)[:20] for x in data["fav_muted"][:12]]
+            if "timetable" in data:
+                actor["timetable"] = data["timetable"] if isinstance(data["timetable"], dict) else {}
+                actor["timetable_saved"] = bool(actor["timetable"])
+            actor["updated_at"] = int(time.time() * 1000)
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action == "mark_notifications_read":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            for n in (db_obj.get("notifications") or []):
+                if isinstance(n, dict) and str(n.get("user_id")) == actor_id:
+                    n["is_read"] = 1
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action in ("plaza_vote", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply"):
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            now_ms = int(time.time() * 1000)
+            if action == "plaza_vote":
+                poll_id = data.get("poll_id")
+                side = str(data.get("side") or "").upper()
+                poll = next((p for p in (db_obj.get("polls") or []) if isinstance(p, dict) and str(p.get("id")) == str(poll_id)), None)
+                if poll and side in ("A", "B"):
+                    poll["votes_a"] = [u for u in (poll.get("votes_a") or []) if str(u) != actor_id]
+                    poll["votes_b"] = [u for u in (poll.get("votes_b") or []) if str(u) != actor_id]
+                    poll["votes_a" if side == "A" else "votes_b"].append(actor_id)
+            elif action == "plaza_create_poll":
+                q = str(data.get("question") or "").strip()[:100]
+                a = str(data.get("opt_a") or "").strip()[:40]
+                b = str(data.get("opt_b") or "").strip()[:40]
+                tag = str(data.get("tag") or "💘 연애 레전드").strip()[:20]
+                if len(q) < 3 or not a or not b:
+                    self._send_json(400, {"ok": False, "message": "질문과 A, B 선택지를 모두 입력해주세요."})
+                    return
+                db_obj.setdefault("polls", []).insert(0, {
+                    "id": now_ms, "tag": tag, "question": q, "opt_a": a, "opt_b": b,
+                    "votes_a": [], "votes_b": [], "replies": [], "author_id": actor_id,
+                })
+                db_obj["polls"] = db_obj["polls"][:50]
+            elif action == "plaza_create_talk":
+                txt = str(data.get("text") or "").strip()[:120]
+                if not txt:
+                    self._send_json(400, {"ok": False, "message": "내용을 입력해주세요."})
+                    return
+                if _contains_contact_info(txt):
+                    self._send_json(400, {"ok": False, "message": "외부 연락처나 SNS 아이디는 올릴 수 없어요."})
+                    return
+                db_obj.setdefault("plaza_talks", []).insert(0, {
+                    "id": now_ms, "created_ts": now_ms, "author_id": actor_id,
+                    "text": txt, "created_at": time.strftime("%m/%d %H:%M"), "likes": [], "replies": [],
+                })
+                db_obj["plaza_talks"] = db_obj["plaza_talks"][:100]
+            elif action == "plaza_like_talk":
+                talk_id = data.get("talk_id")
+                talk = next((t for t in (db_obj.get("plaza_talks") or []) if isinstance(t, dict) and str(t.get("id")) == str(talk_id)), None)
+                if talk:
+                    likes = [str(u) for u in (talk.get("likes") or [])]
+                    if actor_id in likes:
+                        likes = [u for u in likes if u != actor_id]
+                    else:
+                        likes.append(actor_id)
+                    talk["likes"] = likes
+            elif action == "plaza_reply":
+                kind = str(data.get("kind") or "t")
+                target_id = data.get("target_id")
+                txt = str(data.get("text") or "").strip()[:120]
+                if not txt or _contains_contact_info(txt):
+                    self._send_json(400, {"ok": False, "message": "답글 내용을 확인해주세요."})
+                    return
+                arr = db_obj.get("polls" if kind == "p" else "plaza_talks") or []
+                item = next((x for x in arr if isinstance(x, dict) and str(x.get("id")) == str(target_id)), None)
+                if item:
+                    item.setdefault("replies", []).append({
+                        "id": now_ms, "author_id": actor_id, "text": txt,
+                        "created_at": time.strftime("%m/%d %H:%M"), "deleted": False,
+                    })
+            elif action == "plaza_delete_reply":
+                kind = str(data.get("kind") or "t")
+                target_id = data.get("target_id")
+                reply_id = data.get("reply_id")
+                arr = db_obj.get("polls" if kind == "p" else "plaza_talks") or []
+                item = next((x for x in arr if isinstance(x, dict) and str(x.get("id")) == str(target_id)), None)
+                if item:
+                    for rep in (item.get("replies") or []):
+                        if isinstance(rep, dict) and str(rep.get("id")) == str(reply_id):
+                            if str(rep.get("author_id")) == actor_id or is_adm:
+                                rep["deleted"] = True
+                            else:
+                                self._send_json(403, {"ok": False, "message": "본인 답글만 삭제할 수 있습니다."})
+                                return
+            _finish_mutation(db_obj, actor_id, is_adm)
+            return
+
+        if action == "delete_account":
+            db_obj, actor_id, is_adm = _require_auth(allow_suspended=True)
+            if not db_obj:
+                return
+            if is_adm:
+                self._send_json(403, {"ok": False, "message": "운영진 계정은 삭제할 수 없습니다."})
+                return
+            now_ms = int(time.time() * 1000)
+            db_obj.setdefault("users", {}).pop(actor_id, None)
+            db_obj.setdefault("deleted_users_map", {})[actor_id] = now_ms
+            user_post_ids = [
+                p.get("id") for p in (db_obj.get("posts") or [])
+                if isinstance(p, dict) and str(p.get("author_id")) == actor_id and p.get("id")
+            ]
+            db_obj["posts"] = [p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and str(p.get("author_id")) != actor_id]
+            db_obj["applications"] = [a for a in (db_obj.get("applications") or []) if isinstance(a, dict) and str(a.get("applicant_id")) != actor_id and a.get("post_id") not in user_post_ids]
+            db_obj["messages"] = [m for m in (db_obj.get("messages") or []) if isinstance(m, dict) and str(m.get("sender_id")) != actor_id and m.get("post_id") not in user_post_ids]
+            db_obj["notifications"] = [n for n in (db_obj.get("notifications") or []) if isinstance(n, dict) and str(n.get("user_id")) != actor_id]
+            db_obj["plaza_talks"] = [t for t in (db_obj.get("plaza_talks") or []) if isinstance(t, dict) and str(t.get("author_id")) != actor_id]
+            if _has_supabase():
+                try:
+                    req_del_u = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_users?student_id=eq.{urllib.parse.quote(actor_id)}",
+                        headers=_supabase_headers("return=minimal"),
+                        method="DELETE",
+                    )
+                    with urllib.request.urlopen(req_del_u, timeout=5):
+                        pass
+                except Exception:
+                    pass
+            save_cloud_db(db_obj, user_post_ids)
+            self._send_json(200, {"ok": True})
+            return
+
+        if action == "admin_action":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            if not is_adm:
+                self._send_json(403, {"ok": False, "message": "운영진 권한(role=admin)이 필요합니다."})
+                return
+            sub = str(data.get("sub_action") or "").strip()
+            target_id = _resolve_uid(data.get("target_user_id"), db_obj.get("users") or {})
+            target = (db_obj.get("users") or {}).get(target_id)
+            if sub == "suspend_user" and isinstance(target, dict) and not _is_admin_user(target):
+                target["is_suspended"] = True
+                target["updated_at"] = int(time.time() * 1000)
+            elif sub == "unsuspend_user" and isinstance(target, dict):
+                target["is_suspended"] = False
+                target["report_count"] = 0
+                target["reported_by"] = []
+                target["updated_at"] = int(time.time() * 1000)
+            else:
+                self._send_json(400, {"ok": False, "message": "지원하지 않는 관리자 동작입니다."})
+                return
+            _finish_mutation(db_obj, actor_id, is_adm)
             return
 
         if action == "ai_police":
@@ -539,21 +2162,98 @@ class handler(BaseHTTPRequestHandler):
             return
 
         if action == "ai_icebreaker":
-            location = str(data.get("location", "울산대학교"))
-            category = str(data.get("category", "🍚 밥약"))
-            style = str(data.get("meeting_style", "간단한 스몰토크 환영"))
-            prompt = (
-                f"대학생 두 명이 현재 '{location}'에서 '{category}' 목적으로 만나는 중이야. "
-                f"둘의 만남 성향은 '{style}'이야. 어색함을 깰 수 있는 재미있는 대화 소재 1가지와, "
-                "근처 맛집이나 놀거리 1가지를 3줄로 발랄하게 추천해줘."
-            )
-            reply = call_gemini_api(prompt)
-            if not reply:
-                reply = (
-                    f"💡 <b>{location}</b> 근처에서 만나는군요! 오늘 수업이나 공강 루틴 이야기로 "
-                    "가볍게 대화를 시작해 보세요. 모임 후 근처 학생식당이나 북카페 코스를 추천해요!"
+            title = str(data.get("title", "")).strip()
+            location = str(data.get("location", "울산대학교")).strip()
+            category = str(data.get("category", "🍚 밥약")).strip()
+            style = str(data.get("meeting_style", "간단한 스몰토크 환영")).strip()
+            recent_msgs = data.get("recent_messages") or []
+            prev_hints = data.get("prev_hints") or []
+
+            recent_ctx = ""
+            if isinstance(recent_msgs, list) and len(recent_msgs) > 0:
+                lines = [str(x).strip()[:120] for x in recent_msgs[-4:] if str(x).strip()]
+                if lines:
+                    recent_ctx = "\n최근 대화 흐름:\n" + "\n".join(f"- {l}" for l in lines)
+            avoid_ctx = ""
+            if isinstance(prev_hints, list) and len(prev_hints) > 0:
+                avoid_ctx = "\n직전에 추천했던 문구(중복 금지): " + " / ".join(str(x).strip()[:80] for x in prev_hints[-3:])
+
+            if recent_ctx:
+                prompt = (
+                    f"너는 울산대학교 학생들의 캠퍼스 번개 채팅을 돕는 친절한 AI 매니저야.\n"
+                    f"모임 제목: '{title or category}', 장소: '{location}', 카테고리: '{category}', 분위기: '{style}'."
+                    f"{recent_ctx}{avoid_ctx}\n"
+                    "위 대화 흐름에 이어서 어색하지 않게 건넬 수 있는 자연스럽고 센스 있는 대학생 말투의 다음 대화 소재/질문 2개를 추천해줘.\n"
+                    "규칙: 따옴표·번호·불릿 없이 한 줄에 1문장씩, 총 2줄로만 답해줘. (각 문장 35자 이내, 연락처 요구 금지)"
                 )
-            self._send_json(200, {"ok": True, "reply": reply})
+            else:
+                prompt = (
+                    f"너는 울산대학교 학생들의 캠퍼스 번개 채팅을 돕는 친절한 AI 매니저야.\n"
+                    f"모임 제목: '{title or category}', 장소: '{location}', 카테고리: '{category}', 분위기: '{style}'."
+                    f"{avoid_ctx}\n"
+                    "처음 만난 학우에게 가볍게 건넬 수 있는 자연스러운 대학생 말투의 첫 인사·대화 주제 2개를 추천해줘.\n"
+                    "규칙: 따옴표·번호·불릿 없이 한 줄에 1문장씩, 총 2줄로만 답해줘. (각 문장 35자 이내, 연락처 요구 금지)"
+                )
+
+            raw_reply = call_gemini_api(prompt)
+            suggestions = []
+            if raw_reply:
+                for line in raw_reply.splitlines():
+                    clean = re.sub(r'^[\s\d.\-•*\'"]+|[\s\'"]+$', "", line).strip()
+                    if len(clean) >= 6:
+                        suggestions.append(clean)
+                    if len(suggestions) >= 2:
+                        break
+
+            if len(suggestions) < 2:
+                cat_lower = category.lower()
+                if "밥" in cat_lower or "식사" in cat_lower:
+                    pool = [
+                        f"오늘 {location} 메뉴 보셨어요? 선호하시는 메뉴 있으세요?",
+                        "혹시 못 드시는 음식이나 매운 거 괜찮으신지 여쭤봐도 될까요?",
+                        "방금 수업 끝났어요! 오늘 공강은 몇 시간 정도 있으세요?",
+                        "바보사거리 쪽 자주 가시는 최애 맛집 있으신가요?",
+                    ]
+                elif "카공" in cat_lower or "커피" in cat_lower or "카페" in cat_lower:
+                    pool = [
+                        f"오늘 {location}에서 어떤 과제나 공부 하실 예정이세요?",
+                        "조용히 각자 집중하는 편이세요, 아니면 가끔 수다도 괜찮으세요?",
+                        "혹시 선호하시는 카페나 자주 드시는 음료 메뉴 있으세요?",
+                        "노트북 콘센트 있는 자리 쪽으로 잡을까요?",
+                    ]
+                elif "운동" in cat_lower or "헬스" in cat_lower or "러닝" in cat_lower:
+                    pool = [
+                        f"{location}에서 가볍게 러닝이나 스트레칭 위주로 하실 건가요?",
+                        "평소 운동 루틴이나 페이스는 어느 정도 편하세요?",
+                        "혼자 하면 심심한데 같이 하게 돼서 좋네요! 도착하시면 알려주세요",
+                    ]
+                elif "산책" in cat_lower:
+                    pool = [
+                        "날씨 딱 좋은데 음료 하나 테이크아웃해서 가볍게 걸을까요?",
+                        "오늘 공강은 몇 시간 남으셨어요? 편하게 걸으면서 얘기해요!",
+                    ]
+                elif "게임" in cat_lower:
+                    pool = [
+                        "주로 어떤 게임 즐겨 하세요? 편하게 맞춰서 같이 해요!",
+                        "오늘 스트레스 풀 겸 가볍게 한 판 해봐요! 평소 포지션이 어떻게 되세요?",
+                    ]
+                else:
+                    pool = [
+                        f"{location}에서 뵙게 돼서 반가워요! 오늘 시간표는 여유 있으신가요?",
+                        "이번 학기 전공 수업 들으시는 건 좀 어떠세요?",
+                        "MBTI가 어떻게 되세요? 어색해하지 마시고 편하게 얘기해요!",
+                    ]
+                prev_set = set(str(x) for x in prev_hints)
+                fresh = [x for x in pool if x not in prev_set and x not in suggestions]
+                random.shuffle(fresh)
+                for item in fresh:
+                    suggestions.append(item)
+                    if len(suggestions) >= 2:
+                        break
+                while len(suggestions) < 2 and pool:
+                    suggestions.append(pool[len(suggestions) % len(pool)])
+
+            self._send_json(200, {"ok": True, "reply": suggestions[0], "suggestions": suggestions[:2]})
             return
 
         self._send_json(400, {"ok": False, "message": "Unknown action"})
