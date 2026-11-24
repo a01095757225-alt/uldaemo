@@ -4965,10 +4965,13 @@
       return `
         <div style="max-width:920px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-            <button type="button" onclick="state.active_modal=null; render();" style="display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:4px 0;">← 목록으로</button>
-            <span style="background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;">
-              ${escHtml(cleanCat)}${isFreeMatch ? ' · 내 공강 일치' : ''}${post.is_official ? ' · 공식' : ''}
-            </span>
+            <button type="button" onclick="state.active_modal=null; render();" style="display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:6px 4px; min-height:44px;">← 목록으로</button>
+            <div style="display:inline-flex; align-items:center; gap:8px;">
+              <button type="button" onclick="sharePostLink(${post.id})" style="height:34px; padding:0 12px; border-radius:17px; border:1px solid #E5E8EB; background:#FFFFFF; color:#4E5968; font-size:12px; font-weight:700; cursor:pointer;">🔗 링크 공유</button>
+              <span style="background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px;">
+                ${escHtml(cleanCat)}${isFreeMatch ? ' · 내 공강 일치' : ''}${post.is_official ? ' · 공식' : ''}
+              </span>
+            </div>
           </div>
 
           <div class="pc-detail-2col">
@@ -8367,25 +8370,126 @@
     } catch (e) {}
 
     let _isHandlingPopState = false;
+    function buildCurrentRouteHash() {
+      if (state.active_modal === "detail" && state.selected_post_id) return `#/post/${state.selected_post_id}`;
+      if (state.active_modal === "create") return "#/create";
+      if (state.active_modal === "timetable") return "#/timetable";
+      if (state.active_modal === "cafeteria") return "#/cafeteria";
+      if (state.active_modal === "notifications") return "#/notifications";
+      if (state.active_modal === "food_map") return "#/food-map";
+      if (state.active_modal === "review" && state.review_modal_post_id) return `#/review/${state.review_modal_post_id}`;
+      if (state.nav_tab === "지도") return "#/map";
+      if (state.nav_tab === "채팅") return (!state.chat_list_mode && state.active_chat_post_id) ? `#/chat/${state.active_chat_post_id}` : "#/chat";
+      if (state.nav_tab === "광장") return "#/plaza";
+      if (state.nav_tab === "마이") return "#/profile";
+      return "#/home";
+    }
+
+    function applyRouteFromHash(hashStr, shouldRender = true) {
+      const h = String(hashStr || window.location.hash || "").replace(/^#/, "");
+      if (!h || h === "/" || h === "/home") {
+        state.active_modal = null;
+        state.nav_tab = "홈";
+      } else if (h === "/map") {
+        state.active_modal = null;
+        state.nav_tab = "지도";
+      } else if (h === "/plaza") {
+        state.active_modal = null;
+        state.nav_tab = "광장";
+      } else if (h === "/profile") {
+        state.active_modal = null;
+        state.nav_tab = "마이";
+      } else if (h === "/chat") {
+        state.active_modal = null;
+        state.nav_tab = "채팅";
+        state.chat_list_mode = true;
+        state.active_chat_post_id = null;
+      } else if (h.startsWith("/chat/")) {
+        const pid = Number(h.slice(6));
+        if (!isNaN(pid) && pid > 0) {
+          state.active_modal = null;
+          state.nav_tab = "채팅";
+          state.chat_list_mode = false;
+          state.active_chat_post_id = pid;
+        }
+      } else if (h === "/create") {
+        state.active_modal = "create";
+      } else if (h === "/timetable") {
+        state.active_modal = "timetable";
+      } else if (h === "/cafeteria") {
+        state.active_modal = "cafeteria";
+      } else if (h === "/notifications") {
+        state.active_modal = "notifications";
+      } else if (h === "/food-map") {
+        state.active_modal = "food_map";
+      } else if (h.startsWith("/post/")) {
+        const pid = Number(h.slice(6));
+        if (!isNaN(pid) && pid > 0) {
+          state.selected_post_id = pid;
+          state.active_modal = "detail";
+        }
+      } else if (h.startsWith("/review/")) {
+        const pid = Number(h.slice(8));
+        if (!isNaN(pid) && pid > 0) {
+          state.review_modal_post_id = pid;
+          state.active_modal = "review";
+        }
+      }
+      if (shouldRender) render();
+    }
+
+    function sharePostLink(postId) {
+      const url = `${window.location.origin}${window.location.pathname}#/post/${postId}`;
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(url).then(() => showToast("🔗 번개 링크가 복사되었어요!"));
+          return;
+        }
+      } catch (e) {}
+      showToast(`🔗 공유 링크: ${url}`);
+    }
+
     function pushSpaHistoryState(key) {
       if (_isHandlingPopState || !window.history || typeof window.history.pushState !== "function") return;
       try {
-        const curKey = window.history.state && window.history.state.uldaemoKey;
-        if (curKey !== key) {
-          window.history.pushState({ uldaemoKey: key, nav_tab: state.nav_tab, active_modal: state.active_modal || null }, "");
+        const nextHash = buildCurrentRouteHash();
+        if (window.location.hash !== nextHash) {
+          window.history.pushState({ uldaemoKey: key, hash: nextHash }, "", nextHash);
         }
       } catch (e) {}
     }
+
+    window.addEventListener("hashchange", () => {
+      if (!state || !state.user_id) return;
+      _isHandlingPopState = true;
+      try {
+        applyRouteFromHash(window.location.hash, true);
+      } finally {
+        _isHandlingPopState = false;
+      }
+    });
 
     window.addEventListener("popstate", () => {
       if (!state || !state.user_id) return;
       _isHandlingPopState = true;
       try {
-        window.handleNativeBack();
+        if (window.location.hash) {
+          applyRouteFromHash(window.location.hash, true);
+        } else {
+          window.handleNativeBack();
+        }
       } finally {
         _isHandlingPopState = false;
       }
     });
+
+    // 초기 해시 라우트 복원 (새로고침 및 번개 공유 링크 #/post/123 지원)
+    if (state && state.user_id && window.location.hash && window.location.hash.startsWith("#/")) {
+      _isHandlingPopState = true;
+      try { applyRouteFromHash(window.location.hash, true); } finally { _isHandlingPopState = false; }
+    } else if (state && state.user_id && !window.location.hash) {
+      try { window.history.replaceState({ uldaemoKey: "tab:홈:" }, "", "#/home"); } catch (e) {}
+    }
 
     // PC 우측 패널 끝단 고정(X/트위터 방식): 패널이 화면보다 길면 맨 아래 카드가 보일 때 고정, 짧으면 상단 고정
     function syncPcRightStickyTop() {
