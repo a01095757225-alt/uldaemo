@@ -2991,6 +2991,10 @@
         if (state.active_modal === "food_map") {
           setTimeout(initFullFoodMapModal, 60);
         }
+        if (typeof syncPcRightStickyTop === "function") {
+          requestAnimationFrame(syncPcRightStickyTop);
+          setTimeout(syncPcRightStickyTop, 250);
+        }
         if (state.nav_tab === "지도" && !state.active_modal) {
           setTimeout(initLeafletCampusMap, 60);
         }
@@ -8649,6 +8653,19 @@
         _isHandlingPopState = false;
       }
     });
+
+    // PC 우측 패널 끝단 고정(X/트위터 방식): 패널이 화면보다 길면 맨 아래 카드가 보일 때 고정, 짧으면 상단 고정
+    function syncPcRightStickyTop() {
+      try {
+        const rightEl = document.querySelector(".app-shell.wide .pc-right");
+        if (!rightEl || window.innerWidth < 1024) return;
+        const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+        const ph = rightEl.offsetHeight || 0;
+        const topOffset = ph > vh ? Math.round(vh - ph) : 0;
+        rightEl.style.setProperty("--pc-right-sticky-top", `${topOffset}px`);
+      } catch (e) {}
+    }
+    window.addEventListener("resize", syncPcRightStickyTop);
 
     // Flutter WebView 네이티브 뒤로가기(Android 물리 뒤로가기) 브릿지 훅
     window.handleNativeBack = function() {
