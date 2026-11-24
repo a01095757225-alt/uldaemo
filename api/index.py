@@ -193,24 +193,18 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             accepted_partner_ids.add(str(a.get("applicant_id") or ""))
 
     def pub_id(uid: str) -> str:
-        return str(uid) if is_admin else _mask_uid(uid, vid)
+        return _mask_uid(uid, vid)
 
-    # 2. 회원 응답 필터링:
+    # 2. 회원 응답 필터링 (일반 학생·관리자 공통 — 관리자도 일반 응답에서는 학생과 동일한 최소 범위만 수신):
     #    - 본인: 본인 프로필 전체(pw_hash 제외)
     #    - 타인(수락 전): 별명, 아바타, 매너온도, 인증 뱃지/키워드만 (학번·학과·성별·MBTI·이메일·소개 제외)
-    #    - 타인(수락 후 파트너): 학과·MBTI·소개만 추가 공개 (학번·성별·이메일은 여전히 제외)
+    #    - 타인(수락 후 파트너): 학과·MBTI·소개만 추가 공개 (학번·성별·이메일은 어떤 경우에도 타인에게 미노출)
     safe_users = {}
     for uid, u in users.items():
         if not isinstance(u, dict):
             continue
         uid_str = str(uid)
-        if is_admin:
-            su = dict(u)
-            su["has_pw"] = bool(u.get("pw_hash"))
-            su["role"] = "admin" if _is_admin_user(u) else "user"
-            su.pop("pw_hash", None)
-            safe_users[uid_str] = su
-        elif uid_str == vid:
+        if uid_str == vid:
             su = dict(u)
             su["has_pw"] = bool(u.get("pw_hash"))
             su["role"] = "admin" if _is_admin_user(u) else "user"
@@ -258,13 +252,13 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             "updated_at": p.get("updated_at"),
         })
 
-    # 4. 신청 내역: 본인이 신청한 건 + 본인이 만든 번개에 들어온 신청 (+ 수락된 채팅방의 참여자 목록)만 반환
+    # 4. 신청 내역: 본인이 신청한 건 + 본인이 만든 번개에 들어온 신청 (+ 수락된 채팅방의 참여자 목록)만 반환 (관리자 동일 적용)
     safe_apps = []
     for a in apps:
         pid = a.get("post_id")
         ipid = int(pid) if pid is not None else 0
         ap_id = str(a.get("applicant_id") or "")
-        if is_admin or ap_id == vid or ipid in hosted_post_ids or (ipid in accepted_post_ids and a.get("status") == "승인됨"):
+        if ap_id == vid or ipid in hosted_post_ids or (ipid in accepted_post_ids and a.get("status") == "승인됨"):
             safe_apps.append({
                 "id": a.get("id"),
                 "post_id": pid,
@@ -273,14 +267,14 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
                 "updated_at": a.get("updated_at"),
             })
 
-    # 5. 채팅: 수락된 참여자(방장 포함)에게만 해당 방 메시지 반환 + 레거시 AI HTML 구조화 변환
+    # 5. 채팅: 수락된 참여자(방장 포함)에게만 해당 방 메시지 반환 (관리자 일반 응답에도 타인 방 메시지 미포함)
     safe_msgs = []
     for m in msgs:
         pid = m.get("post_id")
         if pid is None:
             continue
         ipid = int(pid)
-        if not is_admin and ipid not in accepted_post_ids:
+        if ipid not in accepted_post_ids:
             continue
         sm = {
             "id": m.get("id"),
@@ -291,16 +285,18 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             "is_read": int(m.get("is_read") or 0),
             "reactions": m.get("reactions") if isinstance(m.get("reactions"), dict) else {},
         }
+        if m.get("flagged"):
+            sm["flagged"] = True
         if m.get("sender_id") == "AI_BOT":
             sm["kind"] = str(m.get("kind") or "ai_icebreaker")
             if isinstance(m.get("suggestions"), list):
                 sm["suggestions"] = [_strip_html_tags(x) for x in m["suggestions"]]
         safe_msgs.append(sm)
 
-    # 6. 알림: 본인 알림만 반환
+    # 6. 알림: 본인 알림만 반환 (관리자 동일 적용)
     safe_notifs = [
         n for n in notifs
-        if is_admin or str(n.get("user_id") or "") == vid
+        if str(n.get("user_id") or "") == vid
     ]
 
     # 7. 후기 · 투표 · 광장톡: 타인 학번 별칭화
@@ -1796,7 +1792,7 @@ class handler(BaseHTTPRequestHandler):
                 isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id and a.get("status") == "승인됨"
                 for a in (db_obj.get("applications") or [])
             )
-            if not is_member and not is_adm:
+            if not is_member:
                 self._send_json(403, {"ok": False, "message": "수락된 참여자만 이 대화방에 접근할 수 있습니다."})
                 return
             now_ms = int(time.time() * 1000)
@@ -2169,6 +2165,145 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True})
             return
 
+        if action == "admin_dashboard_summary":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            if not is_adm:
+                self._send_json(403, {"ok": False, "message": "운영진 권한(role=admin)이 필요합니다."})
+                return
+            users_map = db_obj.get("users") or {}
+            admin_users = []
+            for uid_k, u in users_map.items():
+                if not isinstance(u, dict):
+                    continue
+                # 이메일·성별·MBTI·소개는 관리자 목록에도 포함하지 않음 (개인정보 최소화 원칙)
+                admin_users.append({
+                    "alias": _mask_uid(str(uid_k), actor_id),
+                    "nickname": str(u.get("nickname") or "학우"),
+                    "role": "admin" if _is_admin_user(u) else "user",
+                    "manner_temp": float(u.get("manner_temp") if u.get("manner_temp") is not None else 36.5),
+                    "report_count": int(u.get("report_count") or 0),
+                    "is_suspended": bool(u.get("is_suspended")),
+                    "has_pw": bool(u.get("pw_hash")),
+                    "joined_at": str(u.get("joined_at") or ""),
+                })
+            # 신고 또는 연락처 플래그가 있는 대화방만 집계
+            flagged_by_post = {}
+            for m in (db_obj.get("messages") or []):
+                if isinstance(m, dict) and (m.get("flagged") or _contains_contact_info(m.get("text"))):
+                    pid_i = int(m.get("post_id") or 0)
+                    flagged_by_post[pid_i] = flagged_by_post.get(pid_i, 0) + 1
+            reported_uids = {
+                str(uid_k) for uid_k, u in users_map.items()
+                if isinstance(u, dict) and int(u.get("report_count") or 0) > 0
+            }
+            reported_rooms = []
+            for p in (db_obj.get("posts") or []):
+                if not isinstance(p, dict) or p.get("id") is None:
+                    continue
+                pid_i = int(p.get("id"))
+                participants = {str(p.get("author_id") or "")}
+                for a in (db_obj.get("applications") or []):
+                    if isinstance(a, dict) and int(a.get("post_id") or 0) == pid_i and a.get("status") == "승인됨":
+                        participants.add(str(a.get("applicant_id") or ""))
+                has_rep_user = bool(participants & reported_uids)
+                flg_cnt = flagged_by_post.get(pid_i, 0)
+                if has_rep_user or flg_cnt > 0 or bool(p.get("reported")):
+                    reported_rooms.append({
+                        "post_id": pid_i,
+                        "title": str(p.get("title") or ""),
+                        "status": str(p.get("status") or ""),
+                        "has_reported_participant": has_rep_user,
+                        "flagged_message_count": flg_cnt,
+                    })
+            review_queue = [
+                {
+                    "message_id": item.get("message_id"),
+                    "post_id": item.get("post_id"),
+                    "flag_reason": str(item.get("flag_reason") or "contact_pattern"),
+                    "flagged_at": item.get("flagged_at"),
+                    "status": str(item.get("status") or "pending"),
+                }
+                for item in (db_obj.get("admin_review_queue") or [])
+                if isinstance(item, dict)
+            ]
+            audit_logs = (db_obj.get("admin_audit_logs") or [])[-30:]
+            self._send_json(200, {
+                "ok": True,
+                "users": admin_users,
+                "reported_rooms": reported_rooms,
+                "review_queue": review_queue,
+                "audit_logs": audit_logs,
+            })
+            return
+
+        if action == "admin_reported_room_messages":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            if not is_adm:
+                self._send_json(403, {"ok": False, "message": "운영진 권한(role=admin)이 필요합니다."})
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "올바른 대화방 ID를 입력해주세요."})
+                return
+            reason = str(data.get("reason") or "신고 검토").strip()[:100]
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post:
+                self._send_json(404, {"ok": False, "message": "대화방을 찾을 수 없습니다."})
+                return
+            users_map = db_obj.get("users") or {}
+            participants = {str(post.get("author_id") or "")}
+            for a in (db_obj.get("applications") or []):
+                if isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and a.get("status") == "승인됨":
+                    participants.add(str(a.get("applicant_id") or ""))
+            has_rep_user = any(
+                isinstance(users_map.get(u), dict) and int(users_map[u].get("report_count") or 0) > 0
+                for u in participants
+            )
+            room_msgs = [
+                m for m in (db_obj.get("messages") or [])
+                if isinstance(m, dict) and int(m.get("post_id") or 0) == post_id
+            ]
+            has_flagged = any(bool(m.get("flagged")) or _contains_contact_info(m.get("text")) for m in room_msgs)
+            if not (has_rep_user or has_flagged or bool(post.get("reported"))):
+                self._send_json(403, {"ok": False, "message": "신고 또는 연락처 감지 기록이 있는 대화방만 열람할 수 있습니다."})
+                return
+            # 접근 감사 로그 영구 기록 (메시지 본문·이메일 등 개인정보 미기록)
+            now_ms = int(time.time() * 1000)
+            audit_entry = {
+                "id": now_ms,
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "admin_alias": _mask_uid(actor_id),
+                "action": "view_reported_room",
+                "post_id": post_id,
+                "reason": reason,
+            }
+            db_obj.setdefault("admin_audit_logs", []).append(audit_entry)
+            db_obj["admin_audit_logs"] = db_obj["admin_audit_logs"][-200:]
+            save_cloud_db(db_obj)
+            sanitized_room_msgs = [
+                {
+                    "id": m.get("id"),
+                    "post_id": post_id,
+                    "sender_alias": "AI_BOT" if m.get("sender_id") == "AI_BOT" else _mask_uid(str(m.get("sender_id") or ""), actor_id),
+                    "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
+                    "created_at": m.get("created_at"),
+                    "flagged": bool(m.get("flagged") or _contains_contact_info(m.get("text"))),
+                }
+                for m in room_msgs
+            ]
+            self._send_json(200, {
+                "ok": True,
+                "post_id": post_id,
+                "audit_logged": True,
+                "messages": sanitized_room_msgs,
+            })
+            return
+
         if action == "admin_action":
             db_obj, actor_id, is_adm = _require_auth()
             if not db_obj:
@@ -2179,17 +2314,32 @@ class handler(BaseHTTPRequestHandler):
             sub = str(data.get("sub_action") or "").strip()
             target_id = _resolve_uid(data.get("target_user_id"), db_obj.get("users") or {})
             target = (db_obj.get("users") or {}).get(target_id)
+            now_ms = int(time.time() * 1000)
             if sub == "suspend_user" and isinstance(target, dict) and not _is_admin_user(target):
                 target["is_suspended"] = True
-                target["updated_at"] = int(time.time() * 1000)
+                target["updated_at"] = now_ms
             elif sub == "unsuspend_user" and isinstance(target, dict):
                 target["is_suspended"] = False
                 target["report_count"] = 0
                 target["reported_by"] = []
-                target["updated_at"] = int(time.time() * 1000)
+                target["updated_at"] = now_ms
+            elif sub == "resolve_review_item":
+                msg_id = data.get("message_id")
+                for item in (db_obj.get("admin_review_queue") or []):
+                    if isinstance(item, dict) and str(item.get("message_id")) == str(msg_id):
+                        item["status"] = "resolved"
+                        item["resolved_at"] = now_ms
             else:
                 self._send_json(400, {"ok": False, "message": "지원하지 않는 관리자 동작입니다."})
                 return
+            db_obj.setdefault("admin_audit_logs", []).append({
+                "id": now_ms,
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "admin_alias": _mask_uid(actor_id),
+                "action": f"admin_{sub}",
+                "target_alias": _mask_uid(target_id) if target_id else "",
+            })
+            db_obj["admin_audit_logs"] = db_obj["admin_audit_logs"][-200:]
             _finish_mutation(db_obj, actor_id, is_adm)
             return
 
