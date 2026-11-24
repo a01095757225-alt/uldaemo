@@ -2060,15 +2060,15 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
     margin-top: 12px;
   }
 
-  /* PC 우측 4단 카드 패널 (잘림 없이 본문과 자연스럽게 이어지도록 스크롤 통합) */
+  /* PC 우측 4단 카드 패널 (끝까지 스크롤된 뒤 하단 고정 — X/트위터 스타일) */
   .app-shell.wide .pc-right {
     display: flex;
     flex-direction: column;
     gap: 14px;
     border-left: none;
-    padding: 32px 24px 48px 0;
-    position: static;
-    top: auto;
+    padding: 32px 24px 32px 0;
+    position: sticky;
+    top: var(--pc-right-sticky-top, 0px);
     height: auto;
     max-height: none;
     overflow-y: visible;
