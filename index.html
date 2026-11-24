@@ -763,8 +763,10 @@
       }
     }
 
+    let _pullInFlight = false;
     async function pullFromCloud(force = false) {
-      if (!getSessionToken()) return false;
+      if (!getSessionToken() || _pullInFlight) return false;
+      _pullInFlight = true;
       try {
         const res = await fetch("/api/index", {
           method: "POST",
@@ -772,7 +774,8 @@
           body: JSON.stringify(Object.assign({ action: "load_db", force }, getApiAuthPayload()))
         });
         if (res.status === 401) {
-          if (state && state.user_id) executeLogoutNow();
+          setSessionToken("");
+          executeLogoutNow();
           return false;
         }
         const data = await res.json();
@@ -816,7 +819,9 @@
           }
           return true;
         }
-      } catch (e) {}
+      } catch (e) {} finally {
+        _pullInFlight = false;
+      }
       return false;
     }
 
