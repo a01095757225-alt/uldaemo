@@ -4833,6 +4833,51 @@
       `;
     }
 
+    function renderHomePendingRequestsHtml() {
+      if (!state.user_id || !DB) return "";
+      const myPostsById = {};
+      (DB.posts || []).forEach(p => {
+        if (p && String(p.author_id) === String(state.user_id) && p.status === "모집중" && !isPostExpired(p)) {
+          myPostsById[Number(p.id)] = p;
+        }
+      });
+      const pendingApps = (DB.applications || []).filter(
+        a => a && a.status === "대기중" && myPostsById[Number(a.post_id)]
+      );
+      if (pendingApps.length === 0) return "";
+      return `
+        <div style="background:#EEF8F3; border:1.5px solid #C5E6D6; border-radius:20px; padding:14px 16px; margin:4px 0 14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+            <span style="font-size:14px; font-weight:800; color:#1E6B52;">⚡ 도착한 번개 신청 ${pendingApps.length}건</span>
+            <span style="font-size:11.5px; font-weight:700; color:#287D62;">수락하면 채팅방이 열려요</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${pendingApps.map(a => {
+              const post = myPostsById[Number(a.post_id)];
+              const apUser = (DB.users && DB.users[a.applicant_id]) || { avatar: "🐱", nickname: "학우", manner_temp: 36.5 };
+              const apAvatar = (apUser.avatar || "🐱").split(" ")[0];
+              const apTemp = Number(apUser.manner_temp != null ? apUser.manner_temp : 36.5).toFixed(1);
+              return `
+                <div style="background:#FFFFFF; border:1px solid #D5E8DE; border-radius:14px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <div onclick="openDetailModal(${post.id})" style="display:flex; align-items:center; gap:10px; min-width:0; flex:1; cursor:pointer;">
+                    <span style="width:38px; height:38px; border-radius:19px; background:#F7F9F8; font-size:20px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(apAvatar)}</span>
+                    <div style="min-width:0; flex:1;">
+                      <div style="font-size:13.5px; font-weight:800; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(apUser.nickname || '학우')} · ${apTemp}°C</div>
+                      <div style="font-size:12px; color:#6B7684; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(post.title)}</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                    <button type="button" onclick="rejectApplicant(${a.id})" style="height:36px; padding:0 11px; border-radius:12px; border:1px solid #E5E8EB; background:#FFFFFF; color:#6B7684; font-size:12.5px; font-weight:700; cursor:pointer;">거절</button>
+                    <button type="button" onclick="acceptApplicant(${a.id})" style="height:36px; padding:0 14px; border-radius:12px; border:none; background:#287D62; color:#FFFFFF; font-size:12.5px; font-weight:800; cursor:pointer;">수락</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    }
+
     function renderHomeTab() {
       const currentUser = DB.users[state.user_id] || { nickname: "학우" };
       return `
@@ -4857,6 +4902,8 @@
             <span style="font-size:11.5px; font-weight:700; color:#6B7684; text-decoration:underline;">미리보기</span>
           </button>
         </div>
+
+        ${renderHomePendingRequestsHtml()}
 
         ${renderMugeoFoodMapSection()}
 
@@ -5569,7 +5616,10 @@
                           </div>
                         </div>
                         ${a.status === "대기중"
-                          ? `<button type="button" onclick="acceptApplicant(${a.id})" style="height:34px; padding:0 16px; border-radius:17px; border:none; background:#287D62; color:#FFFFFF; font-size:12.5px; font-weight:700; cursor:pointer; flex-shrink:0;">수락</button>`
+                          ? `<div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                               <button type="button" onclick="rejectApplicant(${a.id})" style="height:34px; padding:0 12px; border-radius:17px; border:1px solid #E5E8EB; background:#FFFFFF; color:#6B7684; font-size:12.5px; font-weight:700; cursor:pointer;">거절</button>
+                               <button type="button" onclick="acceptApplicant(${a.id})" style="height:34px; padding:0 16px; border-radius:17px; border:none; background:#287D62; color:#FFFFFF; font-size:12.5px; font-weight:700; cursor:pointer;">수락</button>
+                             </div>`
                           : `<span style="height:30px; padding:0 12px; border-radius:15px; background:#EEF8F3; color:#287D62; font-size:12px; font-weight:700; display:inline-flex; align-items:center; flex-shrink:0;">${escHtml(a.status)}</span>`}
                       </div>
                     `;
@@ -5627,12 +5677,17 @@
       `;
     }
 
+    const _processingAppIds = new Set();
     async function acceptApplicant(appId) {
-      const app = (DB.applications || []).find(a => Number(a.id) === Number(appId));
-      const post = app ? DB.posts.find(p => Number(p.id) === Number(app.post_id)) : null;
-      const apUser = app ? (DB.users[app.applicant_id] || { avatar: "🐱", nickname: "학우" }) : { avatar: "🐱", nickname: "학우" };
-      const res = await callApiAction("accept", { app_id: Number(appId) });
-      if (!res.ok) return showToast(res.message || "신청 수락에 실패했어요.");
+      const aid = Number(appId);
+      if (_processingAppIds.has(aid)) return;
+      const app = (DB.applications || []).find(a => Number(a.id) === aid);
+      if (!app) return;
+      const post = DB.posts.find(p => Number(p.id) === Number(app.post_id)) || null;
+      const apUser = (DB.users[app.applicant_id] || { avatar: "🐱", nickname: "학우" });
+      _processingAppIds.add(aid);
+      const prevStatus = app.status;
+      app.status = "승인됨";
       if (post) {
         state.active_chat_post_id = Number(post.id);
         state.chat_list_mode = false;
@@ -5641,8 +5696,42 @@
       triggerLightningFlash();
       fireConfetti({ mode: "match" });
       showMeetupMatchCelebration(post, apUser);
-      showToast("🎉 신청을 수락하여 안심 채팅방이 열렸습니다!");
+      showToast("🎉 신청을 수락했어요! 대화 탭에 안심 채팅방이 열렸어요.");
       render();
+      try {
+        const res = await callApiAction("accept", { app_id: aid });
+        if (!res.ok) {
+          app.status = prevStatus;
+          render();
+          return showToast(res.message || "신청 수락에 실패했어요.");
+        }
+        render();
+      } finally {
+        _processingAppIds.delete(aid);
+      }
+    }
+
+    async function rejectApplicant(appId) {
+      const aid = Number(appId);
+      if (_processingAppIds.has(aid)) return;
+      const app = (DB.applications || []).find(a => Number(a.id) === aid);
+      if (!app) return;
+      _processingAppIds.add(aid);
+      const prevStatus = app.status;
+      app.status = "거절됨";
+      showToast("신청을 거절했어요.");
+      render();
+      try {
+        const res = await callApiAction("reject", { app_id: aid });
+        if (!res.ok) {
+          app.status = prevStatus;
+          render();
+          return showToast(res.message || "신청 거절에 실패했어요.");
+        }
+        render();
+      } finally {
+        _processingAppIds.delete(aid);
+      }
     }
 
     async function closePostEarly(postId) {
