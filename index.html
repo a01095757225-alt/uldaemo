@@ -3462,8 +3462,22 @@
             </div>
 
             <div style="font-size:13px; font-weight:700; margin: 10px 0 6px;">Step 2. 블라인드 프로필 작성 (필수 항목)</div>
-            <label class="label">닉네임 (익명 표시용) (필수)</label>
-            <input id="signup_nick" class="input" value="${escHtml(state.signup_nick || '')}" oninput="state.signup_nick=this.value;" placeholder="예: 푸른솔" />
+            <label class="label">닉네임 (익명 표시용 · 실명 사용 금지) (필수)</label>
+            ${(() => {
+              if (!state.signup_nick) state.signup_nick = generateRandomCampusNickname();
+              const realNameWarn = looksLikeKoreanRealName(state.signup_nick);
+              return `
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                  <input id="signup_nick" class="input" style="flex:1; margin-bottom:0;" value="${escHtml(state.signup_nick)}" oninput="handleSignupNickInput(this.value)" placeholder="별명 입력 (실명 금지)" />
+                  <button type="button" class="btn" onclick="applyRandomSignupNickname()" style="width:auto; height:44px; padding:0 12px; background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; font-size:12.5px; font-weight:800; white-space:nowrap; flex-shrink:0;">🎲 랜덤 뽑기</button>
+                </div>
+                <div id="signup_nick_hint" style="font-size:11.5px; font-weight:700; color:${realNameWarn ? '#D92D20' : '#287D62'}; margin:0 0 10px; line-height:1.4;">
+                  ${realNameWarn
+                    ? '⚠️ 실명처럼 보여요! 사생활 보호를 위해 별명이나 [🎲 랜덤 뽑기]를 사용해 주세요.'
+                    : '🛡️ 실명(본명)은 입력하지 마세요! 랜덤 별명으로 안전하게 활동할 수 있어요.'}
+                </div>
+              `;
+            })()}
 
             <div class="row-2">
               <div>
@@ -3716,6 +3730,43 @@
         return showToast("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
       }
       return showToast("로그인 정보를 다시 확인해주세요.");
+    }
+
+    const CAMPUS_RANDOM_NICKS = [
+      "공강요정", "무거수달", "아산부엉이", "학식매니아", "카공다람쥐",
+      "해송강아지", "푸른솔냥이", "문수산여우", "산책토끼", "태화강오리",
+      "새벽감성곰", "바보사거리", "캠퍼스고래", "도서관펭귄"
+    ];
+    function generateRandomCampusNickname() {
+      const base = CAMPUS_RANDOM_NICKS[Math.floor(Math.random() * CAMPUS_RANDOM_NICKS.length)];
+      const num = Math.floor(10 + Math.random() * 90);
+      return `${base}${num}`.slice(0, 12);
+    }
+    const COMMON_KR_SURNAMES = new Set("김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편".split(""));
+    function looksLikeKoreanRealName(nick) {
+      const s = String(nick || "").trim();
+      if (!/^[가-힣]{2,4}$/.test(s)) return false;
+      return COMMON_KR_SURNAMES.has(s[0]);
+    }
+    function updateSignupNickHintDom(val) {
+      const hintEl = document.getElementById("signup_nick_hint");
+      if (!hintEl) return;
+      const warn = looksLikeKoreanRealName(val);
+      hintEl.style.color = warn ? "#D92D20" : "#287D62";
+      hintEl.textContent = warn
+        ? "⚠️ 실명처럼 보여요! 사생활 보호를 위해 별명이나 [🎲 랜덤 뽑기]를 사용해 주세요."
+        : "🛡️ 실명(본명)은 입력하지 마세요! 랜덤 별명으로 안전하게 활동할 수 있어요.";
+    }
+    function handleSignupNickInput(val) {
+      state.signup_nick = val;
+      updateSignupNickHintDom(val);
+    }
+    function applyRandomSignupNickname() {
+      const nextNick = generateRandomCampusNickname();
+      state.signup_nick = nextNick;
+      const el = document.getElementById("signup_nick");
+      if (el) el.value = nextNick;
+      updateSignupNickHintDom(nextNick);
     }
 
     function captureSignupFormDraft() {
