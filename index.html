@@ -9023,20 +9023,62 @@
       render();
     }
 
+    let _chatPollInFlight = false;
+    async function pollChatRoomFast(postId) {
+      const pid = Number(postId);
+      if (!pid || !getSessionToken() || !state.user_id || _chatPollInFlight) return false;
+      _chatPollInFlight = true;
+      try {
+        const res = await fetch("/api/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ action: "poll_chat", post_id: pid }, getApiAuthPayload()))
+        });
+        if (res.status === 401) {
+          setSessionToken("");
+          executeLogoutNow();
+          return false;
+        }
+        const data = await res.json();
+        if (data && data.ok && Array.isArray(data.messages)) {
+          const prevRoomMsgs = (DB.messages || []).filter(m => Number(m.post_id) === pid);
+          const prevSig = JSON.stringify(prevRoomMsgs.filter(m => Number(m.id) > 0).map(m => [m.id, m.is_read, m.reactions]));
+          const nextSig = JSON.stringify(data.messages.map(m => [m.id, m.is_read, m.reactions]));
+          if (prevSig !== nextSig) {
+            // 전송 중인 낙관적 임시 말풍선(음수 ID)은 보존하고 서버 확정 메시지와 병합
+            const pendingTempMsgs = prevRoomMsgs.filter(m => Number(m.id) < 0 && !data.messages.some(sm => String(sm.sender_id) === String(state.user_id) && sm.text === m.text));
+            const otherRoomMsgs = (DB.messages || []).filter(m => Number(m.post_id) !== pid);
+            DB.messages = [...otherRoomMsgs, ...data.messages, ...pendingTempMsgs];
+            saveDB(false);
+            updateChatBoxDOM(pid, true);
+          }
+          return true;
+        }
+      } catch (e) {} finally {
+        _chatPollInFlight = false;
+      }
+      return false;
+    }
+
     let _cloudPollTimer = null;
     function scheduleNextCloudPull(delayMs = 4000) {
       clearTimeout(_cloudPollTimer);
       _cloudPollTimer = setTimeout(async () => {
-        const isChatActive = Boolean(state.active_chat_post_id) || (state.nav_tab === "채팅" && !state.chat_list_mode);
+        const activeChatId = Number(state.active_chat_post_id || 0);
+        const isRoomOpen = Boolean(activeChatId) && (state.nav_tab === "채팅" || isPC()) && !state.chat_list_mode;
+        const isChatListTab = (state.nav_tab === "채팅" && state.chat_list_mode);
         if (document.hidden) {
-          // 백그라운드 상태에서는 서버 폴링을 중단하여 불필요한 호출 방지
           scheduleNextCloudPull(15000);
           return;
         }
-        const nextDelay = isChatActive ? 2000 : 15000;
         try {
-          await pullFromCloud(isChatActive);
+          if (isRoomOpen) {
+            await pollChatRoomFast(activeChatId);
+          } else {
+            await pullFromCloud(isChatListTab);
+          }
         } catch (e) {}
+        const nextDelay = isRoomOpen ? 700 : (isChatListTab ? 3000 : 12000);
         scheduleNextCloudPull(nextDelay);
       }, delayMs);
     }
