@@ -949,29 +949,30 @@ def _supabase_load_db():
         return None
 
 
-def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
+def _supabase_save_db(db_obj: dict, deleted_post_ids=None, sync_users: bool = True, sync_posts: bool = True) -> bool:
     if not _has_supabase() or not isinstance(db_obj, dict):
         return False
     now_ms = int(time.time() * 1000)
-    ok_state = False
-    try:
-        # 1. uldaemo_state 업서트
-        state_payload = [{"id": "main", "data": db_obj, "updated_at": now_ms}]
-        req_state = urllib.request.Request(
-            f"{SUPABASE_URL}/rest/v1/uldaemo_state?on_conflict=id",
-            data=json.dumps(state_payload, ensure_ascii=False).encode("utf-8"),
-            headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
-            method="POST",
-        )
-        with urllib.request.urlopen(req_state, timeout=6) as resp:
-            ok_state = 200 <= resp.status < 300
-    except Exception:
-        ok_state = False
 
-    # 2. uldaemo_users 테이블 행(Row) 단위 업서트
-    try:
-        users_dict = db_obj.get("users") or {}
-        if isinstance(users_dict, dict) and len(users_dict) > 0:
+    def _upsert_state():
+        try:
+            state_payload = [{"id": "main", "data": db_obj, "updated_at": now_ms}]
+            req_state = urllib.request.Request(
+                f"{SUPABASE_URL}/rest/v1/uldaemo_state?on_conflict=id",
+                data=json.dumps(state_payload, ensure_ascii=False).encode("utf-8"),
+                headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                method="POST",
+            )
+            with urllib.request.urlopen(req_state, timeout=6) as resp:
+                return 200 <= resp.status < 300
+        except Exception:
+            return False
+
+    def _upsert_users():
+        try:
+            users_dict = db_obj.get("users") or {}
+            if not isinstance(users_dict, dict) or not users_dict:
+                return
             user_rows = []
             for sid, u in users_dict.items():
                 if not isinstance(u, dict):
@@ -1006,7 +1007,6 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
                     with urllib.request.urlopen(req_users, timeout=6):
                         pass
                 except Exception:
-                    # DB에 role/email/joined_at/is_suspended 컬럼이 아직 추가되지 않은 환경에서도 무중단 유지
                     fallback_rows = [{k: v for k, v in r.items() if k not in ("role", "email", "joined_at", "is_suspended")} for r in user_rows]
                     req_users_fb = urllib.request.Request(
                         f"{SUPABASE_URL}/rest/v1/uldaemo_users?on_conflict=student_id",
@@ -1016,52 +1016,74 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None) -> bool:
                     )
                     with urllib.request.urlopen(req_users_fb, timeout=6):
                         pass
-    except Exception:
-        pass
+        except Exception:
+            pass
 
-    # 3. uldaemo_posts 테이블 행(Row) 단위 업서트 및 삭제 반영
-    try:
-        posts_list = db_obj.get("posts") or []
-        if isinstance(posts_list, list) and len(posts_list) > 0:
-            post_rows = []
-            for p in posts_list:
-                if not isinstance(p, dict) or not p.get("id"):
-                    continue
-                post_rows.append({
-                    "id": int(p.get("id")),
-                    "author_id": str(p.get("author_id") or ""),
-                    "title": str(p.get("title") or ""),
-                    "category": str(p.get("category") or ""),
-                    "location": str(p.get("location") or ""),
-                    "meet_date": str(p.get("meet_date") or ""),
-                    "meet_time": str(p.get("meet_time") or ""),
-                    "max_participants": int(p.get("max_participants") or 2),
-                    "status": str(p.get("status") or "모집중"),
-                    "is_official": bool(p.get("is_official")),
-                    "raw_data": p,
-                    "updated_at": int(p.get("updated_at") or now_ms),
-                })
-            if post_rows:
-                req_posts = urllib.request.Request(
-                    f"{SUPABASE_URL}/rest/v1/uldaemo_posts?on_conflict=id",
-                    data=json.dumps(post_rows, ensure_ascii=False).encode("utf-8"),
-                    headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
-                    method="POST",
-                )
-                with urllib.request.urlopen(req_posts, timeout=6):
-                    pass
+    def _upsert_posts():
+        try:
+            posts_list = db_obj.get("posts") or []
+            if isinstance(posts_list, list) and len(posts_list) > 0:
+                post_rows = []
+                for p in posts_list:
+                    if not isinstance(p, dict) or not p.get("id"):
+                        continue
+                    post_rows.append({
+                        "id": int(p.get("id")),
+                        "author_id": str(p.get("author_id") or ""),
+                        "title": str(p.get("title") or ""),
+                        "category": str(p.get("category") or ""),
+                        "location": str(p.get("location") or ""),
+                        "meet_date": str(p.get("meet_date") or ""),
+                        "meet_time": str(p.get("meet_time") or ""),
+                        "max_participants": int(p.get("max_participants") or 2),
+                        "status": str(p.get("status") or "모집중"),
+                        "is_official": bool(p.get("is_official")),
+                        "raw_data": p,
+                        "updated_at": int(p.get("updated_at") or now_ms),
+                    })
+                if post_rows:
+                    req_posts = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_posts?on_conflict=id",
+                        data=json.dumps(post_rows, ensure_ascii=False).encode("utf-8"),
+                        headers=_supabase_headers("resolution=merge-duplicates,return=minimal"),
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req_posts, timeout=6):
+                        pass
+        except Exception:
+            pass
+
+    def _delete_posts():
+        try:
+            if deleted_post_ids:
+                ids_csv = ",".join(str(int(x)) for x in deleted_post_ids if str(x).isdigit())
+                if ids_csv:
+                    req_del = urllib.request.Request(
+                        f"{SUPABASE_URL}/rest/v1/uldaemo_posts?id=in.({ids_csv})",
+                        headers=_supabase_headers("return=minimal"),
+                        method="DELETE",
+                    )
+                    with urllib.request.urlopen(req_del, timeout=5):
+                        pass
+        except Exception:
+            pass
+
+    # 모든 테이블 업서트·삭제를 병렬 실행하여 응답 지연(RTT) 대폭 단축
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        f_state = ex.submit(_upsert_state)
+        futs = []
+        if sync_users:
+            futs.append(ex.submit(_upsert_users))
+        if sync_posts:
+            futs.append(ex.submit(_upsert_posts))
         if deleted_post_ids:
-            ids_csv = ",".join(str(int(x)) for x in deleted_post_ids if str(x).isdigit())
-            if ids_csv:
-                req_del = urllib.request.Request(
-                    f"{SUPABASE_URL}/rest/v1/uldaemo_posts?id=in.({ids_csv})",
-                    headers=_supabase_headers("return=minimal"),
-                    method="DELETE",
-                )
-                with urllib.request.urlopen(req_del, timeout=5):
-                    pass
-    except Exception:
-        pass
+            futs.append(ex.submit(_delete_posts))
+        ok_state = f_state.result()
+        for f in futs:
+            try:
+                f.result()
+            except Exception:
+                pass
 
     return ok_state
 
@@ -1092,12 +1114,12 @@ def load_cloud_db(force: bool = False):
     return _DB_MEM_CACHE["db"]
 
 
-def save_cloud_db(db_obj: dict, deleted_post_ids=None) -> bool:
+def save_cloud_db(db_obj: dict, deleted_post_ids=None, sync_users: bool = True, sync_posts: bool = True) -> bool:
     if LOCAL_TEST_DB_PATH:
         return _local_test_save_db(db_obj)
     if _has_supabase():
         all_del_ids = db_obj.get("deleted_post_ids") or deleted_post_ids or []
-        if _supabase_save_db(db_obj, all_del_ids):
+        if _supabase_save_db(db_obj, all_del_ids, sync_users=sync_users, sync_posts=sync_posts):
             _DB_MEM_CACHE["db"] = db_obj
             _DB_MEM_CACHE["ts"] = time.time()
             return True
@@ -1198,8 +1220,12 @@ class handler(BaseHTTPRequestHandler):
             })
             db_obj["notifications"] = notifs[:200]
 
-        def _finish_mutation(db_obj: dict, actor_id: str, is_adm: bool, extra=None, deleted_post_ids=None):
-            ok = save_cloud_db(db_obj, deleted_post_ids)
+        def _finish_mutation(db_obj: dict, actor_id: str, is_adm: bool, extra=None, deleted_post_ids=None, sync_users=None, sync_posts=None):
+            if sync_users is None:
+                sync_users = action not in ("apply", "cancel_application", "accept", "reject", "send_message", "react_message", "mark_read", "mark_notifs_read", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply")
+            if sync_posts is None:
+                sync_posts = action in ("create_post", "cancel_post", "close_post", "boost_post", "leave_chat", "delete_account")
+            ok = save_cloud_db(db_obj, deleted_post_ids, sync_users=sync_users, sync_posts=sync_posts)
             payload = {
                 "ok": ok,
                 "storage": "local_test" if LOCAL_TEST_DB_PATH else ("supabase" if _has_supabase() else "github_fallback"),

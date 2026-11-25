@@ -4832,16 +4832,36 @@
       `;
     }
 
+    const _applyingPostIds = new Set();
     async function applyToPost(postId) {
-      const post = DB.posts.find(p => Number(p.id) === Number(postId));
+      const pid = Number(postId);
+      if (_applyingPostIds.has(pid)) return;
+      const post = DB.posts.find(p => Number(p.id) === pid);
       if (!post) return;
-      const res = await callApiAction("apply", { post_id: Number(postId) });
-      if (!res.ok) return showToast(res.message || "참여 신청에 실패했어요.");
-      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
-      fireConfetti();
-      showMeetupMatchCelebration(post, DB.users[state.user_id], "apply");
-      showToast("참여를 신청했어요! 방장이 수락하면 대화방이 열려요");
-      render();
+      _applyingPostIds.add(pid);
+      // 낙관적 UI 즉시 반영: 클릭하자마자 대기중 상태로 표시해 체감 지연 제거
+      const tempAppId = -Date.now();
+      const prevApps = (DB.applications || []).slice();
+      const existingPending = prevApps.find(a => Number(a.post_id) === pid && String(a.applicant_id) === String(state.user_id));
+      if (!existingPending) {
+        DB.applications = [...prevApps, { id: tempAppId, post_id: pid, applicant_id: state.user_id, status: "대기중", updated_at: Date.now() }];
+        render();
+      }
+      try {
+        const res = await callApiAction("apply", { post_id: pid });
+        if (!res.ok) {
+          DB.applications = prevApps;
+          render();
+          return showToast(res.message || "참여 신청에 실패했어요.");
+        }
+        try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
+        fireConfetti();
+        showMeetupMatchCelebration(post, DB.users[state.user_id], "apply");
+        showToast("참여를 신청했어요! 방장이 수락하면 대화방이 열려요");
+        render();
+      } finally {
+        _applyingPostIds.delete(pid);
+      }
     }
 
     function cancelMyApplication(postId) {
@@ -4862,6 +4882,100 @@
       });
     }
 
+    const CREATE_STYLE_PRESETS = [
+      "간단한 스몰토크 환영",
+      "가볍게 밥만 먹고 헤어져요",
+      "이어폰 꽂고 조용히 각자 할일",
+      "텐션 높게 놀아요",
+      "편하게 수다 떨면서 같이 해요",
+      "초면이어도 어색하지 않게 이끌어드려요"
+    ];
+
+    function syncCreateTimeFromParts() {
+      const ampmEl = document.getElementById("c_time_ampm");
+      const hrEl = document.getElementById("c_time_hour");
+      const minEl = document.getElementById("c_time_min");
+      const hiddenEl = document.getElementById("c_time");
+      if (!ampmEl || !hrEl || !minEl || !hiddenEl) return;
+      let h = parseInt(hrEl.value, 10) || 12;
+      const isPm = ampmEl.value === "PM";
+      if (isPm && h < 12) h += 12;
+      if (!isPm && h === 12) h = 0;
+      const mm = String(minEl.value || "00").padStart(2, "0");
+      hiddenEl.value = `${String(h).padStart(2, "0")}:${mm}`;
+    }
+
+    function setCreateTimeInputs(hhmm) {
+      const parts = String(hhmm || "12:30").split(":");
+      let h24 = parseInt(parts[0], 10);
+      let m = parseInt(parts[1], 10);
+      if (isNaN(h24)) h24 = 12;
+      if (isNaN(m)) m = 30;
+      const roundedMin = (Math.round(m / 10) * 10) % 60;
+      if (m >= 55) h24 = (h24 + 1) % 24;
+      const isPm = h24 >= 12;
+      const h12 = (h24 % 12) || 12;
+      const ampmEl = document.getElementById("c_time_ampm");
+      const hrEl = document.getElementById("c_time_hour");
+      const minEl = document.getElementById("c_time_min");
+      const hiddenEl = document.getElementById("c_time");
+      if (ampmEl) ampmEl.value = isPm ? "PM" : "AM";
+      if (hrEl) hrEl.value = String(h12);
+      if (minEl) minEl.value = String(roundedMin).padStart(2, "0");
+      if (hiddenEl) hiddenEl.value = `${String(h24).padStart(2, "0")}:${String(roundedMin).padStart(2, "0")}`;
+    }
+
+    function renderCreateComboOptions(kind, filterText = "") {
+      const listEl = document.getElementById(kind === "loc" ? "c_loc_dropdown" : "c_style_dropdown");
+      if (!listEl) return;
+      const allItems = kind === "loc" ? Object.keys(ULSAN_CAMPUS_COORDS) : CREATE_STYLE_PRESETS;
+      const q = String(filterText || "").trim().toLowerCase();
+      const filtered = q ? allItems.filter(item => item.toLowerCase().includes(q)) : allItems;
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div style="padding:12px 14px; font-size:13px; color:#8B95A1;">일치하는 항목이 없어요. 직접 입력해도 등록돼요!</div>`;
+        return;
+      }
+      const curVal = (document.getElementById(kind === "loc" ? "c_loc" : "c_style")?.value || "").trim();
+      listEl.innerHTML = filtered.map(item => {
+        const active = item === curVal;
+        const safeItem = escHtml(item);
+        const jsVal = item.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+        return `<button type="button" onmousedown="event.preventDefault(); selectCreateComboItem('${kind}', '${jsVal}')" style="width:100%; text-align:left; padding:11px 14px; border:none; border-bottom:1px solid #F2F4F3; background:${active ? '#EEF8F3' : '#FFFFFF'}; color:${active ? '#287D62' : '#191F28'}; font-size:13.5px; font-weight:${active ? '800' : '600'}; cursor:pointer; display:flex; align-items:center; justify-content:space-between;"><span>${safeItem}</span>${active ? '<span style="font-size:12px;">✓</span>' : ''}</button>`;
+      }).join("");
+    }
+
+    function toggleCreateComboDropdown(kind, forceShowAll = false) {
+      const listEl = document.getElementById(kind === "loc" ? "c_loc_dropdown" : "c_style_dropdown");
+      const otherEl = document.getElementById(kind === "loc" ? "c_style_dropdown" : "c_loc_dropdown");
+      if (otherEl) otherEl.style.display = "none";
+      if (!listEl) return;
+      const isOpen = listEl.style.display === "block";
+      if (isOpen && forceShowAll) {
+        listEl.style.display = "none";
+        return;
+      }
+      renderCreateComboOptions(kind, forceShowAll ? "" : (document.getElementById(kind === "loc" ? "c_loc" : "c_style")?.value || ""));
+      listEl.style.display = "block";
+    }
+
+    function selectCreateComboItem(kind, val) {
+      const inputEl = document.getElementById(kind === "loc" ? "c_loc" : "c_style");
+      const listEl = document.getElementById(kind === "loc" ? "c_loc_dropdown" : "c_style_dropdown");
+      if (inputEl) inputEl.value = val;
+      if (listEl) listEl.style.display = "none";
+    }
+
+    function clearCreateComboInput(kind) {
+      const inputEl = document.getElementById(kind === "loc" ? "c_loc" : "c_style");
+      if (inputEl) {
+        inputEl.value = "";
+        inputEl.focus();
+      }
+      renderCreateComboOptions(kind, "");
+      const listEl = document.getElementById(kind === "loc" ? "c_loc_dropdown" : "c_style_dropdown");
+      if (listEl) listEl.style.display = "block";
+    }
+
     function setCreateTitle(t, cat, loc) {
       const el = document.getElementById("c_title");
       if (el) el.value = t;
@@ -4875,19 +4989,24 @@
 
     function setCreateQuickTime(type) {
       const dateEl = document.getElementById("c_date");
-      const timeEl = document.getElementById("c_time");
-      if (!dateEl || !timeEl) return;
+      if (!dateEl) return;
       const now = new Date();
+      let hhmm = "12:30";
       if (type === "now") {
+        now.setMinutes(now.getMinutes() + 10);
         dateEl.value = getTodayStr();
-        timeEl.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       } else if (type === "30min") {
         now.setMinutes(now.getMinutes() + 30);
         dateEl.value = getTodayStr();
-        timeEl.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      } else if (type === "1hour") {
+        now.setMinutes(now.getMinutes() + 60);
+        dateEl.value = getTodayStr();
+        hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       } else if (type === "dinner") {
         dateEl.value = getTodayStr();
-        timeEl.value = "18:30";
+        hhmm = "18:30";
       } else if (type === "tomorrow_lunch") {
         const tm = new Date();
         tm.setDate(tm.getDate() + 1);
@@ -4895,8 +5014,9 @@
         const m = String(tm.getMonth() + 1).padStart(2, '0');
         const d = String(tm.getDate()).padStart(2, '0');
         dateEl.value = `${y}-${m}-${d}`;
-        timeEl.value = "12:30";
+        hhmm = "12:30";
       }
+      setCreateTimeInputs(hhmm);
       document.querySelectorAll(".time-quick-chip").forEach(c => c.classList.remove("active"));
       const target = document.getElementById(`time_chip_${type}`);
       if (target) target.classList.add("active");
@@ -5022,24 +5142,49 @@
                   ${freeSlots.map(sl => `
                     <button type="button" class="quick-chip time-quick-chip" style="border:1px solid #287D62; background:#EEF8F3; color:#287D62;" onclick="applyQuickFreeSlotToCreate('${sl.date}', '${sl.time}')">${escHtml(sl.label.replace(/^[^\w가-힣]+\s*/, ''))}</button>
                   `).join("")}
-                  <button type="button" id="time_chip_now" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:#6B7684;" onclick="setCreateQuickTime('now')">지금</button>
+                  <button type="button" id="time_chip_now" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:#6B7684;" onclick="setCreateQuickTime('now')">지금(+10분)</button>
                   <button type="button" id="time_chip_30min" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:#6B7684;" onclick="setCreateQuickTime('30min')">30분 뒤</button>
+                  <button type="button" id="time_chip_1hour" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:#6B7684;" onclick="setCreateQuickTime('1hour')">1시간 뒤</button>
                   <button type="button" id="time_chip_dinner" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:#6B7684;" onclick="setCreateQuickTime('dinner')">오늘 18:30</button>
                   <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:#6B7684;" onclick="setCreateQuickTime('tomorrow_lunch')">내일 점심</button>
                 </div>
-                <div class="row-2" style="margin-bottom:18px;">
-                  <input id="c_date" type="date" class="input" value="${escHtml(state.prefill_date || getTodayStr())}" min="${getTodayStr()}" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:13.5px; font-weight:600; margin-bottom:0;" />
-                  <input id="c_time" type="time" class="input" value="${escHtml(state.prefill_time || '12:30')}" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:13.5px; font-weight:600; margin-bottom:0;" />
-                </div>
+                ${(() => {
+                  const initT = String(state.prefill_time || "12:30").split(":");
+                  const initH24 = parseInt(initT[0], 10) || 12;
+                  const initM = String((Math.round((parseInt(initT[1], 10) || 30) / 10) * 10) % 60).padStart(2, "0");
+                  const initAmPm = initH24 >= 12 ? "PM" : "AM";
+                  const initH12 = (initH24 % 12) || 12;
+                  const initVal = `${String(initH24).padStart(2, "0")}:${initM}`;
+                  return `
+                    <div style="display:grid; grid-template-columns:1.25fr 0.72fr 0.72fr 0.72fr; gap:6px; margin-bottom:18px;">
+                      <input id="c_date" type="date" class="input" value="${escHtml(state.prefill_date || getTodayStr())}" min="${getTodayStr()}" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:13px; font-weight:700; padding:0 10px; margin-bottom:0;" />
+                      <select id="c_time_ampm" class="select" onchange="syncCreateTimeFromParts()" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:13px; font-weight:700; padding:0 8px; margin-bottom:0;">
+                        <option value="AM" ${initAmPm === "AM" ? "selected" : ""}>오전</option>
+                        <option value="PM" ${initAmPm === "PM" ? "selected" : ""}>오후</option>
+                      </select>
+                      <select id="c_time_hour" class="select" onchange="syncCreateTimeFromParts()" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:13px; font-weight:700; padding:0 8px; margin-bottom:0;">
+                        ${[12,1,2,3,4,5,6,7,8,9,10,11].map(h => `<option value="${h}" ${initH12 === h ? "selected" : ""}>${h}시</option>`).join("")}
+                      </select>
+                      <select id="c_time_min" class="select" onchange="syncCreateTimeFromParts()" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:13px; font-weight:700; padding:0 8px; margin-bottom:0;">
+                        ${["00","10","20","30","40","50"].map(m => `<option value="${m}" ${initM === m ? "selected" : ""}>${m}분</option>`).join("")}
+                      </select>
+                      <input id="c_time" type="hidden" value="${escHtml(initVal)}" />
+                    </div>
+                  `;
+                })()}
               </div>
 
               <!-- 우측 열: 장소 + 인원 + 분위기 -->
               <div class="pc-create-col-right">
                 <div style="font-size:13px; font-weight:700; color:#6B7684; margin-bottom:8px;">만날 장소 (건물 단위 표시)</div>
-                <input id="c_loc" list="loc_presets" class="input" value="${escHtml(state.prefill_loc || '22호관 학생회관')}" placeholder="호관 또는 장소 검색" style="height:48px; background:#F7F9F8; border:none; border-radius:14px; font-size:15px; font-weight:600; padding:0 16px; margin-bottom:20px;" />
-                <datalist id="loc_presets">
-                  ${buildingList.map(b => `<option value="${b}"></option>`).join("")}
-                </datalist>
+                <div style="position:relative; margin-bottom:20px;">
+                  <div style="display:flex; align-items:center; background:#F7F9F8; border-radius:14px; padding-right:6px;">
+                    <input id="c_loc" class="input" value="${escHtml(state.prefill_loc || '22호관 학생회관')}" placeholder="호관 또는 장소 검색" autocomplete="off" oninput="renderCreateComboOptions('loc', this.value); document.getElementById('c_loc_dropdown').style.display='block';" onfocus="renderCreateComboOptions('loc', ''); document.getElementById('c_loc_dropdown').style.display='block';" onblur="setTimeout(()=>{ const d=document.getElementById('c_loc_dropdown'); if(d) d.style.display='none'; }, 160)" style="flex:1; height:48px; background:transparent; border:none; border-radius:14px; font-size:14.5px; font-weight:600; padding:0 12px 0 16px; margin-bottom:0;" />
+                    <button type="button" title="지우기" onmousedown="event.preventDefault(); clearCreateComboInput('loc')" style="width:32px; height:32px; border:none; background:transparent; color:#98A2B3; font-size:14px; font-weight:700; cursor:pointer; border-radius:50%; flex-shrink:0;">✕</button>
+                    <button type="button" title="전체 호관 보기" onmousedown="event.preventDefault(); toggleCreateComboDropdown('loc', true)" style="width:34px; height:34px; border:none; background:#FFFFFF; color:#287D62; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06); flex-shrink:0;">▾</button>
+                  </div>
+                  <div id="c_loc_dropdown" style="display:none; position:absolute; left:0; right:0; top:52px; max-height:220px; overflow-y:auto; background:#FFFFFF; border:1.5px solid #D5E4DC; border-radius:14px; box-shadow:0 10px 26px rgba(17,24,39,0.12); z-index:90;"></div>
+                </div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                   <span style="font-size:13px; font-weight:700; color:#6B7684;">모집 인원 (나 포함)</span>
@@ -5058,17 +5203,18 @@
 
                 <div style="font-size:13px; font-weight:700; color:#6B7684; margin-bottom:8px;">모임 분위기</div>
                 <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
-                  ${["가볍게 밥만", "간단한 스몰토크 환영", "조용히 각자 할일", "텐션 높게 놀아요"].map((st, idx) => `
-                    <button type="button" class="quick-chip" style="border:none; background:#F7F9F8; color:#4E5968;" onclick="const el=document.getElementById('c_style'); if(el) el.value='${st}';">${st}</button>
+                  ${["가볍게 밥만", "간단한 스몰토크 환영", "조용히 각자 할일", "텐션 높게 놀아요"].map((st) => `
+                    <button type="button" class="quick-chip" style="border:none; background:#F7F9F8; color:#4E5968;" onclick="selectCreateComboItem('style', '${st}')">${st}</button>
                   `).join("")}
                 </div>
-                <input id="c_style" list="style_presets" class="input" value="간단한 스몰토크 환영" style="height:46px; background:#F7F9F8; border:none; border-radius:14px; font-size:14px; font-weight:600; padding:0 16px; margin-bottom:0;" />
-                <datalist id="style_presets">
-                  <option value="간단한 스몰토크 환영"></option>
-                  <option value="이어폰 꽂고 조용히 각자 할일"></option>
-                  <option value="텐션 높게 놀아요"></option>
-                  <option value="가볍게 밥만 먹고 헤어져요"></option>
-                </datalist>
+                <div style="position:relative;">
+                  <div style="display:flex; align-items:center; background:#F7F9F8; border-radius:14px; padding-right:6px;">
+                    <input id="c_style" class="input" value="간단한 스몰토크 환영" placeholder="분위기 선택 또는 직접 입력" autocomplete="off" oninput="renderCreateComboOptions('style', this.value); document.getElementById('c_style_dropdown').style.display='block';" onfocus="renderCreateComboOptions('style', ''); document.getElementById('c_style_dropdown').style.display='block';" onblur="setTimeout(()=>{ const d=document.getElementById('c_style_dropdown'); if(d) d.style.display='none'; }, 160)" style="flex:1; height:46px; background:transparent; border:none; border-radius:14px; font-size:14px; font-weight:600; padding:0 12px 0 16px; margin-bottom:0;" />
+                    <button type="button" title="지우기" onmousedown="event.preventDefault(); clearCreateComboInput('style')" style="width:32px; height:32px; border:none; background:transparent; color:#98A2B3; font-size:14px; font-weight:700; cursor:pointer; border-radius:50%; flex-shrink:0;">✕</button>
+                    <button type="button" title="전체 분위기 보기" onmousedown="event.preventDefault(); toggleCreateComboDropdown('style', true)" style="width:34px; height:34px; border:none; background:#FFFFFF; color:#287D62; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06); flex-shrink:0;">▾</button>
+                  </div>
+                  <div id="c_style_dropdown" style="display:none; position:absolute; left:0; right:0; top:50px; max-height:200px; overflow-y:auto; background:#FFFFFF; border:1.5px solid #D5E4DC; border-radius:14px; box-shadow:0 10px 26px rgba(17,24,39,0.12); z-index:90;"></div>
+                </div>
               </div>
             </div>
 
@@ -5095,14 +5241,17 @@
 
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px; padding-top:18px; border-top:1px solid #F2F4F3;">
               <button type="button" onclick="state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();" style="height:48px; padding:0 22px; border-radius:24px; border:none; background:#F7F9F8; color:#6B7684; font-size:14.5px; font-weight:700; cursor:pointer;">취소</button>
-              <button type="button" onclick="submitCreatePost()" style="flex:1; max-width:260px; height:48px; border-radius:24px; border:none; background:#287D62; color:#FFFFFF; font-size:15.5px; font-weight:800; cursor:pointer;">번개 열기</button>
+              <button id="btn_submit_create_post" type="button" onclick="submitCreatePost()" style="flex:1; max-width:260px; height:48px; border-radius:24px; border:none; background:#287D62; color:#FFFFFF; font-size:15.5px; font-weight:800; cursor:pointer;">번개 열기</button>
             </div>
           </div>
         </div>
       `;
     }
 
+    let _creatingPost = false;
     async function submitCreatePost() {
+      if (_creatingPost) return;
+      syncCreateTimeFromParts();
       const title = document.getElementById("c_title").value.trim();
       const category = document.getElementById("c_cat").value.trim();
       const meet_date = document.getElementById("c_date").value;
@@ -5153,18 +5302,35 @@
         state.prefill_boost = false;
       }
 
-      const res = await callApiAction("create_post", {
-        title,
-        category,
-        meet_date,
-        meet_time,
-        location,
-        max_participants: max_p,
-        meeting_style: style,
-        is_official,
-        use_boost: useBoost
-      });
-      if (!res.ok) return showToast(res.message || "번개 등록에 실패했어요.");
+      _creatingPost = true;
+      const submitBtn = document.getElementById("btn_submit_create_post");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = "0.7";
+        submitBtn.textContent = "번개 여는 중...";
+      }
+      let res;
+      try {
+        res = await callApiAction("create_post", {
+          title,
+          category,
+          meet_date,
+          meet_time,
+          location,
+          max_participants: max_p,
+          meeting_style: style,
+          is_official,
+          use_boost: useBoost
+        });
+      } finally {
+        _creatingPost = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = "1";
+          submitBtn.textContent = "번개 열기";
+        }
+      }
+      if (!res || !res.ok) return showToast((res && res.message) || "번개 등록에 실패했어요.");
       const newId = res.post_id || (DB.posts[0] && DB.posts[0].id);
       const createdPost = (DB.posts || []).find(p => Number(p.id) === Number(newId)) || { title, location, meet_time, author_id: state.user_id };
       window._justCreatedPostId = newId;
