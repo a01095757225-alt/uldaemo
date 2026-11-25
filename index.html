@@ -3432,10 +3432,10 @@
             <div class="privacy-badge"><span>방장 수락 전까지 실명과 이메일은 절대 외부에 노출되지 않습니다.</span></div>
 
             <label class="label">학번 (아이디) (필수)</label>
-            <input id="signup_sid" class="input" placeholder="예: 20240001" />
+            <input id="signup_sid" class="input" value="${escHtml(state.signup_sid || '')}" oninput="state.signup_sid=this.value;" placeholder="예: 20240001" />
 
             <label class="label">로그인 비밀번호 설정 (4자리 이상) (필수)</label>
-            <input id="signup_pw" type="password" class="input" placeholder="비밀번호 4자리 이상 (자동 로그인 유지)" autocomplete="new-password" />
+            <input id="signup_pw" type="password" class="input" value="${escHtml(state.signup_pw || '')}" oninput="state.signup_pw=this.value;" placeholder="비밀번호 4자리 이상 (자동 로그인 유지)" autocomplete="new-password" />
 
             <div style="margin: 10px 0;">
               <div style="font-size:13px; font-weight:700; margin-bottom:4px;">Step 1. 이메일 본인 인증 (구글·네이버·학교메일 모두 가능)</div>
@@ -3463,20 +3463,20 @@
 
             <div style="font-size:13px; font-weight:700; margin: 10px 0 6px;">Step 2. 블라인드 프로필 작성 (필수 항목)</div>
             <label class="label">닉네임 (익명 표시용) (필수)</label>
-            <input id="signup_nick" class="input" placeholder="예: 푸른솔" />
+            <input id="signup_nick" class="input" value="${escHtml(state.signup_nick || '')}" oninput="state.signup_nick=this.value;" placeholder="예: 푸른솔" />
 
             <div class="row-2">
               <div>
                 <label class="label">프로필 아바타 (필수)</label>
-                <select id="signup_avatar" class="select">
-                  ${AVATARS.map(a => `<option value="${a}">${a}</option>`).join("")}
+                <select id="signup_avatar" class="select" onchange="state.signup_avatar=this.value;">
+                  ${AVATARS.map(a => `<option value="${a}" ${state.signup_avatar === a ? 'selected' : ''}>${a}</option>`).join("")}
                 </select>
               </div>
               <div>
                 <label class="label">성별 (필수)</label>
-                <select id="signup_gender" class="select">
-                  <option value="남성">남성</option>
-                  <option value="여성">여성</option>
+                <select id="signup_gender" class="select" onchange="state.signup_gender=this.value;">
+                  <option value="남성" ${(state.signup_gender || '남성') === '남성' ? 'selected' : ''}>남성</option>
+                  <option value="여성" ${state.signup_gender === '여성' ? 'selected' : ''}>여성</option>
                 </select>
               </div>
             </div>
@@ -3484,12 +3484,12 @@
             <div class="row-2">
               <div>
                 <label class="label">학과 (필수)</label>
-                <input id="signup_dept" class="input" value="" placeholder="예: 컴퓨터공학과, 경영학과" />
+                <input id="signup_dept" class="input" value="${escHtml(state.signup_dept || '')}" oninput="state.signup_dept=this.value;" placeholder="예: 컴퓨터공학과, 경영학과" />
               </div>
               <div>
                 <label class="label">MBTI (필수)</label>
-                <select id="signup_mbti" class="select">
-                  ${MBTIS.map(m => `<option value="${m}">${m}</option>`).join("")}
+                <select id="signup_mbti" class="select" onchange="state.signup_mbti=this.value;">
+                  ${MBTIS.map(m => `<option value="${m}" ${state.signup_mbti === m ? 'selected' : ''}>${m}</option>`).join("")}
                 </select>
               </div>
             </div>
@@ -3718,7 +3718,25 @@
       return showToast("로그인 정보를 다시 확인해주세요.");
     }
 
+    function captureSignupFormDraft() {
+      const sidEl = document.getElementById("signup_sid");
+      const pwEl = document.getElementById("signup_pw");
+      const nickEl = document.getElementById("signup_nick");
+      const avatarEl = document.getElementById("signup_avatar");
+      const genderEl = document.getElementById("signup_gender");
+      const deptEl = document.getElementById("signup_dept");
+      const mbtiEl = document.getElementById("signup_mbti");
+      if (sidEl) state.signup_sid = sidEl.value;
+      if (pwEl) state.signup_pw = pwEl.value;
+      if (nickEl) state.signup_nick = nickEl.value;
+      if (avatarEl) state.signup_avatar = avatarEl.value;
+      if (genderEl) state.signup_gender = genderEl.value;
+      if (deptEl) state.signup_dept = deptEl.value;
+      if (mbtiEl) state.signup_mbti = mbtiEl.value;
+    }
+
     async function requestEmailOtp() {
+      captureSignupFormDraft();
       const em = document.getElementById("signup_email").value.trim();
       const re = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
       if (!re.test(em)) return showToast("올바른 이메일 주소(예: id@gmail.com, id@naver.com)를 입력해주세요.");
@@ -3749,6 +3767,7 @@
     }
 
     function confirmEmailOtp() {
+      captureSignupFormDraft();
       const code = document.getElementById("signup_otp_code").value.trim();
       if (!state.signup_otp_token || !/^\d{6}$/.test(code)) {
         return showToast("메일로 받은 6자리 숫자 인증번호를 입력해주세요.");
@@ -3813,6 +3832,10 @@
         }
         if (data.session_token) setSessionToken(data.session_token);
         if (data.db) applyServerSnapshot(data.db);
+        state.signup_sid = "";
+        state.signup_pw = "";
+        state.signup_nick = "";
+        state.signup_dept = "";
         openBlindOnboardingIfNew(sid);
         showToast("가입 완료! 지금부터 30일간 자동 로그인이 유지됩니다.");
         persistLogin(sid);
