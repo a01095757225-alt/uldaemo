@@ -855,15 +855,19 @@ def _supabase_fetch_table(query_path: str):
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _supabase_load_db():
+def _supabase_load_db(include_users_table: bool = True):
     if not _has_supabase():
         return None
     try:
-        with ThreadPoolExecutor(max_workers=2) as ex:
-            f_state = ex.submit(_supabase_fetch_table, "uldaemo_state?id=eq.main&select=data,updated_at")
-            f_users = ex.submit(_supabase_fetch_table, "uldaemo_users?select=*")
-            state_rows = f_state.result()
-            user_rows = f_users.result()
+        if include_users_table:
+            with ThreadPoolExecutor(max_workers=2) as ex:
+                f_state = ex.submit(_supabase_fetch_table, "uldaemo_state?id=eq.main&select=data,updated_at")
+                f_users = ex.submit(_supabase_fetch_table, "uldaemo_users?select=*")
+                state_rows = f_state.result()
+                user_rows = f_users.result()
+        else:
+            state_rows = _supabase_fetch_table("uldaemo_state?id=eq.main&select=data,updated_at")
+            user_rows = None
 
         db_obj = None
         if isinstance(state_rows, list) and len(state_rows) > 0:
@@ -1088,7 +1092,7 @@ def _supabase_save_db(db_obj: dict, deleted_post_ids=None, sync_users: bool = Tr
     return ok_state
 
 
-def load_cloud_db(force: bool = False):
+def load_cloud_db(force: bool = False, include_users_table: bool = True):
     if LOCAL_TEST_DB_PATH:
         return _local_test_load_db()
     now = time.time()
@@ -1097,7 +1101,7 @@ def load_cloud_db(force: bool = False):
 
     # 1순위: Supabase PostgreSQL DB (설정되어 있으면 오래된 GitHub 스냅샷으로 절대 폴백하지 않음)
     if _has_supabase():
-        sb_db = _supabase_load_db()
+        sb_db = _supabase_load_db(include_users_table=include_users_table)
         if isinstance(sb_db, dict) and "users" in sb_db:
             _DB_MEM_CACHE["db"] = sb_db
             _DB_MEM_CACHE["ts"] = now
@@ -1185,13 +1189,13 @@ class handler(BaseHTTPRequestHandler):
             })
             return
 
-        def _require_auth(allow_suspended: bool = False):
+        def _require_auth(allow_suspended: bool = False, include_users_table: bool = False):
             tok = str(data.get("session_token") or "").strip()
             sess = _verify_session_token(tok)
             if not sess:
                 self._send_json(401, {"ok": False, "error": "AUTH_REQUIRED", "message": "로그인이 필요합니다."})
                 return None, None, False
-            db_obj = load_cloud_db(force=True)
+            db_obj = load_cloud_db(force=True, include_users_table=include_users_table)
             if not isinstance(db_obj, dict):
                 self._send_json(503, {"ok": False, "error": "DB_UNAVAILABLE", "message": "데이터베이스에 연결할 수 없습니다."})
                 return None, None, False

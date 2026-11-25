@@ -4839,14 +4839,18 @@
       const post = DB.posts.find(p => Number(p.id) === pid);
       if (!post) return;
       _applyingPostIds.add(pid);
-      // 낙관적 UI 즉시 반영: 클릭하자마자 대기중 상태로 표시해 체감 지연 제거
+      // 0ms 즉각 낙관적 UI 반영 (서버 응답을 기다리지 않고 바로 신청 완료 UX 제공)
       const tempAppId = -Date.now();
       const prevApps = (DB.applications || []).slice();
       const existingPending = prevApps.find(a => Number(a.post_id) === pid && String(a.applicant_id) === String(state.user_id));
       if (!existingPending) {
         DB.applications = [...prevApps, { id: tempAppId, post_id: pid, applicant_id: state.user_id, status: "대기중", updated_at: Date.now() }];
-        render();
       }
+      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
+      fireConfetti();
+      showMeetupMatchCelebration(post, DB.users[state.user_id], "apply");
+      showToast("참여를 신청했어요! 방장이 수락하면 대화방이 열려요");
+      render();
       try {
         const res = await callApiAction("apply", { post_id: pid });
         if (!res.ok) {
@@ -4854,10 +4858,6 @@
           render();
           return showToast(res.message || "참여 신청에 실패했어요.");
         }
-        try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
-        fireConfetti();
-        showMeetupMatchCelebration(post, DB.users[state.user_id], "apply");
-        showToast("참여를 신청했어요! 방장이 수락하면 대화방이 열려요");
         render();
       } finally {
         _applyingPostIds.delete(pid);
@@ -5303,15 +5303,39 @@
       }
 
       _creatingPost = true;
-      const submitBtn = document.getElementById("btn_submit_create_post");
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.style.opacity = "0.7";
-        submitBtn.textContent = "번개 여는 중...";
-      }
-      let res;
+      // 0ms 즉각 낙관적 UI 반영: 모달을 즉시 닫고 홈 피드 최상단에 번개 카드를 바로 표시
+      const tempPostId = -Date.now();
+      const prevPosts = (DB.posts || []).slice();
+      const optimisticPost = {
+        id: tempPostId,
+        author_id: state.user_id,
+        title,
+        category,
+        meet_date,
+        meet_time,
+        location,
+        max_participants: max_p,
+        accepted_count: 1,
+        meeting_style: style,
+        status: "모집중",
+        is_official,
+        is_boosted: useBoost,
+        created_at: Date.now(),
+        updated_at: Date.now()
+      };
+      DB.posts = [optimisticPost, ...prevPosts];
+      window._justCreatedPostId = tempPostId;
+      state.prefill_title = ""; state.prefill_loc = ""; state.prefill_date = ""; state.prefill_time = ""; state.invite_mate_id = null;
+      state.active_modal = null;
+      state.nav_tab = "홈";
+      render();
+      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([25, 40, 45]); } catch (e) {}
+      triggerLightningFlash();
+      fireConfetti({ mode: "match" });
+      showMeetupMatchCelebration(optimisticPost, null, "create");
+      showToast("⚡ 새 번개를 올렸어요!");
       try {
-        res = await callApiAction("create_post", {
+        const res = await callApiAction("create_post", {
           title,
           category,
           meet_date,
@@ -5322,28 +5346,17 @@
           is_official,
           use_boost: useBoost
         });
+        if (!res || !res.ok) {
+          DB.posts = prevPosts;
+          render();
+          return showToast((res && res.message) || "번개 등록에 실패했어요.");
+        }
+        window._justCreatedPostId = res.post_id || (DB.posts[0] && DB.posts[0].id);
+        render();
       } finally {
         _creatingPost = false;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.style.opacity = "1";
-          submitBtn.textContent = "번개 열기";
-        }
+        setTimeout(() => { window._justCreatedPostId = null; }, 1200);
       }
-      if (!res || !res.ok) return showToast((res && res.message) || "번개 등록에 실패했어요.");
-      const newId = res.post_id || (DB.posts[0] && DB.posts[0].id);
-      const createdPost = (DB.posts || []).find(p => Number(p.id) === Number(newId)) || { title, location, meet_time, author_id: state.user_id };
-      window._justCreatedPostId = newId;
-      state.prefill_title = ""; state.prefill_loc = ""; state.prefill_date = ""; state.prefill_time = ""; state.invite_mate_id = null;
-      state.active_modal = null;
-      state.nav_tab = "홈";
-      render();
-      try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([25, 40, 45]); } catch (e) {}
-      triggerLightningFlash();
-      fireConfetti({ mode: "match" });
-      showMeetupMatchCelebration(createdPost, null, "create");
-      showToast("⚡ 새 번개를 올렸어요!");
-      setTimeout(() => { window._justCreatedPostId = null; }, 1200);
     }
 
     function openDetailModal(postId) {
