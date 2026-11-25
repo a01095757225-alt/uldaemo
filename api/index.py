@@ -1509,6 +1509,47 @@ class handler(BaseHTTPRequestHandler):
             })
             return
 
+        if action == "poll_chat":
+            db_obj, actor_id, is_adm = _require_auth(allow_suspended=True, include_users_table=False)
+            if not db_obj:
+                return
+            try:
+                post_id = int(data.get("post_id"))
+            except Exception:
+                self._send_json(400, {"ok": False, "message": "잘못된 대화방 ID입니다."})
+                return
+            post = next((p for p in (db_obj.get("posts") or []) if isinstance(p, dict) and int(p.get("id") or 0) == post_id), None)
+            if not post:
+                self._send_json(404, {"ok": False, "message": "대화방을 찾을 수 없습니다."})
+                return
+            is_member = (str(post.get("author_id")) == actor_id) or any(
+                isinstance(a, dict) and int(a.get("post_id") or 0) == post_id and str(a.get("applicant_id")) == actor_id and a.get("status") == "승인됨"
+                for a in (db_obj.get("applications") or [])
+            )
+            if not is_member:
+                self._send_json(403, {"ok": False, "message": "수락된 참여자만 이 대화방에 접근할 수 있습니다."})
+                return
+            room_msgs = []
+            for m in (db_obj.get("messages") or []):
+                if not isinstance(m, dict) or int(m.get("post_id") or 0) != post_id:
+                    continue
+                sm = {
+                    "id": m.get("id"),
+                    "post_id": post_id,
+                    "sender_id": "AI_BOT" if m.get("sender_id") == "AI_BOT" else _mask_uid(str(m.get("sender_id") or ""), actor_id),
+                    "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
+                    "created_at": m.get("created_at"),
+                    "is_read": int(m.get("is_read") or 0),
+                    "reactions": m.get("reactions") if isinstance(m.get("reactions"), dict) else {},
+                }
+                if m.get("sender_id") == "AI_BOT":
+                    sm["kind"] = str(m.get("kind") or "ai_icebreaker")
+                    if isinstance(m.get("suggestions"), list):
+                        sm["suggestions"] = [_strip_html_tags(x) for x in m["suggestions"]]
+                room_msgs.append(sm)
+            self._send_json(200, {"ok": True, "post_id": post_id, "messages": room_msgs})
+            return
+
         # ---- 5) 동작별 전용 API (모든 actor_id는 session_token에서만 추출) ----
         if action == "create_post":
             db_obj, actor_id, is_adm = _require_auth()
