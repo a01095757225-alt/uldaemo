@@ -7196,20 +7196,55 @@
       return msgUnread + pendingHost.length;
     }
 
+    const _markReadInFlight = new Set();
+    function markChatRoomReadOnServer(postId) {
+      const pid = Number(postId);
+      const myId = String(state.user_id || "");
+      if (!pid || !myId || !getSessionToken()) return false;
+      let hasUnread = false;
+      (DB.messages || []).forEach(m => {
+        if (m && Number(m.post_id) === pid && String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
+          m.is_read = 1;
+          m.updated_at = Date.now();
+          hasUnread = true;
+        }
+      });
+      if (!hasUnread) return false;
+      saveDB(false);
+      if (_markReadInFlight.has(pid)) return true;
+      _markReadInFlight.add(pid);
+      callApiAction("mark_read", { post_id: pid })
+        .then(() => {
+          updateAllChatBoxesInPlace();
+          // 읽음 반영 후 좌측/하단 배지 및 목록 카운트 갱신
+          const ae = document.activeElement;
+          if (!ae || !(ae.id && ae.id.startsWith("chat_in_"))) {
+            renderWithoutMapFlicker();
+          }
+        })
+        .catch(() => {})
+        .finally(() => { _markReadInFlight.delete(pid); });
+      return true;
+    }
+
     function openChatRoom(postId) {
-      state.active_chat_post_id = Number(postId);
+      const pid = Number(postId);
+      state.active_chat_post_id = pid;
       state.chat_list_mode = false;
+      const triggeredMarkRead = markChatRoomReadOnServer(pid);
       render();
       setTimeout(() => {
-        const box = document.getElementById(`chat_box_${postId}`);
+        const box = document.getElementById(`chat_box_${pid}`);
         if (box) box.scrollTop = box.scrollHeight;
         if (isPC()) {
-          const inp = document.getElementById(`chat_in_${postId}`);
+          const inp = document.getElementById(`chat_in_${pid}`);
           if (inp) inp.focus();
         }
       }, 30);
-      pullFromCloud(true);
-      scheduleNextCloudPull(1000);
+      if (!triggeredMarkRead) {
+        pullFromCloud(true);
+      }
+      scheduleNextCloudPull(1500);
     }
 
     function backToChatList() {
@@ -7479,16 +7514,9 @@
       const partner = DB.users[partnerId] || { avatar: "🐶", nickname: partnerId, department: "울산대", manner_temp: 36.5 };
       const otherNames = otherIds.map(uid => (DB.users[uid] && DB.users[uid].nickname) ? DB.users[uid].nickname : uid).join(", ");
 
-      let markedRead = false;
-      msgs.forEach(m => {
-        if (String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
-          m.is_read = 1;
-          m.updated_at = Date.now();
-          markedRead = true;
-        }
-      });
-      if (markedRead) {
-        setTimeout(() => saveDB(false), 80);
+      const hasUnreadHere = msgs.some(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read);
+      if (hasUnreadHere) {
+        markChatRoomReadOnServer(post.id);
       }
 
       const isActionOpen = Boolean(state[`chat_action_open_${post.id}`]);
@@ -7708,16 +7736,9 @@
       const lastPartnerMsg = msgs.filter(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT").slice(-1)[0];
       const lastPartnerTime = lastPartnerMsg ? (lastPartnerMsg.time || lastPartnerMsg.id || 0) : 0;
 
-      let markedRead = false;
-      msgs.forEach(m => {
-        if (String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read) {
-          m.is_read = 1;
-          m.updated_at = Date.now();
-          markedRead = true;
-        }
-      });
-      if (markedRead) {
-        setTimeout(() => saveDB(false), 100);
+      const hasUnreadInBox = msgs.some(m => String(m.sender_id) !== myId && m.sender_id !== "AI_BOT" && !m.is_read);
+      if (hasUnreadInBox) {
+        markChatRoomReadOnServer(postId);
       }
 
       if (msgs.length === 0) {
@@ -7931,16 +7952,38 @@
       input.style.borderRadius = isPC() ? "12px" : "22px";
       input.focus();
 
-      const res = await callApiAction("send_message", { post_id: Number(postId), text: txt });
-      if (!res.ok) {
-        return showToast(res.message || "메시지 전송에 실패했어요.");
-      }
+      // 0ms 즉각 낙관적 말풍선 표시 (카카오톡처럼 딜레이 없이 바로 화면에 출력)
+      const nowMs = Date.now();
+      const tempMsgId = -nowMs;
+      const nowD = new Date(nowMs);
+      const createdAtStr = `${String(nowD.getHours()).padStart(2, "0")}:${String(nowD.getMinutes()).padStart(2, "0")}`;
+      const optimisticMsg = {
+        id: tempMsgId,
+        post_id: Number(postId),
+        sender_id: state.user_id,
+        text: txt,
+        time: nowMs,
+        created_at: createdAtStr,
+        is_read: 0,
+        reactions: {}
+      };
+      DB.messages = [...(DB.messages || []), optimisticMsg];
       if (!updateChatBoxDOM(postId, true)) {
         render();
         const restored = document.getElementById(`chat_in_${postId}`);
         if (restored) restored.focus();
       }
-      scheduleNextCloudPull(800);
+
+      const res = await callApiAction("send_message", { post_id: Number(postId), text: txt });
+      if (!res.ok) {
+        DB.messages = (DB.messages || []).filter(m => m.id !== tempMsgId);
+        if (!updateChatBoxDOM(postId, false)) render();
+        return showToast(res.message || "메시지 전송에 실패했어요.");
+      }
+      if (!updateChatBoxDOM(postId, true)) {
+        render();
+      }
+      scheduleNextCloudPull(1500);
 
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput && document.activeElement !== curInput) {
