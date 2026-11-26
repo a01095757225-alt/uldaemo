@@ -4633,14 +4633,8 @@
       const minRating = Number(state.food_min_rating || 4.6);
       const platform = state.food_platform || "all";
       const zone = state.food_zone || "all";
-      const homeCat = state.home_cat || "전체";
       return MUGEO_FOOD_SPOTS.filter(s => {
         if (zone !== "all" && s.zone !== zone) return false;
-        if (homeCat !== "전체") {
-          if (homeCat.includes("밥") && !s.cat.includes("밥")) return false;
-          if (homeCat.includes("카공") && !s.cat.includes("카공")) return false;
-          if ((homeCat.includes("술") || homeCat.includes("번개")) && !s.cat.includes("술")) return false;
-        }
         const score = getSpotScoreByPlatform(s, platform);
         return score + 1e-6 >= minRating;
       });
