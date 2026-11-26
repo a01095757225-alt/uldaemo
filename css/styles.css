@@ -3067,4 +3067,81 @@ body {
   .fade-scroll-wrap.on-bg::after {
     background: linear-gradient(to left, rgba(244, 246, 248, 0.98), rgba(244, 246, 248, 0)) !important;
   }
+
+  /* ===== Figma 모바일 v3 (토스풍 · 30:2) =====
+     - 둥근 모서리: 카드 24 · 버튼 16 · 입력 16 · 시트 28 · 칩 알약
+     - 테두리 대신 은은한 그림자 (0 4px 20px rgba(26,31,41,0.06))
+     - 채움형 입력창 및 비활성 카테고리 칩 (테두리 없음) */
+  :root {
+    --radius-card: 24px;
+    --radius-btn: 16px;
+    --radius-input: 16px;
+    --radius-chip: 999px;
+  }
+  .uldaemo-card,
+  .tk-feed-item,
+  .balance-ab-card {
+    border: none !important;
+    border-radius: 24px !important;
+    box-shadow: 0 4px 20px rgba(26, 31, 41, 0.06) !important;
+  }
+  .cat-btn {
+    border: none !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 2px 10px rgba(26, 31, 41, 0.04) !important;
+    border-radius: 999px !important;
+  }
+  .cat-btn.active,
+  .cat-btn.active:hover {
+    background: #287D62 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 12px rgba(40, 125, 98, 0.22) !important;
+  }
+  .input,
+  .select,
+  .textarea,
+  .tk-search-box {
+    border: none !important;
+    background: #F4F6F8 !important;
+    border-radius: 16px !important;
+  }
+  .profile-sheet-panel {
+    border-radius: 28px 28px 0 0 !important;
+  }
+}
+
+/* Figma M19 메뉴 룰렛 v3 (토스풍 심플 원판 & GO 버튼) */
+.roulette-wheel {
+  border: 6px solid #E5E8EB !important;
+  box-shadow: 0 8px 24px rgba(26, 31, 41, 0.08) !important;
+  background: conic-gradient(
+    #287D62 0deg 60deg,
+    #EEF8F3 60deg 120deg,
+    #4C957C 120deg 180deg,
+    #FFFFFF 180deg 240deg,
+    #2F8569 240deg 300deg,
+    #EEF8F3 300deg 360deg
+  ) !important;
+}
+.roulette-peg {
+  display: none !important;
+}
+.roulette-center-btn {
+  width: 68px !important;
+  height: 68px !important;
+  border-radius: 50% !important;
+  background: #FFFFFF !important;
+  color: #1F6A52 !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(26, 31, 41, 0.16) !important;
+  font-size: var(--fs-lg) !important;
+  font-weight: 800 !important;
+}
+.roulette-label-inner.v3-slice-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: var(--fs-md) !important;
+  font-weight: 800 !important;
+  padding: 0 !important;
 }
