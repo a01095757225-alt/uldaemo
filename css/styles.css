@@ -1410,23 +1410,16 @@ body {
   color: #287D62;
 }
 
-/* ===== 스크롤 개선: 상단 고정 카테고리 칩 바 ===== */
+/* ===== 카테고리 칩 바 (자연스러운 인라인 배치, 스크롤 시 겹침 방지) ===== */
 .category-sticky-wrap {
-  position: sticky;
-  top: 6px;
-  z-index: 45;
-  background: rgba(247, 249, 248, 0.94);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 6px 2px;
-  margin-bottom: 8px;
-  border-radius: 14px;
-  transition: background 0.2s ease, box-shadow 0.2s ease;
-}
-@media (min-width: 1024px) {
-  .category-sticky-wrap {
-    top: 14px;
-  }
+  position: static;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 2px 0;
+  margin-bottom: 10px;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* ===== 스크롤 개선: 플로팅 맨 위로 가기 버튼 ===== */
@@ -1566,10 +1559,10 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
 
 /* 카테고리 칩 (토스/당근 다크 알약) */
 .category-sticky-wrap {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 6px 0;
-  margin-bottom: 6px;
-  top: 0;
+  position: static;
+  background: transparent;
+  padding: 2px 0;
+  margin-bottom: 10px;
 }
 .cat-btn {
   background: #F2F4F3;
