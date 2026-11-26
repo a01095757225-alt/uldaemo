@@ -1736,7 +1736,9 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
 .tk-room-container {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 24px);
+  height: calc(100dvh - 76px);
+  max-height: calc(100dvh - 76px);
+  overflow: hidden;
 }
 .tk-room-header {
   display: flex;
@@ -1744,8 +1746,7 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
   gap: 10px;
   padding: 10px 0 12px;
   border-bottom: 1px solid #F2F4F3;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   background: #FFFFFF;
   z-index: 20;
 }
@@ -1795,18 +1796,20 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
 }
 .tk-chat-messages {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   background: #FFFFFF !important;
   border: none !important;
-  padding: 16px 2px !important;
+  padding: 16px 2px 24px;
   max-height: none !important;
-  min-height: 320px;
 }
 .tk-room-footer {
-  position: sticky;
-  bottom: 0;
+  position: relative;
+  flex-shrink: 0;
   background: #FFFFFF;
   padding: 8px 0 12px;
   border-top: 1px solid #F2F4F3;
+  z-index: 15;
 }
 .tk-chat-input {
   flex: 1;
@@ -2213,7 +2216,9 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
   }
   .tk-room-container {
     height: 100dvh;
+    max-height: 100dvh;
     min-height: 100dvh;
+    overflow: hidden;
   }
   .tk-room-header {
     height: 72px;
@@ -2222,7 +2227,7 @@ body { background: #FFFFFF; color: #191F28; letter-spacing: -0.02em; }
   .tk-room-back { display: none; }
   .tk-room-avatar { display: inline-flex; }
   .tk-room-sub { display: block; }
-  .tk-chat-messages { padding: 24px 32px !important; }
+  .tk-chat-messages { padding: 24px 32px 28px; }
   .tk-room-footer { padding: 12px 24px 20px; }
   .tk-chat-input { border-radius: 12px; min-height: 44px; height: 44px; max-height: 120px; resize: none; }
   .tk-chat-send-btn {

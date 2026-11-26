@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261122b" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126a" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -8153,15 +8153,10 @@
       const afterH = slot.offsetHeight || 0;
       const delta = afterH - beforeH;
       if (box && delta !== 0) {
-        // AI 서랍이 열릴 때 대화를 가리지 않도록 하단 여백 확보 + 현재 보고 있던 스크롤 위치 유지
-        box.style.paddingBottom = afterH > 0 ? `${afterH + 24}px` : "";
         if (wasAtBottom) {
           box.scrollTop = box.scrollHeight;
         } else {
           box.scrollTop = Math.max(0, box.scrollTop + delta);
-        }
-        if (delta > 0 && (window.innerHeight + window.scrollY >= document.body.scrollHeight - 120)) {
-          try { window.scrollBy(0, delta); } catch (e) {}
         }
       }
     }
