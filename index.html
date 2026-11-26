@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv2b" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv2c" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -35,7 +35,7 @@
 
   <script src="/js/data.js?v=20261118"></script>
   <script src="/js/effects.js?v=20261118"></script>
-  <script src="/js/timetable.js?v=20261126uiv2b"></script>
+  <script src="/js/timetable.js?v=20261126uiv2c"></script>
   <script>
     window.onerror = function(msg, url, line, col, error) {
       console.error("Global JS Error:", msg, line, col, error);
@@ -2993,91 +2993,77 @@
 
       return `
         <aside class="pc-right">
-          <!-- 1) 오늘의 학식 카드 (+ 이날 밥약 열기 버튼) -->
-          <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
+          <!-- 1) 오늘 점심 · 학생회관 (Figma PC v2) -->
+          <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary);">오늘의 학식</span>
-              <button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="openCafeteriaModal()">전체 식단 ›</button>
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-xs); font-weight:700; color:#1F6A52;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+                <span>오늘 ${meal === 'breakfast' ? '아침' : (meal === 'lunch' ? '점심' : '저녁')} · 학생회관</span>
+              </span>
+              <button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#1F6A52; background:none; border:none; cursor:pointer; padding:0;" onclick="openCafeteriaModal()">전체 ›</button>
             </div>
-            <div style="margin-top:8px; font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="openCafeteriaModal()">${escHtml(dishTitle)}</div>
-            <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:4px;">학생회관 · 청운학사 11:30–13:30</div>
-            <button type="button" onclick="openCreateWithTodayCafeteria('${escHtml(dishTitle)}')" style="width:100%; height:40px; margin-top:12px; border-radius:var(--radius-card); border:none; background:#EEF8F3; color:#287D62; font-size:var(--fs-md); font-weight:800; cursor:pointer;">
-              이날 밥약 열기
+            <div style="margin-top:8px; font-size:var(--fs-md); font-weight:800; color:var(--text-primary); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="openCafeteriaModal()">${escHtml(dishTitle)}</div>
+            <button type="button" onclick="openCreateWithTodayCafeteria('${escHtml(dishTitle)}')" style="width:100%; height:40px; margin-top:12px; border-radius:var(--radius-btn); border:none; background:#EEF8F3; color:#1F6A52; font-size:var(--fs-sm); font-weight:800; cursor:pointer;">
+              이 메뉴로 밥약
             </button>
           </div>
 
-          <!-- 2) 오늘 출석하기 카드 (+3점 알약) -->
-          <div onclick="handleDailyCheckin()" style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-            <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-              <span style="width:40px; height:40px; border-radius:var(--radius-card); background:${st.checkedInToday ? '#287D62' : '#EEF8F3'}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${st.checkedInToday ? '#FFFFFF' : '#287D62'}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
-              </span>
-              <div style="min-width:0;">
-                <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</div>
-                <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">${(!_initialCloudSynced && getSessionToken()) ? `<span class="skeleton-bar" style="display:inline-block; width:56px; height:12px; border-radius:6px; background:#E5EAE7; vertical-align:middle;"></span>` : `연속 ${st.streakDays}일째`}</div>
-              </div>
-            </div>
-            <span style="height:32px; padding:0 14px; border-radius:var(--radius-card); background:${st.checkedInToday ? '#EEF8F3' : '#287D62'}; color:${st.checkedInToday ? '#287D62' : '#FFFFFF'}; font-size:var(--fs-sm); font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-              ${st.checkedInToday ? '완료' : '+3점'}
-            </span>
-          </div>
-
-          <!-- 3) 광장 탭일 때는 '메뉴 룰렛' 카드 / 그 외 탭일 때는 '진행 중인 대화' 카드 -->
+          <!-- 2) 다가오는 약속 / 메뉴 룰렛 (Figma PC v2) -->
           ${isPlazaTab ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
+            <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
               <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary);">메뉴 룰렛</div>
               <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); margin-top:6px;">오늘 뭐 먹지?</div>
-              <button type="button" onclick="state.plaza_view='roulette'; render();" style="width:100%; height:40px; margin-top:12px; border-radius:var(--radius-card); border:none; background:#EEF8F3; color:#287D62; font-size:var(--fs-md); font-weight:800; cursor:pointer;">
+              <button type="button" onclick="state.plaza_view='roulette'; render();" style="width:100%; height:40px; margin-top:12px; border-radius:var(--radius-btn); border:none; background:#EEF8F3; color:#1F6A52; font-size:var(--fs-sm); font-weight:800; cursor:pointer;">
                 SPIN 하러 가기
               </button>
             </div>
           ` : `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary);">진행 중인 대화</span>
-                ${activeChats.length > 0 ? `<button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="switchTab('채팅')">전체 ›</button>` : ''}
+            <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary);">다가오는 약속</span>
+                ${activeChats.length > 0 ? `<button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#1F6A52; background:none; border:none; cursor:pointer; padding:0;" onclick="switchTab('채팅')">대화 ›</button>` : ''}
               </div>
               ${activeChats.length === 0 ? `
-                <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); margin-top:8px;">${escHtml(COPY.chatEmptyTitle)}</div>
+                <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary);">예정된 번개가 없어요</div>
                 <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:4px;">${escHtml(COPY.chatEmptySub)}</div>
-                <button type="button" onclick="switchTab('홈')" style="margin-top:10px; padding:0; background:none; border:none; color:#287D62; font-size:var(--fs-sm); font-weight:800; cursor:pointer;">
-                  번개 둘러보기 ›
-                </button>
               ` : `
-                <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
-                  ${activeChats.slice(0, 2).map(r => {
-                    const lastTxt = r.lastMsg ? (r.lastMsg.sender_id === "AI_BOT" ? "추천 대화 주제가 도착했어요" : r.lastMsg.text) : "첫 인사를 나눠보세요";
-                    return `
-                      <div onclick="state.nav_tab='채팅'; state.active_modal=null; openChatRoom(${r.post.id});" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:var(--radius-btn); background:#F7F9F8; cursor:pointer;">
-                        <div style="min-width:0; flex:1;">
-                          <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(r.post.title)}</div>
-                          <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(lastTxt)}</div>
-                        </div>
-                        ${r.unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:var(--fs-xs); font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:var(--radius-chip); display:inline-flex; align-items:center; justify-content:center;">${r.unreadInRoom}</span>` : `<span style="color:#287D62; font-size:var(--fs-sm); font-weight:700;">›</span>`}
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  ${activeChats.slice(0, 2).map(r => `
+                    <div onclick="state.nav_tab='채팅'; state.active_modal=null; openChatRoom(${r.post.id});" style="display:flex; align-items:center; gap:10px; padding:4px 0; cursor:pointer;">
+                      <span style="width:36px; height:36px; border-radius:var(--radius-btn); background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                      </span>
+                      <div style="min-width:0; flex:1;">
+                        <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(r.post.title)}</div>
+                        <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(r.post.meet_time || '오늘')} · ${escHtml(r.post.location)}</div>
                       </div>
-                    `;
-                  }).join("")}
+                      ${r.unreadInRoom > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:var(--fs-xs); font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:var(--radius-chip); display:inline-flex; align-items:center; justify-content:center;">${r.unreadInRoom}</span>` : ''}
+                    </div>
+                  `).join("")}
                 </div>
               `}
             </div>
           `}
 
-          <!-- 4) 알림 · 울산대 공지 카드 (최근 3건 미리보기) -->
-          <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary);">알림 · 울산대 공지${(unreadCnt + newNoticeCnt) > 0 ? ` (${unreadCnt + newNoticeCnt})` : ''}</span>
-              <button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:0;" onclick="openUlsanNoticesModal(event)">전체 ›</button>
+          <!-- 3) 출석 카드 (Figma PC v2) -->
+          <div onclick="handleDailyCheckin()" style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
+            <div style="min-width:0;">
+              <div style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary);">${(!_initialCloudSynced && getSessionToken()) ? '동기화 중...' : `${st.streakDays}일째 출석 중`}</div>
+              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 +3점'}</div>
             </div>
-            ${noticeItems.map((item, idx) => {
-              const shortDate = String(item.date || "").replace(/^\d{4}-/, "");
-              return `
-                <a href="${escHtml(item.link || 'https://www.ulsan.ac.kr')}" target="_blank" rel="noopener" style="display:block; text-decoration:none; padding:${idx === 0 ? '2px 0 8px' : '8px 0'}; ${idx < noticeItems.length - 1 ? 'border-bottom:1px solid #E5E8EB;' : ''}">
-                  <div style="font-size:var(--fs-sm); font-weight:600; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.title)}</div>
-                  <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:3px;">${escHtml(shortDate)}</div>
-                </a>
-              `;
-            }).join("")}
+            <span style="height:36px; padding:0 14px; border-radius:var(--radius-btn); background:${st.checkedInToday ? '#EEF8F3' : '#287D62'}; color:${st.checkedInToday ? '#1F6A52' : '#FFFFFF'}; font-size:var(--fs-sm); font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+              ${st.checkedInToday ? '완료' : '출석'}
+            </span>
           </div>
+
+          <!-- 4) 상대에게 보이는 내 프로필 배너 (Figma PC v2) -->
+          <button type="button" onclick="openBlindPreviewModal()" style="width:100%; min-height:52px; padding:14px 16px; border-radius:var(--radius-card); border:none; background:#EEF8F3; color:#1F6A52; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left;">
+            <span style="display:inline-flex; align-items:center; gap:8px; font-size:var(--fs-sm); font-weight:800; color:#1F6A52;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>상대에게 보이는 내 프로필</span>
+            </span>
+            <span style="font-size:var(--fs-md); font-weight:800; color:#1F6A52;">›</span>
+          </button>
         </aside>
       `;
     }
@@ -3149,8 +3135,18 @@
           { key: "홈", iconSvg: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>', label: "홈", mLabel: "홈" },
           { key: "지도", iconSvg: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>', label: "지도", mLabel: "지도" },
           { key: "채팅", iconSvg: '<path d="M4 5h16v11H8l-4 4z"/>', label: "대화", mLabel: "대화" },
-          { key: "광장", iconSvg: '<circle cx="12" cy="12" r="9"/><path d="M8 13s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>', label: "광장", mLabel: "광장" },
+          { key: "광장", iconSvg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', label: "광장", mLabel: "광장" },
           { key: "마이", iconSvg: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>', label: "내 정보", mLabel: "내 정보" }
+        ];
+        // PC v2 좌측 사이드바 7개 메뉴 (홈 / 지도 / 대화 / 광장 / 학식 / 알림 / 내 정보)
+        const pcNavItems = [
+          { key: "홈", label: "홈", iconSvg: navItems[0].iconSvg, on: state.nav_tab === "홈" && !state.active_modal, action: "switchTab('홈')", badge: 0 },
+          { key: "지도", label: "지도", iconSvg: navItems[1].iconSvg, on: state.nav_tab === "지도" && !state.active_modal, action: "switchTab('지도')", badge: 0 },
+          { key: "채팅", label: "대화", iconSvg: navItems[2].iconSvg, on: state.nav_tab === "채팅" && !state.active_modal, action: "switchTab('채팅')", badge: unreadChatCnt },
+          { key: "광장", label: "광장", iconSvg: navItems[3].iconSvg, on: state.nav_tab === "광장" && !state.active_modal, action: "switchTab('광장')", badge: 0 },
+          { key: "학식", label: "학식", iconSvg: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>', on: state.active_modal === "cafeteria", action: "openCafeteriaModal()", badge: 0 },
+          { key: "알림", label: "알림", iconSvg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>', on: state.active_modal === "notifications", action: "toggleNotificationsModal()", badge: badgeCnt },
+          { key: "마이", label: "내 정보", iconSvg: navItems[4].iconSvg, on: state.nav_tab === "마이" && !state.active_modal, action: "switchTab('마이')", badge: 0 }
         ];
         const isActiveNav = (k) => state.nav_tab === k && !state.active_modal;
         const myTempForTier = resolveUserTempForTier(state.user_id);
@@ -3163,23 +3159,22 @@
         const sidebarHtml = `
           <aside class="pc-sidebar">
             <div class="side-logo" onclick="switchTab('홈')">
-              <img src="/icon-192.png" alt="울대모" width="36" height="36" style="width:36px; height:36px; border-radius:var(--radius-btn); flex-shrink:0; display:block; object-fit:cover;" />
+              <span style="width:32px; height:32px; border-radius:10px; background:#287D62; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
               <span style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); letter-spacing:-0.03em;">울대모</span>
             </div>
 
             <nav class="side-nav">
-              ${navItems.map(n => {
-                const on = isActiveNav(n.key);
-                return `
-                  <button class="side-nav-btn ${on ? 'active' : ''}" data-nav-key="${n.key}" onclick="switchTab('${n.key}')">
-                    <span class="side-nav-icon">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${on ? '#287D62' : '#6B7684'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.iconSvg}</svg>
-                    </span>
-                    <span style="flex:1; text-align:left;">${n.label}</span>
-                    ${n.key === '채팅' && unreadChatCnt > 0 ? `<span class="side-dot">${unreadChatCnt}</span>` : ''}
-                  </button>
-                `;
-              }).join("")}
+              ${pcNavItems.map(n => `
+                <button class="side-nav-btn ${n.on ? 'active' : ''}" data-nav-key="${n.key}" onclick="${n.action}">
+                  <span class="side-nav-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${n.on ? '#1F6A52' : '#4E5968'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.iconSvg}</svg>
+                  </span>
+                  <span style="flex:1; text-align:left;">${n.label}</span>
+                  ${n.badge > 0 ? `<span class="side-dot">${n.badge}</span>` : ''}
+                </button>
+              `).join("")}
             </nav>
 
             <button type="button" class="btn btn-primary side-create-btn" onclick="state.active_modal='create'; render();">
@@ -3188,24 +3183,20 @@
 
             <div class="side-user" onclick="switchTab('마이')" style="cursor:pointer;">
               <div style="display:flex; align-items:center; gap:10px;">
-                <span style="width:40px; height:40px; border-radius:var(--radius-card); background:#EEF8F3; font-size:var(--fs-xl); line-height:1; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(sideAvatar)}</span>
+                <span style="width:34px; height:34px; border-radius:var(--radius-chip); background:#EEF8F3; font-size:var(--fs-lg); line-height:1; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(sideAvatar)}</span>
                 <div style="min-width:0; flex:1;">
-                  <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(currentUser.nickname)}</div>
-                  <div style="font-size:var(--fs-xs); color:#287D62; font-weight:600; margin-top:1px;">${myTierInfo.tier === 5 ? '👑 ' : ''}${escHtml(myTierInfo.name)} · ${myTierInfo.displayTemp}°C</div>
+                  <div style="font-size:var(--fs-sm); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(currentUser.nickname)}</div>
+                  <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:500; margin-top:1px;">매너온도 ${myTierInfo.displayTemp}°</div>
                 </div>
               </div>
             </div>
           </aside>
         `;
 
+        // PC v2 개선 원칙: 오른쪽 위젯 레일은 홈·광장에서만 노출
         const hideRightPanel = Boolean(
-          state.active_modal === "create"
-          || state.active_modal === "detail"
-          || state.active_modal === "timetable"
-          || state.active_modal === "food_map"
-          || state.active_modal === "cafeteria"
-          || state.active_modal === "notifications"
-          || (!state.active_modal && (state.nav_tab === "채팅" || state.nav_tab === "지도"))
+          state.active_modal
+          || (state.nav_tab !== "홈" && state.nav_tab !== "광장")
         );
         const rightHtml = hideRightPanel ? "" : renderPcRightSidePanel(unreadCnt, newNoticeCnt);
 
@@ -3222,14 +3213,11 @@
             ${sidebarHtml}
             <main class="main-col">
               ${(state.nav_tab === "홈" && !state.active_modal) ? `
-                <div class="app-header" style="align-items:flex-end; padding-top:14px; padding-bottom:10px;">
-                  <div>
-                    <div style="font-size:var(--fs-md); font-weight:500; color:var(--text-secondary); margin-bottom:2px;">안녕하세요, ${escHtml(currentUser.nickname)}님</div>
-                    <div style="font-size:var(--fs-2xl); font-weight:800; color:var(--text-primary); letter-spacing:-0.03em; line-height:1.25;">오늘, 같이 할래요?</div>
-                  </div>
-                  <button type="button" class="press-flat" style="position:relative; padding:6px; background:none; border:none; cursor:pointer;" onclick="toggleNotificationsModal()" aria-label="알림">
+                <div class="app-header" style="align-items:center; padding-top:8px; padding-bottom:6px;">
+                  <span style="font-size:var(--fs-xl); font-weight:800; color:#1F6A52; letter-spacing:-0.03em;">울대모</span>
+                  <button type="button" class="press-flat" style="position:relative; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer;" onclick="toggleNotificationsModal()" aria-label="알림">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0"/></svg>
-                    ${badgeCnt > 0 ? `<span style="position:absolute; top:4px; right:4px; width:8px; height:8px; border-radius:50%; background:#287D62; border:1.5px solid #FFFFFF;"></span>` : ''}
+                    ${badgeCnt > 0 ? `<span style="position:absolute; top:9px; right:9px; width:8px; height:8px; border-radius:50%; background:#D93025; border:1.5px solid #FFFFFF;"></span>` : ''}
                   </button>
                 </div>
               ` : ''}
@@ -5039,12 +5027,15 @@
       const mainDishes = mealList.filter(item => !item.startsWith("[") && item !== "쌀밥" && !item.includes("김치") && !item.includes("단무지"));
       const summary = mainDishes.slice(0, 2).map(x => x.replace(/\([^)]*\)/g, "").trim()).join(" · ") || "식단 정보 보기";
       return `
-        <button type="button" class="only-mobile-flex" onclick="openCafeteriaModal()" style="width:100%; min-height:48px; padding:10px 14px; margin-bottom:10px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left;">
-          <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
-            <span style="font-size:var(--fs-xs); font-weight:800; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:var(--radius-chip); flex-shrink:0;">오늘의 학식 · ${mealLabel}</span>
-            <span style="font-size:var(--fs-sm); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(summary)}</span>
+        <button type="button" class="only-mobile-flex" onclick="openCafeteriaModal()" style="width:100%; padding:12px; margin-bottom:14px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; align-items:center; gap:12px; cursor:pointer; text-align:left;">
+          <span style="width:40px; height:40px; border-radius:var(--radius-btn); background:#EEF8F3; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+          </span>
+          <div style="min-width:0; flex:1;">
+            <div style="font-size:var(--fs-xs); font-weight:700; color:#1F6A52;">오늘 ${mealLabel} · 학생회관</div>
+            <div style="font-size:var(--fs-md); font-weight:600; color:var(--text-primary); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(summary)}</div>
           </div>
-          <span style="font-size:var(--fs-sm); font-weight:700; color:#287D62; flex-shrink:0;">›</span>
+          <span style="font-size:var(--fs-lg); font-weight:700; color:var(--text-secondary); flex-shrink:0;">›</span>
         </button>
       `;
     }
@@ -5053,20 +5044,20 @@
       const st = getUserStatsAndBadges(state.user_id);
       const newNoticeCnt = unseenNoticeCnt();
       return `
-        <div class="only-mobile-grid" style="grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; margin-bottom:8px;">
-          <button type="button" onclick="handleDailyCheckin()" style="min-height:52px; padding:10px 12px; border-radius:var(--radius-card); border:1px solid ${st.checkedInToday ? '#C5E6D6' : '#E5E8EB'}; background:${st.checkedInToday ? '#EEF8F3' : '#FFFFFF'}; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; text-align:left;">
+        <div class="only-mobile-grid" style="grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; margin-bottom:8px;">
+          <button type="button" onclick="handleDailyCheckin()" style="min-height:56px; padding:12px 14px; border-radius:var(--radius-card); border:1px solid ${st.checkedInToday ? '#C5E6D6' : '#E5E8EB'}; background:${st.checkedInToday ? '#EEF8F3' : '#FFFFFF'}; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; text-align:left;">
             <div style="min-width:0;">
               <div style="font-size:var(--fs-sm); font-weight:800; color:var(--text-primary);">${st.checkedInToday ? '오늘 출석 완료' : '오늘 출석하기'}</div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:1px;">연속 ${st.streakDays}일째</div>
+              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">연속 ${st.streakDays}일째</div>
             </div>
-            <span style="font-size:var(--fs-xs); font-weight:800; color:#287D62; flex-shrink:0;">${st.checkedInToday ? '✓' : '+3점'}</span>
+            <span style="font-size:var(--fs-xs); font-weight:800; color:#1F6A52; flex-shrink:0;">${st.checkedInToday ? '✓' : '+3점'}</span>
           </button>
-          <button type="button" onclick="openUlsanNoticesModal(event)" style="min-height:52px; padding:10px 12px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; text-align:left;">
+          <button type="button" onclick="openUlsanNoticesModal(event)" style="min-height:56px; padding:12px 14px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; text-align:left;">
             <div style="min-width:0;">
               <div style="font-size:var(--fs-sm); font-weight:800; color:var(--text-primary);">캠퍼스 공지</div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:1px;">${newNoticeCnt > 0 ? `새 공지 ${newNoticeCnt}건` : '울산대 행사·소식'}</div>
+              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">${newNoticeCnt > 0 ? `새 공지 ${newNoticeCnt}건` : '울산대 행사·소식'}</div>
             </div>
-            <span style="font-size:var(--fs-sm); font-weight:700; color:#287D62; flex-shrink:0;">›</span>
+            <span style="font-size:var(--fs-sm); font-weight:700; color:#1F6A52; flex-shrink:0;">›</span>
           </button>
         </div>
       `;
@@ -5075,30 +5066,27 @@
     function renderHomeTab() {
       const currentUser = DB.users[state.user_id] || { nickname: "학우" };
       return `
-        <div class="tk-pc-home-header">
-          <div class="only-pc" style="display:block; font-size:var(--fs-md); font-weight:500; color:var(--text-secondary); margin-bottom:4px;">안녕하세요, ${escHtml(currentUser.nickname)}님</div>
-          <h1 class="tk-page-title">오늘, 같이 할래요?</h1>
-          <div class="tk-search-box" style="height:44px; border-radius:var(--radius-input); background:#F7F9F8;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7684" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-            <input id="home-search-input" type="text" placeholder="번개 검색 · 학식, 카공, 러닝" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
+        <!-- PC v2 헤더 (좌: 타이틀+안내 / 우: 검색) -->
+        <div class="tk-pc-home-header pc-v2-home-head">
+          <div style="min-width:0; flex:1;">
+            <h1 class="tk-page-title" style="margin:0 0 4px;">오늘은 누구랑 밥 먹을까요?</h1>
+            <div style="font-size:var(--fs-sm); font-weight:500; color:var(--text-secondary);">${escHtml(COPY.blindNotice)}</div>
           </div>
+          <div class="tk-search-box" style="width:240px; flex-shrink:0; height:44px; border-radius:var(--radius-input); background:#FFFFFF; border:1px solid #E5E8EB;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4E5968" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+            <input id="home-search-input" type="text" placeholder="번개 검색" value="${escHtml(state.search_q)}" oninput="handleHomeSearchInput(this.value)" />
+          </div>
+        </div>
+
+        <!-- Mobile v2 인사말 -->
+        <div class="only-mobile-block" style="margin: 2px 0 14px;">
+          <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.4; letter-spacing:-0.02em;">오늘은 누구랑<br/>밥 먹을까요?</h1>
         </div>
 
         ${renderMobileHomeCafeteriaBar()}
 
         <div class="category-sticky-wrap">
           ${renderCategoryChips("home_cat")}
-        </div>
-
-        <!-- 항상 보여주는 사생활 안심 안내 (탭하면 블라인드 미리보기) -->
-        <div style="display:flex; align-items:center; margin: 2px 0 12px;">
-          <button type="button" onclick="openBlindPreviewModal()" style="min-height:44px; border:1px solid #C5E6D6; background:#EEF8F3; border-radius:var(--radius-btn); padding:8px 14px; display:inline-flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; width:100%;">
-            <span style="display:inline-flex; align-items:center; gap:7px; min-width:0;">
-              <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
-              <span class="home-blind-notice-text" style="font-size:var(--fs-md); font-weight:700; color:#1E634C;">${escHtml(COPY.blindNotice)}</span>
-            </span>
-            <span class="home-blind-notice-text" style="font-size:var(--fs-md); font-weight:800; color:#287D62; flex-shrink:0; white-space:nowrap;">미리보기 ›</span>
-          </button>
         </div>
 
         ${renderHomePendingRequestsHtml()}
@@ -8978,75 +8966,71 @@
         <div style="max-width:720px;">
           <h1 class="tk-page-title" style="margin-bottom:14px;">내 정보</h1>
 
-          <!-- 상단 그린 매너온도 히어로 카드 -->
-          <div style="background:#287D62; border-radius:var(--radius-card); padding:18px 20px; color:#FFFFFF; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <!-- 상단 화이트 매너온도 히어로 카드 (Figma M20 / P08 v2) -->
+          <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:20px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
               <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-                <span style="width:52px; height:52px; border-radius:var(--radius-chip); background:#FFFFFF; font-size:var(--fs-2xl); line-height:1; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <span style="width:52px; height:52px; border-radius:var(--radius-chip); background:#EEF8F3; font-size:var(--fs-2xl); line-height:1; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
                   ${escHtml(myAvatar)}
                 </span>
                 <div style="min-width:0;">
-                  <div style="font-size:var(--fs-xl); font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     <span>${escHtml(user.nickname)}</span>
-                    ${isCurrentUserAdmin() ? `<span style="font-size:var(--fs-xs); background:rgba(255,255,255,0.22); color:#FFFFFF; font-weight:700; padding:2px 8px; border-radius:var(--radius-btn);">운영진</span>` : ""}
+                    ${isCurrentUserAdmin() ? `<span style="font-size:var(--fs-xs); background:#EEF8F3; color:#1F6A52; font-weight:700; padding:2px 8px; border-radius:var(--radius-chip);">운영진</span>` : ""}
                   </div>
-                  <div style="font-size:var(--fs-xs); color:#CFEADF; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    ${escHtml(user.department)} · 인증 뱃지 ${myStats.badges.length}개
+                  <div style="font-size:var(--fs-sm); color:var(--text-secondary); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    학교 인증 · ${escHtml(myTier.name)}
                   </div>
                 </div>
               </div>
-              <span style="background:rgba(255,255,255,0.2); color:#FFFFFF; padding:4px 12px; border-radius:var(--radius-btn); font-size:var(--fs-xs); font-weight:700; flex-shrink:0;">
-                ${escHtml(myTier.name)}
-              </span>
-            </div>
-
-            <div style="margin-top:18px; display:flex; justify-content:space-between; align-items:flex-end; gap:8px;">
-              <div>
-                <div style="display:inline-flex; align-items:center; gap:6px;">
-                  <span style="font-size:var(--fs-xs); color:#CFEADF; font-weight:600;">매너온도</span>
-                  <button type="button" onclick="state.show_temp_guide=!state.show_temp_guide; render();" style="border:1px solid rgba(255,255,255,0.45); background:rgba(255,255,255,0.16); color:#FFFFFF; font-size:var(--fs-xs); font-weight:800; padding:2px 8px; border-radius:var(--radius-chip); cursor:pointer;">${state.show_temp_guide ? '안내 닫기 ▲' : escHtml(COPY.tempGuideBtn)}</button>
-                </div>
-                <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-top:2px;">
-                  <div style="font-size:var(--fs-2xl); font-weight:800; color:#FFFFFF; line-height:1.05; letter-spacing:-0.03em;">
-                    ${myTier.displayTemp}°C
-                  </div>
-                  <span style="font-size:var(--fs-xs); font-weight:600; color:#D8F3E5;">${escHtml(COPY.tempRecentReviews(myReviews.length))}</span>
-                </div>
-              </div>
-              <div style="font-size:var(--fs-xs); color:#FFFFFF; font-weight:600; padding-bottom:4px;">
-                ${escHtml(nextStepCopy)}
+              <div style="text-align:right; flex-shrink:0;">
+                <div style="font-size:var(--fs-2xl); font-weight:800; color:#1F6A52; line-height:1.1; letter-spacing:-0.02em;">${myTier.displayTemp}°</div>
               </div>
             </div>
 
-            <div style="height:8px; border-radius:4px; background:rgba(255,255,255,0.3); margin-top:12px; overflow:hidden;">
-              <div style="width:${myTier.gaugePct}%; height:100%; background:#FFFFFF; border-radius:4px; transition:width 0.5s ease;"></div>
+            <div style="height:8px; border-radius:4px; background:#E5E8EB; margin-top:14px; overflow:hidden;">
+              <div style="width:${myTier.gaugePct}%; height:100%; background:#287D62; border-radius:4px; transition:width 0.5s ease;"></div>
             </div>
+
+            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:var(--fs-xs); color:var(--text-secondary);">${escHtml(nextStepCopy)} · 후기를 받으면 올라요</span>
+              <button type="button" onclick="state.show_temp_guide=!state.show_temp_guide; render();" style="border:none; background:transparent; color:#1F6A52; font-size:var(--fs-xs); font-weight:700; padding:4px 0; cursor:pointer;">${state.show_temp_guide ? '안내 닫기 ▲' : escHtml(COPY.tempGuideBtn)}</button>
+            </div>
+
             ${state.show_temp_guide ? `
-              <div style="margin-top:14px; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.24); border-radius:var(--radius-card); padding:12px 14px; font-size:var(--fs-xs); color:#FFFFFF; line-height:1.55;">
-                <div style="font-weight:800; margin-bottom:6px;">🌡️ 울대모 매너온도 산정 기준 (36.5°C 시작)</div>
+              <div style="margin-top:10px; background:#F4F6F8; border-radius:var(--radius-btn); padding:12px 14px; font-size:var(--fs-xs); color:var(--text-secondary); line-height:1.55;">
+                <div style="font-weight:800; color:var(--text-primary); margin-bottom:4px;">매너온도 산정 기준 (36.5°C 시작)</div>
                 <div>• 좋은 만남 후기를 받으면 <b>+0.5°C</b> 상승해요</div>
                 <div>• 만남 후 따뜻한 후기를 남기면 내 온도도 <b>+0.2°C</b> 올라가요</div>
                 <div>• 노쇼·비매너 신고 접수 시 <b>-3.0°C</b> 차감 및 누적 3회 시 즉시 정지돼요</div>
-                <div style="margin-top:6px; font-size:var(--fs-xs); color:#D8F3E5;">등급: 새싹(&lt;36.5) → 따뜻한(36.5) → 믿음직(40.0) → 인싸(45.0) → 레전드(50.0°C+)</div>
               </div>
             ` : ''}
+
+            <!-- 3칸 활동 요약 그리드 (진행 중 / 지난 번개 / 받은 후기) -->
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:14px;">
+              <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#F4F6F8'}; border:${sec === 'myposts' ? '1.5px solid #287D62' : '1px solid transparent'}; border-radius:var(--radius-btn); padding:12px 6px; text-align:center; cursor:pointer;">
+                <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">${myPosts.length}</div>
+                <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:600; margin-top:2px;">진행 중</div>
+              </button>
+              <button type="button" onclick="toggleProfileSection('myapps')" style="background:${sec === 'myapps' ? '#EEF8F3' : '#F4F6F8'}; border:${sec === 'myapps' ? '1.5px solid #287D62' : '1px solid transparent'}; border-radius:var(--radius-btn); padding:12px 6px; text-align:center; cursor:pointer;">
+                <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">${myPastPosts.length + myAppliedList.length}</div>
+                <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:600; margin-top:2px;">지난·신청</div>
+              </button>
+              <button type="button" onclick="toggleProfileSection('reviews')" style="background:${sec === 'reviews' ? '#EEF8F3' : '#F4F6F8'}; border:${sec === 'reviews' ? '1.5px solid #287D62' : '1px solid transparent'}; border-radius:var(--radius-btn); padding:12px 6px; text-align:center; cursor:pointer;">
+                <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">${myStats.totalPraiseCnt}</div>
+                <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:600; margin-top:2px;">받은 후기</div>
+              </button>
+            </div>
           </div>
 
-          <!-- 3칸 활동 요약 그리드 (받은 후기 / 신청한 번개 / 만든 번개) -->
-          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:12px;">
-            <button type="button" onclick="toggleProfileSection('reviews')" style="background:${sec === 'reviews' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'reviews' ? '#287D62' : '#E5E8EB'}; border-radius:var(--radius-card); padding:14px 8px; text-align:center; cursor:pointer;">
-              <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">${myStats.totalPraiseCnt}</div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:600; margin-top:2px;">받은 후기</div>
-            </button>
-            <button type="button" onclick="toggleProfileSection('myapps')" style="background:${sec === 'myapps' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'myapps' ? '#287D62' : '#E5E8EB'}; border-radius:var(--radius-card); padding:14px 8px; text-align:center; cursor:pointer;">
-              <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">${myAppliedList.length}</div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:600; margin-top:2px;">신청한 번개</div>
-            </button>
-            <button type="button" onclick="toggleProfileSection('myposts')" style="background:${sec === 'myposts' ? '#EEF8F3' : '#FFFFFF'}; border:1.5px solid ${sec === 'myposts' ? '#287D62' : '#E5E8EB'}; border-radius:var(--radius-card); padding:14px 8px; text-align:center; cursor:pointer;">
-              <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">${myPosts.length}</div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:600; margin-top:2px;">진행 중 ${myPosts.length}${myPastPosts.length > 0 ? ` · 지난 번개 ${myPastPosts.length}` : ''}</div>
-            </button>
-          </div>
+          <!-- 상대에게 보이는 내 프로필 배너 (Figma M20 v2) -->
+          <button type="button" onclick="openBlindPreviewModal()" style="width:100%; min-height:52px; padding:14px 16px; margin-bottom:12px; border-radius:var(--radius-card); border:none; background:#EEF8F3; color:#1F6A52; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left;">
+            <span style="display:inline-flex; align-items:center; gap:8px; font-size:var(--fs-md); font-weight:800; color:#1F6A52;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>상대에게 보이는 내 프로필</span>
+            </span>
+            <span style="font-size:var(--fs-lg); font-weight:800; color:#1F6A52;">›</span>
+          </button>
 
           ${sec === 'reviews' ? `
             <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
