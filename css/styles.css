@@ -3471,3 +3471,7 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   box-shadow: 0 4px 20px rgba(25, 31, 40, 0.06);
 }
 .pc-right > button { border-radius: 20px !important; }
+/* PC에서는 주변 맛집 지도를 우측 사이드바로 이동했으므로 메인 피드 배너는 모바일에서만 노출 */
+@media (min-width: 1024px) {
+  .mobile-only-food-map { display: none !important; }
+}

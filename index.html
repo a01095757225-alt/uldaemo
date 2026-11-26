@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3f" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3g" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -2977,17 +2977,9 @@
     }
 
     function renderPcRightSidePanel(unreadCnt, newNoticeCnt) {
-      loadCafeteriaMenu(false);
-      const data = CAFETERIA.data || DEFAULT_CAFETERIA_DATA;
-      const days = data.days || [];
-      const todayIdx = getCafeteriaTodayIdx();
-      const curIdx = (CAFETERIA.activeDayIdx >= 0 && CAFETERIA.activeDayIdx < days.length) ? CAFETERIA.activeDayIdx : todayIdx;
-      const dayData = days[curIdx] || { date: "", day: "오늘", breakfast: [], lunch: [], dinner: [] };
-      const hour = new Date().getHours();
-      const meal = hour < 10 ? "breakfast" : (hour < 14 ? "lunch" : "dinner");
-      const mealList = dayData[meal] || [];
-      const mainDishes = mealList.filter(item => !item.startsWith("[") && item !== "쌀밥" && !item.includes("김치") && !item.includes("단무지"));
-      const dishTitle = mainDishes.slice(0, 2).map(x => x.replace(/\([^)]*\)/g, "").trim()).join(" · ") || "닭살바베큐조림 · 순두부찌개";
+      const spotList = (typeof getFilteredFoodSpots === "function" ? getFilteredFoodSpots() : MUGEO_FOOD_SPOTS) || MUGEO_FOOD_SPOTS;
+      const spotCnt = spotList.length || MUGEO_FOOD_SPOTS.length;
+      const topSpotSummary = "가무댕댕 ★4.8 · 기린카페 ★4.8";
 
       const st = getUserStatsAndBadges(state.user_id);
       const { activeChats } = getMyActiveChatRooms();
@@ -2998,18 +2990,18 @@
 
       return `
         <aside class="pc-right">
-          <!-- 1) 오늘 점심 · 학생회관 (Figma PC v2) -->
+          <!-- 1) 내 주변 맛집 지도 (PC 우측 사이드바 컴팩트 카드) -->
           <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span style="display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-xs); font-weight:700; color:#1F6A52;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
-                <span>오늘 ${meal === 'breakfast' ? '아침' : (meal === 'lunch' ? '점심' : '저녁')} · 학생회관</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                <span>내 주변 맛집 ${spotCnt}곳</span>
               </span>
-              <button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#1F6A52; background:none; border:none; cursor:pointer; padding:0;" onclick="openCafeteriaModal()">전체 ›</button>
+              <button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#1F6A52; background:none; border:none; cursor:pointer; padding:0;" onclick="openFoodMapModal()">지도 보기 ›</button>
             </div>
-            <div style="margin-top:8px; font-size:var(--fs-md); font-weight:800; color:var(--text-primary); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="openCafeteriaModal()">${escHtml(dishTitle)}</div>
-            <button type="button" onclick="openCreateWithTodayCafeteria('${escHtml(dishTitle)}')" style="width:100%; height:40px; margin-top:12px; border-radius:var(--radius-btn); border:none; background:#EEF8F3; color:#1F6A52; font-size:var(--fs-sm); font-weight:800; cursor:pointer;">
-              이 메뉴로 밥약
+            <div style="margin-top:8px; font-size:var(--fs-md); font-weight:800; color:var(--text-primary); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="openFoodMapModal()">${topSpotSummary}</div>
+            <button type="button" onclick="openFoodMapModal()" style="width:100%; height:40px; margin-top:12px; border-radius:var(--radius-btn); border:none; background:#EEF8F3; color:#1F6A52; font-size:var(--fs-sm); font-weight:800; cursor:pointer;">
+              맛집 지도 열기
             </button>
           </div>
 
@@ -5117,7 +5109,7 @@
           ${renderHomeFeedListHtml()}
         </div>
 
-        <div style="margin-top:16px;">${renderMugeoFoodMapSection()}</div>
+        <div class="mobile-only-food-map" style="margin-top:16px;">${renderMugeoFoodMapSection()}</div>
 
         ${renderMobileHomeFooterWidgets()}
       `;
