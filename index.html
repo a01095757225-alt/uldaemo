@@ -3050,56 +3050,25 @@
             </div>
           `}
 
-          <!-- 3) 출석 카드 (Figma PC v2) -->
-          <div onclick="handleDailyCheckin()" style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-            <div style="min-width:0;">
-              <div style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary);">${(!_initialCloudSynced && getSessionToken()) ? '동기화 중...' : `${st.streakDays}일째 출석 중`}</div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">${st.checkedInToday ? '오늘 출석 완료' : '오늘 +3점'}</div>
+          <!-- 3) 알림 · 울산대 공지 카드 (오른쪽 레일 전용) -->
+          <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary);">
+                <span>알림 · 울산대 공지</span>
+                ${(unreadCnt + newNoticeCnt) > 0 ? `<span style="background:#287D62; color:#FFFFFF; font-size:var(--fs-xs); font-weight:700; min-width:20px; height:20px; padding:0 6px; border-radius:var(--radius-chip); display:inline-flex; align-items:center; justify-content:center;">${unreadCnt + newNoticeCnt}</span>` : ''}
+              </span>
+              <button type="button" style="font-size:var(--fs-xs); font-weight:700; color:#1F6A52; background:none; border:none; cursor:pointer; padding:0;" onclick="toggleNotificationsModal()">전체 ›</button>
             </div>
-            <span style="height:36px; padding:0 14px; border-radius:var(--radius-btn); background:${st.checkedInToday ? '#EEF8F3' : '#287D62'}; color:${st.checkedInToday ? '#1F6A52' : '#FFFFFF'}; font-size:var(--fs-sm); font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-              ${st.checkedInToday ? '완료' : '출석'}
-            </span>
+            ${noticeItems.map((item, idx) => {
+              const shortDate = String(item.date || "").replace(/^\d{4}-/, "");
+              return `
+                <a href="${escHtml(item.link || 'https://www.ulsan.ac.kr')}" target="_blank" rel="noopener" style="display:block; text-decoration:none; padding:${idx === 0 ? '2px 0 8px' : '8px 0'}; ${idx < noticeItems.length - 1 ? 'border-bottom:1px solid #E5E8EB;' : ''}">
+                  <div style="font-size:var(--fs-sm); font-weight:600; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.title)}</div>
+                  <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:3px;">${escHtml(shortDate)}</div>
+                </a>
+              `;
+            }).join("")}
           </div>
-
-          <!-- 3.5) 알림 · 울산대 공지 카드 (복원 · 토스풍) -->
-          ${(() => {
-            const myNotifs = (DB.notifications || []).filter(n => String(n.user_id) === String(state.user_id)).slice(0, 2);
-            const total = (unreadCnt || 0) + (newNoticeCnt || 0);
-            return `
-              <div class="pc-rail-card" style="background:#FFFFFF; border-radius:20px; padding:16px; box-shadow:0 4px 20px rgba(25,31,40,0.06);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                  <span style="font-size:var(--fs-sm); font-weight:800; color:var(--text-primary);">알림 · 울산대 공지${total > 0 ? ` <span style="color:#287D62;">${total}</span>` : ''}</span>
-                  <button type="button" class="ghost-link" style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:none; border:none; cursor:pointer; padding:4px 8px;" onclick="state.active_modal='notifications'; render();">전체 ›</button>
-                </div>
-                ${myNotifs.map(n => `
-                  <div onclick="openNotifItem(${n.id})" style="display:flex; gap:10px; align-items:flex-start; padding:10px; margin:0 -6px 4px; border-radius:14px; cursor:pointer; background:${n.is_read ? 'transparent' : '#EEF8F3'};">
-                    <span style="width:8px; height:8px; border-radius:50%; margin-top:6px; flex-shrink:0; background:${n.is_read ? '#D1D6DB' : '#287D62'};"></span>
-                    <div style="min-width:0;">
-                      <div style="font-size:var(--fs-sm); font-weight:${n.is_read ? 600 : 700}; color:var(--text-primary); line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escHtml(String(n.message || ''))}</div>
-                      <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">${escHtml(String(n.created_at || ''))}</div>
-                    </div>
-                  </div>
-                `).join('')}
-                ${myNotifs.length === 0 ? `<div style="font-size:var(--fs-xs); color:var(--text-secondary); padding:2px 0 8px;">새 알림이 없어요</div>` : ''}
-                <div style="height:1px; background:#F2F4F6; margin:6px 0 4px;"></div>
-                ${noticeItems.map(item => `
-                  <a href="${escHtml(item.link || 'https://www.ulsan.ac.kr')}" target="_blank" rel="noopener" style="display:block; text-decoration:none; padding:8px 4px; border-radius:12px;">
-                    <div style="font-size:var(--fs-sm); font-weight:600; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.title)}</div>
-                    <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">${escHtml(String(item.date || '').replace(/^\d{4}[-.]/, ''))}</div>
-                  </a>
-                `).join('')}
-              </div>
-            `;
-          })()}
-
-          <!-- 4) 상대에게 보이는 내 프로필 배너 (Figma PC v2) -->
-          <button type="button" onclick="openBlindPreviewModal()" style="width:100%; min-height:52px; padding:14px 16px; border-radius:var(--radius-card); border:none; background:#EEF8F3; color:#1F6A52; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left;">
-            <span style="display:inline-flex; align-items:center; gap:8px; font-size:var(--fs-sm); font-weight:800; color:#1F6A52;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <span>상대에게 보이는 내 프로필</span>
-            </span>
-            <span style="font-size:var(--fs-md); font-weight:800; color:#1F6A52;">›</span>
-          </button>
         </aside>
       `;
     }
@@ -3174,14 +3143,13 @@
           { key: "광장", iconSvg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', label: "광장", mLabel: "광장" },
           { key: "마이", iconSvg: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>', label: "내 정보", mLabel: "내 정보" }
         ];
-        // PC v2 좌측 사이드바 7개 메뉴 (홈 / 지도 / 대화 / 광장 / 학식 / 알림 / 내 정보)
+        // PC 좌측 사이드바 6개 메뉴 (알림은 오른쪽 패널 전용)
         const pcNavItems = [
           { key: "홈", label: "홈", iconSvg: navItems[0].iconSvg, on: state.nav_tab === "홈" && !state.active_modal, action: "switchTab('홈')", badge: 0 },
           { key: "지도", label: "지도", iconSvg: navItems[1].iconSvg, on: state.nav_tab === "지도" && !state.active_modal, action: "switchTab('지도')", badge: 0 },
           { key: "채팅", label: "대화", iconSvg: navItems[2].iconSvg, on: state.nav_tab === "채팅" && !state.active_modal, action: "switchTab('채팅')", badge: unreadChatCnt },
           { key: "광장", label: "광장", iconSvg: navItems[3].iconSvg, on: state.nav_tab === "광장" && !state.active_modal, action: "switchTab('광장')", badge: 0 },
           { key: "학식", label: "학식", iconSvg: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>', on: state.active_modal === "cafeteria", action: "openCafeteriaModal()", badge: 0 },
-          { key: "알림", label: "알림", iconSvg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>', on: state.active_modal === "notifications", action: "toggleNotificationsModal()", badge: badgeCnt },
           { key: "마이", label: "내 정보", iconSvg: navItems[4].iconSvg, on: state.nav_tab === "마이" && !state.active_modal, action: "switchTab('마이')", badge: 0 }
         ];
         const isActiveNav = (k) => state.nav_tab === k && !state.active_modal;
@@ -9073,15 +9041,6 @@
               </button>
             </div>
           </div>
-
-          <!-- 상대에게 보이는 내 프로필 배너 (Figma M20 v2) -->
-          <button type="button" onclick="openBlindPreviewModal()" style="width:100%; min-height:52px; padding:14px 16px; margin-bottom:12px; border-radius:var(--radius-card); border:none; background:#EEF8F3; color:#1F6A52; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left;">
-            <span style="display:inline-flex; align-items:center; gap:8px; font-size:var(--fs-md); font-weight:800; color:#1F6A52;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <span>상대에게 보이는 내 프로필</span>
-            </span>
-            <span style="font-size:var(--fs-lg); font-weight:800; color:#1F6A52;">›</span>
-          </button>
 
           ${sec === 'reviews' ? `
             <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
