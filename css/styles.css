@@ -3358,3 +3358,113 @@ button, .btn, .cat-btn, .quick-chip, .tk-feed-item, .tk-menu-row, .dock-btn, .si
   }
   .cat-btn:hover, .btn:hover { transform: none; }
 }
+
+/* ===== 모바일 v3 추가 다듬기: 투명 상단 헤더 + 둥근 플로팅 하단 탭바 ===== */
+@media (max-width: 1023px) {
+  /* 상단 울대모 헤더: 이질적인 흰 네모 배경 제거 → #F4F6F8 배경에 자연스럽게 밀착 */
+  .app-header {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 8px 0 6px !important;
+  }
+
+  /* 하단 탭바: 각진 사각형 대신 토스풍 둥근 플로팅 알약 도크 */
+  .floating-dock-wrap {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    padding: 0 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    background: transparent !important;
+    pointer-events: none;
+  }
+  .floating-dock {
+    pointer-events: auto;
+    width: 100% !important;
+    max-width: 440px !important;
+    margin: 0 auto !important;
+    border-radius: 28px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+    border: 1px solid rgba(229, 232, 235, 0.7) !important;
+    box-shadow: 0 8px 28px rgba(26, 31, 41, 0.12) !important;
+    padding: 6px 8px !important;
+    overflow: hidden;
+  }
+  .dock-btn {
+    border-radius: 20px !important;
+    padding: 6px 4px !important;
+    min-height: 50px !important;
+  }
+  .dock-btn.active {
+    background: #EEF8F3 !important;
+    color: #1F6A52 !important;
+  }
+  .fab-create {
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 6px 20px rgba(40, 125, 98, 0.28) !important;
+  }
+}
+
+/* =====================================================
+   PC 다듬기 (2026-11-26): 네모 그림자 상자 제거 · 둥근 닫기 버튼 · 포커스 링
+   ===================================================== */
+/* 배경 없는 버튼(✕, '전체 ›' 같은 글자 버튼)은 떠오르는 그림자 대신 둥근 연회색 배경만 */
+@media (hover: hover) and (pointer: fine) {
+  button[style*="background:none"]:not(:disabled):hover,
+  button[style*="background: none"]:not(:disabled):hover,
+  button[style*="background:transparent"]:not(:disabled):hover,
+  button[style*="background: transparent"]:not(:disabled):hover,
+  button.ghost-link:not(:disabled):hover {
+    transform: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    background-color: rgba(25, 31, 40, 0.05) !important;
+    border-radius: 999px;
+  }
+}
+button[style*="background:none"]:not(:disabled):active,
+button[style*="background: none"]:not(:disabled):active,
+button[style*="background:transparent"]:not(:disabled):active,
+button[style*="background: transparent"]:not(:disabled):active,
+button.ghost-link:not(:disabled):active {
+  box-shadow: none !important;
+  transform: scale(0.94) !important;
+  background-color: rgba(25, 31, 40, 0.08) !important;
+  border-radius: 999px;
+}
+/* 닫기·접기 버튼은 항상 동그랗게 */
+button[aria-label*="닫기"], button[aria-label="접기"], button[title="지우기"] {
+  border-radius: 999px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+/* 마우스 클릭 시 네모 포커스 테두리 숨김, 키보드 이동 시에만 둥근 초록 링 */
+:focus:not(:focus-visible) { outline: none; }
+button:focus-visible, a:focus-visible, [onclick]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+/* 지도 확대/축소 버튼 둥글게 */
+.leaflet-bar {
+  border: none !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(25, 31, 40, 0.12) !important;
+}
+.leaflet-bar a { border-bottom-color: #F2F4F6 !important; }
+/* PC 오른쪽 패널 카드: 테두리 대신 그림자, 반경 20으로 통일 */
+.pc-right > div {
+  border: none !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 20px rgba(25, 31, 40, 0.06);
+}
+.pc-right > button { border-radius: 20px !important; }
