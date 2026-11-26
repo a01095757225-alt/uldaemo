@@ -1114,8 +1114,8 @@ body {
 }
 .roulette-stage {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: 272px;
+  height: 272px;
   margin: 12px auto 10px;
   display: flex;
   align-items: center;
@@ -1141,8 +1141,8 @@ body {
   pointer-events: none;
 }
 .roulette-wheel {
-  width: 198px;
-  height: 198px;
+  width: 252px;
+  height: 252px;
   border-radius: 50%;
   border: 3.5px solid #287D62;
   box-shadow: 0 6px 18px rgba(25, 31, 40, 0.08), inset 0 0 12px rgba(40, 125, 98, 0.08);
@@ -1202,17 +1202,21 @@ body {
   align-items: center;
   justify-content: center;
   gap: 3px;
+  max-width: 82px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  word-break: keep-all;
   transform: translate(-50%, -50%);
   will-change: transform;
   font-size:var(--fs-xs);
   font-weight: 800;
   color:var(--text-primary);
   background: rgba(255, 255, 255, 0.96);
-  padding: 3px 7.5px;
-  border-radius:var(--radius-chip);
+  padding: 4px 7px;
+  border-radius:var(--radius-btn);
   border: 1px solid #D5E4DC;
   box-shadow: 0 2px 6px rgba(25, 31, 40, 0.09);
-  white-space: nowrap;
   letter-spacing: -0.02em;
   transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
 }
