@@ -431,8 +431,8 @@ function renderTimetableModal() {
         </div>
       ` : `
         <div style="display:flex; gap:8px; margin-bottom:14px;">
-          <button type="button" onclick="state.timetable_tab='mates'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'mates' ? '#191F28' : '#F7F9F8'}; color:${curTab === 'mates' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">공강 메이트 ${mates.length}</button>
-          <button type="button" onclick="state._tt_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable||{})); state._tt_names_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable_names||{})); state.timetable_tab='edit'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'edit' ? '#191F28' : '#F7F9F8'}; color:${curTab === 'edit' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">내 시간표 입력</button>
+          <button type="button" onclick="state.timetable_tab='mates'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'mates' ? '#287D62' : '#F7F9F8'}; color:${curTab === 'mates' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">공강 메이트 ${mates.length}</button>
+          <button type="button" onclick="state._tt_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable||{})); state._tt_names_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable_names||{})); state.timetable_tab='edit'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'edit' ? '#287D62' : '#F7F9F8'}; color:${curTab === 'edit' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">내 시간표 입력</button>
         </div>
         ${curTab === 'edit' ? editorHtml : matesHtml}
       `}

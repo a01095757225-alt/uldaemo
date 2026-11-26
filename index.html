@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126c" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv2b" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -35,7 +35,7 @@
 
   <script src="/js/data.js?v=20261118"></script>
   <script src="/js/effects.js?v=20261118"></script>
-  <script src="/js/timetable.js?v=20261119"></script>
+  <script src="/js/timetable.js?v=20261126uiv2b"></script>
   <script>
     window.onerror = function(msg, url, line, col, error) {
       console.error("Global JS Error:", msg, line, col, error);
@@ -2825,7 +2825,7 @@
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
-              <button type="button" onclick="state.cafe_show_allergy=!state.cafe_show_allergy; render();" style="min-height:44px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid ${state.cafe_show_allergy ? '#287D62' : '#E5E8EB'}; background:${state.cafe_show_allergy ? '#EEF8F3' : '#FFFFFF'}; color:${state.cafe_show_allergy ? '#287D62' : 'var(--text-secondary)'}; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">${state.cafe_show_allergy ? escHtml(COPY.allergyHideBtn) : escHtml(COPY.allergyShowBtn)}</button>
+              <button type="button" onclick="state.cafe_show_allergy=!state.cafe_show_allergy; render();" style="white-space:nowrap; flex-shrink:0; min-height:44px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid ${state.cafe_show_allergy ? '#287D62' : '#E5E8EB'}; background:${state.cafe_show_allergy ? '#EEF8F3' : '#FFFFFF'}; color:${state.cafe_show_allergy ? '#287D62' : 'var(--text-secondary)'}; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">${state.cafe_show_allergy ? escHtml(COPY.allergyHideBtn) : escHtml(COPY.allergyShowBtn)}</button>
               <button type="button" onclick="loadCafeteriaMenu(true)" style="min-height:44px; padding:0 14px; border-radius:var(--radius-chip); border:none; background:#EEF8F3; color:#287D62; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">새로고침</button>
             </div>
           </div>
@@ -2836,8 +2836,8 @@
               const isSel = idx === selIdx;
               const isToday = idx === todayIdx;
               return `
-                <button type="button" onclick="state.cafe_day_idx=${idx}; render();" style="height:36px; padding:0 14px; border-radius:var(--radius-card); border:none; background:${isSel ? '#191F28' : '#FFFFFF'}; color:${isSel ? '#FFFFFF' : '#6B7684'}; border:1px solid ${isSel ? '#191F28' : '#E5E8EB'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer; flex-shrink:0;">
-                  ${escHtml(d.day)} ${String(d.date || '').replace(/^\d{4}-/, '')}${isToday ? ' (오늘)' : ''}
+                <button type="button" onclick="state.cafe_day_idx=${idx}; render();" style="flex-shrink:0; white-space:nowrap; height:36px; padding:0 14px; border-radius:var(--radius-card); border:none; background:${isSel ? '#287D62' : '#FFFFFF'}; color:${isSel ? '#FFFFFF' : '#6B7684'}; border:1px solid ${isSel ? '#287D62' : '#E5E8EB'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer; flex-shrink:0;">
+                  ${escHtml(String(d.day || '').replace('요일', ''))} ${String(d.date || '').replace(/^\d{4}[-.]/, '')}${isToday ? ' · 오늘' : ''}
                 </button>
               `;
             }).join("")}
@@ -3200,6 +3200,7 @@
 
         const hideRightPanel = Boolean(
           state.active_modal === "create"
+          || state.active_modal === "detail"
           || state.active_modal === "timetable"
           || state.active_modal === "food_map"
           || state.active_modal === "cafeteria"
@@ -3258,7 +3259,7 @@
           ` : ''}
 
           ${state.nav_tab === "홈" && !state.active_modal && getFilteredHomePosts().length > 0 ? `
-            <button type="button" class="fab-create" onclick="state.active_modal='create'; render();">
+            <button type="button" class="fab-create" aria-label="번개 만들기" onclick="state.active_modal='create'; render();">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
               <span>번개 만들기</span>
             </button>
@@ -3330,6 +3331,7 @@
   }
 
   function updateScrollTopButton() {
+    document.body.classList.toggle("fab-mini", window.scrollY > 80);
     const btn = document.getElementById("btn-scroll-top");
     if (!btn) return;
 
@@ -4104,8 +4106,8 @@
             </div>
           ` : `
             <div style="display:flex; gap:8px; margin-bottom:14px;">
-              <button type="button" onclick="switchNotifTab('mine')" style="height:36px; padding:0 16px; border-radius:var(--radius-card); border:none; background:${state.notif_tab !== 'ulsan' ? '#191F28' : '#F7F9F8'}; color:${state.notif_tab !== 'ulsan' ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">내 알림${unreadCnt > 0 ? ` ${unreadCnt}` : ''}</button>
-              <button type="button" onclick="switchNotifTab('ulsan')" style="height:36px; padding:0 16px; border-radius:var(--radius-card); border:none; background:${state.notif_tab === 'ulsan' ? '#191F28' : '#F7F9F8'}; color:${state.notif_tab === 'ulsan' ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">울산대 공지${newNotice > 0 ? ` ${newNotice}` : ''}</button>
+              <button type="button" onclick="switchNotifTab('mine')" style="height:36px; padding:0 16px; border-radius:var(--radius-card); border:none; background:${state.notif_tab !== 'ulsan' ? '#287D62' : '#F7F9F8'}; color:${state.notif_tab !== 'ulsan' ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">내 알림${unreadCnt > 0 ? ` ${unreadCnt}` : ''}</button>
+              <button type="button" onclick="switchNotifTab('ulsan')" style="height:36px; padding:0 16px; border-radius:var(--radius-card); border:none; background:${state.notif_tab === 'ulsan' ? '#287D62' : '#F7F9F8'}; color:${state.notif_tab === 'ulsan' ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">울산대 공지${newNotice > 0 ? ` ${newNotice}` : ''}</button>
             </div>
             ${state.notif_tab === 'ulsan' ? ulsanNoticeCardHtml : myNotifListHtml}
           `}
@@ -4907,9 +4909,9 @@
         <div>
           <!-- 권역 칩 + 평점 조절 한 줄 -->
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <div class="h-scroll-row" style="display:flex; gap:6px; flex:1 1 100%;">
               ${zoneTabs.map(z => `
-                <button type="button" onclick="setFoodMapFilter({ zone: '${z.k}' })" style="height:32px; padding:0 13px; border-radius:var(--radius-card); border:none; background:${zone === z.k ? '#191F28' : '#F7F9F8'}; color:${zone === z.k ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">${z.label}</button>
+                <button type="button" onclick="setFoodMapFilter({ zone: '${z.k}' })" style="height:32px; padding:0 13px; border-radius:var(--radius-card); border:none; background:${zone === z.k ? '#287D62' : '#F7F9F8'}; color:${zone === z.k ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">${z.label}</button>
               `).join("")}
             </div>
             <div style="display:inline-flex; align-items:center; gap:4px; background:#F7F9F8; padding:3px 6px; border-radius:var(--radius-btn);">
@@ -5093,15 +5095,13 @@
           <button type="button" onclick="openBlindPreviewModal()" style="min-height:44px; border:1px solid #C5E6D6; background:#EEF8F3; border-radius:var(--radius-btn); padding:8px 14px; display:inline-flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; width:100%;">
             <span style="display:inline-flex; align-items:center; gap:7px; min-width:0;">
               <span style="width:8px; height:8px; border-radius:50%; background:#287D62; display:inline-block; flex-shrink:0;"></span>
-              <span style="font-size:var(--fs-md); font-weight:700; color:#1E634C;">${escHtml(COPY.blindNotice)}</span>
+              <span class="home-blind-notice-text" style="font-size:var(--fs-md); font-weight:700; color:#1E634C;">${escHtml(COPY.blindNotice)}</span>
             </span>
-            <span style="font-size:var(--fs-md); font-weight:800; color:#287D62; flex-shrink:0; white-space:nowrap;">미리보기 ›</span>
+            <span class="home-blind-notice-text" style="font-size:var(--fs-md); font-weight:800; color:#287D62; flex-shrink:0; white-space:nowrap;">미리보기 ›</span>
           </button>
         </div>
 
         ${renderHomePendingRequestsHtml()}
-
-        ${renderMugeoFoodMapSection()}
 
         ${(() => {
           const hasTT = typeof hasUserTimetable === "function" && hasUserTimetable(state.user_id);
@@ -5123,6 +5123,8 @@
         <div id="home-feed-list-wrap">
           ${renderHomeFeedListHtml()}
         </div>
+
+        <div style="margin-top:16px;">${renderMugeoFoodMapSection()}</div>
 
         ${renderMobileHomeFooterWidgets()}
       `;
@@ -5503,7 +5505,7 @@
             <!-- 카테고리 심플 알약 칩 (홈/관심 카테고리와 단일 상수 공유) -->
             <div style="margin-bottom:20px; padding-bottom:18px; border-bottom:1px solid #F2F4F3;">
               <div style="font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary); margin-bottom:10px;">카테고리</div>
-              <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <div class="h-scroll-row" style="display:flex; gap:8px;">
                 ${catPresets.map(c => {
                   const isSel = (c.val === defaultCat || String(defaultCat).includes(c.label));
                   return `
@@ -5523,7 +5525,7 @@
               <div>
                 <div style="font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary); margin-bottom:8px;">번개 제목</div>
                 <input id="c_title" class="input" value="${escHtml(prefillTitle)}" placeholder="예: 학생회관 학식 같이 먹어요" style="height:48px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-lg); font-weight:600; padding:0 16px; margin-bottom:10px;" />
-                <div id="create-title-chips-wrap" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:22px;">
+                <div id="create-title-chips-wrap" class="h-scroll-row" style="display:flex; gap:6px; margin-bottom:22px;">
                   ${renderCreateTitleChipsHtml(defaultCat)}
                 </div>
 
@@ -5531,7 +5533,7 @@
                   <span style="font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary);">만날 시간</span>
                   ${freeSlots.length > 0 ? `<span style="font-size:var(--fs-xs); font-weight:700; color:#287D62;">내 시간표 공강 자동 추천</span>` : ""}
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+                <div class="h-scroll-row" style="display:flex; gap:6px; margin-bottom:10px;">
                   ${freeSlots.map(sl => `
                     <button type="button" class="quick-chip time-quick-chip" style="border:1px solid #287D62; background:#EEF8F3; color:#287D62;" onclick="applyQuickFreeSlotToCreate('${sl.date}', '${sl.time}')">${escHtml(sl.label.replace(/^[^\w가-힣]+\s*/, ''))}</button>
                   `).join("")}
@@ -5898,8 +5900,8 @@
                     const apDeptText = isApApproved ? `${apUser.department} · ${apUser.mbti}` : `${getBroadCollege(apUser.department)} · 수락 전 블라인드`;
                     const apAvatar = (apUser.avatar || "🐱").split(" ")[0];
                     return `
-                      <div style="background:#F7F9F8; border-radius:var(--radius-card); padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                      <div class="applicant-row" style="background:#F7F9F8; border-radius:var(--radius-card); padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                        <div class="applicant-info" style="display:flex; align-items:center; gap:10px; min-width:0;">
                           <span style="width:40px; height:40px; border-radius:var(--radius-card); background:#FFFFFF; font-size:var(--fs-xl); line-height:1; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${escHtml(apAvatar)}</span>
                           <div style="min-width:0;">
                             <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary);">${escHtml(apTier.name)} · ${apTier.displayTemp}°C</div>
@@ -5907,7 +5909,7 @@
                           </div>
                         </div>
                         ${a.status === "대기중"
-                          ? `<div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                          ? `<div class="applicant-actions" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                                <button type="button" onclick="rejectApplicant(${a.id})" style="height:34px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-secondary); font-size:var(--fs-sm); font-weight:700; cursor:pointer;">거절</button>
                                <button type="button" onclick="acceptApplicant(${a.id})" style="height:34px; padding:0 16px; border-radius:var(--radius-chip); border:none; background:#287D62; color:#FFFFFF; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">수락</button>
                              </div>`
@@ -6960,7 +6962,7 @@
             <div>
               <!-- 모드 전환 탭: 공강 메뉴 추천 vs 리워드 룰렛 -->
               <div style="display:flex; gap:6px; width:100%; margin-bottom:12px;">
-                <button class="btn" style="flex:1; min-height:44px; padding:0 12px; font-size:var(--fs-sm); font-weight:800; background:${mode === 'menu' ? '#191F28' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : 'var(--text-secondary)'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; resetRouletteResultState(); render();">
+                <button class="btn" style="flex:1; min-height:44px; padding:0 12px; font-size:var(--fs-sm); font-weight:800; background:${mode === 'menu' ? '#287D62' : '#FFFFFF'}; color:${mode === 'menu' ? '#FFFFFF' : 'var(--text-secondary)'}; border-color:${mode === 'menu' ? '#191F28' : '#E5EAE7'};" onclick="state.roulette_mode='menu'; resetRouletteResultState(); render();">
                   🍴 공강 메뉴 룰렛
                 </button>
                 <button class="btn" style="flex:1; min-height:44px; padding:0 12px; font-size:var(--fs-sm); font-weight:800; background:${mode === 'reward' ? '#287D62' : '#FFFFFF'}; color:${mode === 'reward' ? '#FFFFFF' : 'var(--text-secondary)'}; border-color:${mode === 'reward' ? '#287D62' : '#E5EAE7'};" onclick="state.roulette_mode='reward'; resetRouletteResultState(); render();">
@@ -7103,11 +7105,11 @@
                 </span>
               ` : `
                 <button type="button" onclick="handleDailyCheckin()" style="min-height:44px; padding:0 12px; border-radius:var(--radius-chip); border:none; background:#287D62; color:#FFFFFF; font-size:var(--fs-xs); font-weight:800; display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
-                  <span>오늘 출석하기 +3점</span>
+                  <span>출석하기 +3점</span>
                 </button>
               `}
               ${state.plaza_view === 'balance' ? `
-                <button type="button" onclick="state.show_poll_form=!state.show_poll_form; render();" aria-label="${state.show_poll_form ? '글쓰기 닫기' : '새 밸런스 투표 글쓰기'}" style="min-height:44px; padding:0 14px; border-radius:var(--radius-chip); border:1px solid ${state.show_poll_form ? '#191F28' : '#E5E8EB'}; background:${state.show_poll_form ? '#191F28' : '#FFFFFF'}; color:${state.show_poll_form ? '#FFFFFF' : 'var(--text-primary)'}; font-size:var(--fs-sm); font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
+                <button type="button" onclick="state.show_poll_form=!state.show_poll_form; render();" aria-label="${state.show_poll_form ? '글쓰기 닫기' : '새 밸런스 투표 글쓰기'}" style="min-height:44px; padding:0 14px; border-radius:var(--radius-chip); border:1px solid ${state.show_poll_form ? '#287D62' : '#E5E8EB'}; background:${state.show_poll_form ? '#287D62' : '#FFFFFF'}; color:${state.show_poll_form ? '#FFFFFF' : 'var(--text-primary)'}; font-size:var(--fs-sm); font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
                   <span>${state.show_poll_form ? '✕ 닫기' : '+ 글쓰기'}</span>
                 </button>
               ` : ""}
@@ -7443,7 +7445,7 @@
         </div>
 
         <!-- 지도 하단 바텀시트: 주변 번개 목록 -->
-        <div style="margin-top:-18px; position:relative; z-index:440; background:#FFFFFF; border-radius:var(--radius-chip); padding:12px 18px 20px; box-shadow:0 -4px 12px rgba(0,0,0,0.08); border:1px solid #E5E8EB;">
+        <div style="margin-top:-18px; position:relative; z-index:440; background:#FFFFFF; border-radius:20px 20px var(--radius-card) var(--radius-card); padding:12px 18px 20px; box-shadow:0 -4px 12px rgba(0,0,0,0.08); border:1px solid #E5E8EB;">
           <div style="width:40px; height:5px; border-radius:3px; background:#E5E8EB; margin:0 auto 12px;"></div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <span style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">주변 번개 ${nearPosts.length}개</span>
@@ -7769,7 +7771,7 @@
       const filterChips = ["전체", "진행 중", "후기 쓰기"].map(f => {
         const isActive = (curFilter === f);
         return `
-          <button type="button" onclick="state.chat_filter='${f}'; render();" style="height:34px; padding:0 14px; border-radius:var(--radius-chip); border:none; background:${isActive ? '#191F28' : '#F7F9F8'}; color:${isActive ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:${isActive ? '700' : '600'}; cursor:pointer; flex-shrink:0;">
+          <button type="button" onclick="state.chat_filter='${f}'; render();" style="height:34px; padding:0 14px; border-radius:var(--radius-chip); border:none; background:${isActive ? '#287D62' : '#F7F9F8'}; color:${isActive ? '#FFFFFF' : '#6B7684'}; font-size:var(--fs-sm); font-weight:${isActive ? '700' : '600'}; cursor:pointer; flex-shrink:0;">
             ${f}
           </button>
         `;
@@ -9667,7 +9669,7 @@
             <!-- 4) 4축 비주얼 MBTI 토글 피커 + 비공개 스위치 -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
               <span style="font-size:var(--fs-sm); font-weight:800; color:var(--text-primary);">MBTI</span>
-              <button type="button" onclick="toggleProfileMbtiPrivate()" style="min-height:44px; padding:0 12px; border-radius:var(--radius-chip); border:${isMbtiPrivate ? '1.5px solid #191F28' : '1px solid #E5E8EB'}; background:${isMbtiPrivate ? '#191F28' : '#FFFFFF'}; color:${isMbtiPrivate ? '#FFFFFF' : 'var(--text-secondary)'}; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">
+              <button type="button" onclick="toggleProfileMbtiPrivate()" style="min-height:44px; padding:0 12px; border-radius:var(--radius-chip); border:${isMbtiPrivate ? '1.5px solid #191F28' : '1px solid #E5E8EB'}; background:${isMbtiPrivate ? '#287D62' : '#FFFFFF'}; color:${isMbtiPrivate ? '#FFFFFF' : 'var(--text-secondary)'}; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">
                 ${isMbtiPrivate ? '✓ 비공개 중' : '비공개'}
               </button>
             </div>
