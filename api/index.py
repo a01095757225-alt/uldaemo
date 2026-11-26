@@ -386,7 +386,11 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
         sp["votes_b"] = [pub_id(u) for u in (pl.get("votes_b") or [])]
         if isinstance(pl.get("replies"), list):
             sp["replies"] = [
-                {**rep, "author_id": pub_id(rep.get("author_id"))}
+                {
+                    **rep,
+                    "author_id": pub_id(rep.get("author_id")),
+                    "likes": [pub_id(u) for u in (rep.get("likes") or [])],
+                }
                 for rep in pl["replies"] if isinstance(rep, dict)
             ]
         safe_polls.append(sp)
@@ -398,7 +402,11 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
         st["likes"] = [pub_id(u) for u in (t.get("likes") or [])]
         if isinstance(t.get("replies"), list):
             st["replies"] = [
-                {**rep, "author_id": pub_id(rep.get("author_id"))}
+                {
+                    **rep,
+                    "author_id": pub_id(rep.get("author_id")),
+                    "likes": [pub_id(u) for u in (rep.get("likes") or [])],
+                }
                 for rep in t["replies"] if isinstance(rep, dict)
             ]
         safe_talks.append(st)
@@ -1230,7 +1238,7 @@ class handler(BaseHTTPRequestHandler):
 
         def _finish_mutation(db_obj: dict, actor_id: str, is_adm: bool, extra=None, deleted_post_ids=None, sync_users=None, sync_posts=None):
             if sync_users is None:
-                sync_users = action not in ("apply", "cancel_application", "accept", "reject", "send_message", "react_message", "mark_read", "mark_notifs_read", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply")
+                sync_users = action not in ("apply", "cancel_application", "accept", "reject", "send_message", "react_message", "mark_read", "mark_notifs_read", "mark_notifications_read", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply", "plaza_like_reply")
             if sync_posts is None:
                 sync_posts = action in ("create_post", "cancel_post", "close_post", "boost_post", "leave_chat", "delete_account")
             ok = save_cloud_db(db_obj, deleted_post_ids, sync_users=sync_users, sync_posts=sync_posts)
@@ -2031,7 +2039,7 @@ class handler(BaseHTTPRequestHandler):
             _finish_mutation(db_obj, actor_id, is_adm)
             return
 
-        if action in ("plaza_vote", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply"):
+        if action in ("plaza_vote", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply", "plaza_like_reply"):
             db_obj, actor_id, is_adm = _require_auth()
             if not db_obj:
                 return
@@ -2134,14 +2142,44 @@ class handler(BaseHTTPRequestHandler):
                 reps = item.setdefault("replies", [])
                 last_rid = max((int(r.get("id") or 0) for r in reps if isinstance(r, dict)), default=0)
                 new_rid = max(now_ms, last_rid + 1)
-                reps.append({
+                raw_pid = data.get("parent_id")
+                parent_id = None
+                if raw_pid is not None and str(raw_pid).strip() != "":
+                    try:
+                        pid_num = int(raw_pid)
+                        if any(isinstance(r, dict) and int(r.get("id") or 0) == pid_num for r in reps):
+                            parent_id = pid_num
+                    except Exception:
+                        parent_id = None
+                new_rep = {
                     "id": new_rid,
                     "author_id": actor_id,
                     "text": txt,
                     "created_at": time.strftime("%m/%d %H:%M"),
                     "deleted": False,
-                })
+                    "likes": [],
+                }
+                if parent_id is not None:
+                    new_rep["parent_id"] = parent_id
+                reps.append(new_rep)
                 item["updated_at"] = now_ms
+            elif action == "plaza_like_reply":
+                kind = str(data.get("kind") or "t")
+                target_id = data.get("target_id")
+                reply_id = data.get("reply_id")
+                arr = db_obj.get("polls" if kind == "p" else "plaza_talks") or []
+                item = next((x for x in arr if isinstance(x, dict) and str(x.get("id")) == str(target_id)), None)
+                if item:
+                    for rep in (item.get("replies") or []):
+                        if isinstance(rep, dict) and str(rep.get("id")) == str(reply_id):
+                            likes = [str(u) for u in (rep.get("likes") or [])]
+                            if actor_id in likes:
+                                likes = [u for u in likes if u != actor_id]
+                            else:
+                                likes.append(actor_id)
+                            rep["likes"] = likes
+                            item["updated_at"] = now_ms
+                            break
             elif action == "plaza_delete_reply":
                 kind = str(data.get("kind") or "t")
                 target_id = data.get("target_id")

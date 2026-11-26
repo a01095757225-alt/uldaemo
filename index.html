@@ -5962,22 +5962,31 @@
       if (text.length > 200) return showToast("답글은 200자 이내로 입력해주세요.");
       if (el) el.value = "";
       _replySubmitting.add(key);
+      const subTarget = (state.reply_target && state.reply_target.kind === kind && Number(state.reply_target.targetId) === Number(id))
+        ? state.reply_target
+        : null;
+      const parentId = subTarget ? Number(subTarget.parentId) : null;
+      if (subTarget) state.reply_target = null;
       item.replies = item.replies || [];
       const tempRid = -Date.now();
       const now = new Date();
-      item.replies.push({
+      const newLocalReply = {
         id: tempRid,
         author_id: state.user_id,
         text,
         created_at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
-        deleted: false
-      });
+        deleted: false,
+        likes: []
+      };
+      if (parentId) newLocalReply.parent_id = parentId;
+      item.replies.push(newLocalReply);
       item.updated_at = Date.now();
       state.open_replies = state.open_replies || {};
       state.open_replies[kind + id] = true;
       render();
       try {
         const payload = { kind, target_id: Number(id), text };
+        if (parentId) payload.parent_id = parentId;
         if (kind === "p") {
           payload.poll_meta = {
             id: item.id,
@@ -5995,11 +6004,54 @@
         }
         ensurePlazaDefaults(DB);
         state.open_replies[kind + id] = true;
-        showToast("답글이 등록되었어요.");
+        showToast(parentId ? "대댓글이 등록되었어요." : "답글이 등록되었어요.");
         render();
       } finally {
         _replySubmitting.delete(key);
       }
+    }
+
+    function startSubReply(kind, targetId, parentReplyId, targetLabel) {
+      state.open_replies = state.open_replies || {};
+      state.open_replies[kind + targetId] = true;
+      state.reply_target = { kind, targetId: Number(targetId), parentId: Number(parentReplyId), label: String(targetLabel || "익명") };
+      render();
+      setTimeout(() => {
+        const inp = document.getElementById("reply_in_" + kind + targetId);
+        if (inp) { inp.focus(); inp.scrollIntoView({ behavior: "smooth", block: "center" }); }
+      }, 40);
+    }
+
+    function cancelSubReply() {
+      state.reply_target = null;
+      render();
+    }
+
+    async function toggleReplyLike(kind, targetId, replyId) {
+      const item = findReplyTarget(kind, targetId);
+      if (!item) return;
+      const r = (item.replies || []).find(x => Number(x.id) === Number(replyId));
+      if (!r || Number(r.id) < 0) return;
+      r.likes = Array.isArray(r.likes) ? r.likes.map(String) : [];
+      const myId = String(state.user_id || "");
+      if (!myId) return;
+      const prevLikes = r.likes.slice();
+      const idx = r.likes.indexOf(myId);
+      if (idx >= 0) r.likes.splice(idx, 1);
+      else r.likes.push(myId);
+      render();
+      const res = await callApiAction("plaza_like_reply", {
+        kind,
+        target_id: Number(targetId),
+        reply_id: Number(replyId)
+      });
+      if (!res.ok) {
+        r.likes = prevLikes;
+        render();
+        return showToast(res.message || "좋아요 반영에 실패했어요.");
+      }
+      ensurePlazaDefaults(DB);
+      render();
     }
 
     async function deleteReply(kind, id, rid) {
@@ -6041,30 +6093,73 @@
         if (item.author_id && uid === item.author_id) return "익명(글쓴이)";
         return "익명 " + (order.indexOf(uid) + 1);
       };
-      const rows = (item.replies || []).filter(r => r && !r.deleted && !isUserBlocked(r.author_id)).map(r => {
-        const mine = r.author_id === state.user_id;
-        const isOwner = item.author_id && r.author_id === item.author_id;
-        const replyBlockLabel = isOwner ? "익명 글쓴이" : label(r.author_id);
+      const allReplies = (item.replies || []).filter(r => r && !isUserBlocked(r.author_id));
+      const topReplies = allReplies.filter(r => !r.parent_id);
+      const childrenByParent = {};
+      allReplies.forEach(r => {
+        if (r.parent_id && !r.deleted) {
+          const pk = String(r.parent_id);
+          childrenByParent[pk] = childrenByParent[pk] || [];
+          childrenByParent[pk].push(r);
+        }
+      });
+
+      const renderOneReply = (r, isChild) => {
+        const mine = String(r.author_id) === String(state.user_id);
+        const isOwner = item.author_id && String(r.author_id) === String(item.author_id);
+        const dispLabel = label(r.author_id);
+        const replyBlockLabel = isOwner ? "익명 글쓴이" : dispLabel;
+        const likesArr = Array.isArray(r.likes) ? r.likes.map(String) : [];
+        const liked = likesArr.includes(String(state.user_id));
+        const jsLabel = dispLabel.replace(/'/g, "\\'");
         return `
-          <div style="display:flex; gap:8px; align-items:flex-start; padding:7px 0;">
+          <div style="display:flex; gap:8px; align-items:flex-start; padding:${isChild ? '6px 0 6px 10px' : '7px 0'}; ${isChild ? 'margin-left:14px; border-left:2px solid #D5E4DC;' : ''}">
             <div style="flex:1; min-width:0;">
               <div style="font-size:12px; font-weight:700; color:${isOwner ? '#287D62' : '#6B7684'}; margin-bottom:2px;">
-                ${label(r.author_id)}${mine ? ' <span style="color:#B0B8C1; font-weight:600;">· 나</span>' : ''}
+                ${isChild ? '<span style="color:#98A2B3; margin-right:4px;">↳</span>' : ''}${escHtml(dispLabel)}${mine ? ' <span style="color:#B0B8C1; font-weight:600;">· 나</span>' : ''}
                 <span style="font-weight:500; color:#B0B8C1; margin-left:6px;">${escHtml(r.created_at || "방금 전")}</span>
               </div>
               <div style="font-size:14px; color:#191F28; line-height:1.45; word-break:break-word;">${escHtml(r.text)}</div>
+              <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+                <button type="button" onclick="toggleReplyLike('${kind}', ${item.id}, ${r.id})" style="border:none; background:none; padding:2px 0; font-size:11.5px; font-weight:700; color:${liked ? '#E85D75' : '#8B95A1'}; display:inline-flex; align-items:center; gap:3px; cursor:pointer;">
+                  <span>${liked ? '♥' : '♡'}</span><span>${likesArr.length > 0 ? likesArr.length : '좋아요'}</span>
+                </button>
+                ${!isChild ? `
+                  <button type="button" onclick="startSubReply('${kind}', ${item.id}, ${r.id}, '${jsLabel}')" style="border:none; background:none; padding:2px 0; font-size:11.5px; font-weight:700; color:#6B7684; cursor:pointer;">답글</button>
+                ` : ''}
+              </div>
             </div>
             ${mine
               ? `<button type="button" style="border:none; background:none; color:#B0B8C1; font-size:12px; cursor:pointer; flex-shrink:0;" onclick="deleteReply('${kind}', ${item.id}, ${r.id})">삭제</button>`
               : (r.author_id ? `<button type="button" style="border:none; background:none; color:#B0B8C1; font-size:11.5px; cursor:pointer; flex-shrink:0;" onclick="blockUser('${escHtml(r.author_id)}', '${escHtml(replyBlockLabel)}')">차단</button>` : "")}
           </div>
         `;
+      };
+
+      const rows = topReplies.map(r => {
+        const kids = childrenByParent[String(r.id)] || [];
+        if (r.deleted && kids.length === 0) return "";
+        const parentHtml = r.deleted
+          ? `<div style="padding:7px 0; font-size:13px; color:#98A2B3;">삭제된 댓글입니다.</div>`
+          : renderOneReply(r, false);
+        return parentHtml + kids.map(c => renderOneReply(c, true)).join("");
       }).join("");
+
+      const activeSub = (state.reply_target && state.reply_target.kind === kind && Number(state.reply_target.targetId) === Number(item.id))
+        ? state.reply_target
+        : null;
+
       return `
         <div style="background:#F7F9F8; border-radius:14px; padding:10px 14px; margin:6px 0 12px;">
           ${rows || `<div style="font-size:13px; color:#8B95A1; padding:6px 0;">아직 답글이 없어요. 첫 답글을 남겨보세요!</div>`}
+          ${activeSub ? `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#EEF8F3; border-radius:8px; padding:5px 10px; margin-top:8px; font-size:12px; font-weight:700; color:#287D62;">
+              <span>↳ ${escHtml(activeSub.label)}님에게 대댓글 작성 중</span>
+              <button type="button" onclick="cancelSubReply()" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:700; cursor:pointer; padding:0;">✕ 취소</button>
+            </div>
+          ` : ''}
           <div style="display:flex; gap:8px; margin-top:8px;">
-            <input id="reply_in_${kind}${item.id}" type="text" maxlength="200" style="flex:1; min-width:0; height:38px; border-radius:10px; border:1px solid #E5EAE7; background:#FFFFFF; padding:0 12px; font-size:13.5px; color:#191F28;" placeholder="익명으로 답글 남기기" onkeydown="if(event.key==='Enter') submitReply('${kind}', ${item.id})" />
+            <input id="reply_in_${kind}${item.id}" type="text" maxlength="200" style="flex:1; min-width:0; height:38px; border-radius:10px; border:1px solid #E5EAE7; background:#FFFFFF; padding:0 12px; font-size:13.5px; color:#191F28;" placeholder="${activeSub ? escHtml(activeSub.label) + '님에게 대댓글 남기기' : '익명으로 답글 남기기'}" onkeydown="if(event.key==='Enter') submitReply('${kind}', ${item.id})" />
             <button type="button" class="btn btn-primary" style="width:auto; min-height:38px; height:38px; padding:0 14px; border-radius:10px; font-size:13px;" onclick="submitReply('${kind}', ${item.id})">등록</button>
           </div>
         </div>
