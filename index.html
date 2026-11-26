@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3b" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3c" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -74,6 +74,7 @@
       withdrawDesc: "회원 탈퇴 시 학번·이메일·프로필·개설한 번개·신청 내역·시간표·보유 쿠폰이 즉시 영구 삭제되며 되돌릴 수 없어요.",
       withdrawAdminNotice: "운영진 보호 계정은 안전을 위해 앱에서 직접 탈퇴할 수 없어요.",
       mapPrivacyChip: "울대모 · 내 위치는 건물 단위로만 써요",
+      mapPrivacyShort: "내 위치는 건물 단위로만 써요",
       allergyShowBtn: "알레르기 보기",
       allergyHideBtn: "알레르기 접기",
       onboardingCards: [
@@ -7335,8 +7336,8 @@
           }
 
           const clickAttr = forPc ? `onclick="selectMapPost(${post.id})" ondblclick="openDetailModal(${post.id})"` : `onclick="openDetailModal(${post.id})"`;
-          const cardBg = isSelected && forPc ? "#EEF8F3" : "#F7F9F8";
-          const cardBorder = isSelected && forPc ? "2px solid #287D62" : "2px solid transparent";
+          const cardBg = isSelected ? "#EEF8F3" : "#F7F9F8";
+          const cardBorder = isSelected ? "1.5px solid #287D62" : "1.5px solid transparent";
 
           const cleanMapCat = String(post.category || "모임").replace(/^[^\w가-힣]+/, "").trim() || "모임";
           return `
@@ -7410,35 +7411,34 @@
           ` : ""}
         </div>
 
-        <!-- 풀-블리드 지도 컨테이너 + 플로팅 컨트롤 -->
-        <div style="position:relative; border-radius:var(--radius-card); overflow:hidden; border:1px solid #E5E8EB;">
-          <!-- 상단 플로팅 안심 위치 알약 바 -->
-          <div style="position:absolute; top:12px; left:12px; right:12px; z-index:450; height:44px; border-radius:var(--radius-card); background:#FFFFFF; box-shadow:0 4px 12px rgba(0,0,0,0.14); display:flex; align-items:center; justify-content:space-between; padding:0 14px; gap:8px;">
-            <div style="display:flex; align-items:center; gap:7px; min-width:0;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3z"/></svg>
-              <span style="font-size:var(--fs-sm); font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">울산대 · 내 위치는 건물 단위로만 써요</span>
+        <!-- Figma M17 v3: 흰 둥근 헤더(위치 안내 + 칩) → 그 아래 지도 → 둥근 바텀시트 (겹침 없음) -->
+        <div class="map-v3-wrap">
+          <div class="map-v3-header">
+            <div class="map-v3-privacy-row">
+              <span class="map-v3-privacy-chip">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="5" y="11" width="14" height="10" rx="3"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                <span>${escHtml(COPY.mapPrivacyShort)}</span>
+              </span>
+              <button type="button" role="switch" aria-checked="${state.gps_consent ? 'true' : 'false'}" aria-label="건물 단위 위치 사용" onclick="state.gps_consent=!state.gps_consent; render();" class="map-v3-switch">
+                <span class="map-v3-switch-track ${state.gps_consent ? 'on' : ''}"><span class="map-v3-switch-knob"></span></span>
+              </button>
             </div>
-            <button type="button" onclick="state.gps_consent=!state.gps_consent; render();" title="건물 단위 위치 사용 토글" style="width:36px; height:20px; border-radius:var(--radius-btn); border:none; background:${state.gps_consent ? '#287D62' : '#D0D5DD'}; position:relative; cursor:pointer; flex-shrink:0; transition:background 0.18s;">
-              <span style="position:absolute; top:3px; left:${state.gps_consent ? '19px' : '3px'}; width:14px; height:14px; border-radius:7px; background:#FFFFFF; transition:left 0.18s;"></span>
+            <div class="map-v3-chips fade-scroll-wrap">
+              ${renderCategoryChips("map_cat")}
+            </div>
+          </div>
+
+          <div class="map-v3-canvas">
+            <div id="campus-map" style="height:380px; width:100%;"></div>
+            <button type="button" onclick="requestRealGps()" aria-label="현위치로 이동" class="map-v3-locate">
+              ${getSvgIcon('location', 20, '#287D62')}
             </button>
           </div>
-
-          <!-- 상단 플로팅 카테고리 칩 -->
-          <div style="position:absolute; top:64px; left:12px; right:12px; z-index:450;">
-            ${renderCategoryChips("map_cat")}
-          </div>
-
-          <!-- 우측 하단 현위치 버튼 -->
-          <button type="button" onclick="requestRealGps()" title="현위치로 이동" style="position:absolute; bottom:28px; right:14px; z-index:450; width:44px; height:44px; border-radius:var(--radius-card); border:none; background:#FFFFFF; box-shadow:0 4px 10px rgba(0,0,0,0.14); display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
-            ${getSvgIcon('location', 18, '#287D62')}
-          </button>
-
-          <div id="campus-map" style="height:410px; width:100%;"></div>
         </div>
 
         <!-- 지도 하단 바텀시트: 주변 번개 목록 -->
-        <div style="margin-top:-18px; position:relative; z-index:440; background:#FFFFFF; border-radius:20px 20px var(--radius-card) var(--radius-card); padding:12px 18px 20px; box-shadow:0 -4px 12px rgba(0,0,0,0.08); border:1px solid #E5E8EB;">
-          <div style="width:40px; height:5px; border-radius:3px; background:#E5E8EB; margin:0 auto 12px;"></div>
+        <div class="map-v3-sheet">
+          <div style="width:40px; height:5px; border-radius:3px; background:#E5E8EB; margin:0 auto 14px;"></div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <span style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">주변 번개 ${nearPosts.length}개</span>
             <span style="font-size:var(--fs-sm); color:var(--text-secondary); font-weight:500;">가까운 순</span>
@@ -7512,33 +7512,49 @@
 
       let activePosts = (DB.posts || []).filter(p => p.status === "모집중" && !isPostExpired(p) && !isUserBlocked(p.author_id));
       if (state.map_cat !== "전체") activePosts = activePosts.filter(p => p.category.includes(state.map_cat));
+      // Figma M17 v3: 건물 단위로 묶어 [아이콘 N개] 알약 하나로 표시 (겹침 방지 · 팝업 대신 바텀시트 연동)
+      const groups = {};
       activePosts.forEach(p => {
-        const c = getBuildingCoords(p.location);
-        const apps = DB.applications.filter(a => a.post_id === p.id && a.status === "승인됨");
-        const currentCnt = apps.length + 1;
-        const shortCat = String(p.category || "모임").replace(/^[^\w가-힣]+/, "").trim() || "모임";
-        const cBadge = getCatKoreanBadge(p.category, p.title);
-        const isSel = Number(state.selected_map_post_id) === Number(p.id);
-        const pillBg = isSel ? cBadge.border : "#FFFFFF";
-        const pillColor = isSel ? "#FFFFFF" : "#191F28";
-
+        const key = String(p.location || "");
+        (groups[key] = groups[key] || []).push(p);
+      });
+      const iconFood = '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>';
+      const iconChat = '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.6-.8L3 21l1.9-5.4A8.4 8.4 0 1 1 21 11.5z"/>';
+      const iconUsers = '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
+      Object.keys(groups).forEach(loc => {
+        const list = groups[loc];
+        const first = list[0];
+        const c = getBuildingCoords(first.location);
+        const isSel = list.some(x => Number(state.selected_map_post_id) === Number(x.id));
+        const catTxt = String(first.category || "");
+        const svgPath = /밥|학식|식/.test(catTxt) ? iconFood : (/카공|스터디|산책|운동/.test(catTxt) ? iconChat : iconUsers);
         const pinHtml = `
-          <div onclick="openDetailModal(${p.id})" style="display:inline-flex; flex-direction:column; align-items:center; cursor:pointer; transform:${isSel ? 'scale(1.06)' : 'scale(1)'}; transition:transform 0.16s;">
-            <div style="background:${pillBg}; border:2.5px solid ${cBadge.border}; border-radius:var(--radius-card); padding:3px 10px; box-shadow:0 3px 10px rgba(0,0,0,0.18); font-size:var(--fs-xs); font-weight:800; color:${pillColor}; white-space:nowrap;">
-              ${escHtml(shortCat)} ${currentCnt}/${p.max_participants}명
-            </div>
-            <div style="width:10px; height:10px; border-radius:50%; background:${cBadge.border}; border:2px solid #FFFFFF; margin-top:-3px; box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
+          <div class="map-v3-pin ${isSel ? 'is-selected' : ''}" onclick="onMapPinTap(${first.id}, ${list.length})">
+            <span class="map-v3-pin-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${isSel ? '#FFFFFF' : '#1F6A52'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${svgPath}</svg></span>
+            <span class="map-v3-pin-cnt">${list.length}개</span>
           </div>
         `;
         const bubbleIcon = L.divIcon({
           html: pinHtml,
           className: "custom-bubble-pin-wrapper",
-          iconSize: [100, 38],
-          iconAnchor: [50, 36]
+          iconSize: [74, 36],
+          iconAnchor: [37, 18]
         });
-        L.marker([c[0], c[1]], { icon: bubbleIcon }).addTo(map)
-          .bindPopup(`<div style="font-size:var(--fs-sm); line-height:1.5; color:var(--text-primary);"><b>${escHtml(p.title)}</b><br><span style="color:var(--text-secondary);">${escHtml(p.location)} · ${escHtml(p.meet_time)}</span><br><button class="btn btn-primary" style="margin-top:8px; min-height:32px; padding:4px 10px; font-size:var(--fs-xs);" onclick="openDetailModal(${p.id})">상세 보기</button></div>`);
+        L.marker([c[0], c[1]], { icon: bubbleIcon, keyboard: false }).addTo(map);
       });
+    }
+
+    function onMapPinTap(firstPostId, cnt) {
+      state.selected_map_post_id = Number(firstPostId);
+      if (Number(cnt) <= 1) {
+        openDetailModal(firstPostId);
+      } else {
+        render();
+        setTimeout(() => {
+          const sheet = document.querySelector(".map-v3-sheet");
+          if (sheet) sheet.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 60);
+      }
     }
 
     // =========================================================
