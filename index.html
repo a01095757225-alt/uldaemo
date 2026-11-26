@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3h" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3i" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -4362,6 +4362,7 @@
     function switchTab(tab) {
       state.nav_tab = tab;
       state.active_modal = null;
+      state.sort_menu_open = false;
       if (tab === "채팅") {
         // 대화 탭을 누르면 항상 대화방이 접힌 목록 상태로 시작
         state.chat_list_mode = true;
@@ -4583,11 +4584,32 @@
       render();
     }
 
+    function refreshHomeFeedWrapOrRender() {
+      const wrap = document.getElementById("home-feed-list-wrap");
+      if (wrap && state.nav_tab === "홈" && !state.active_modal) {
+        wrap.innerHTML = renderHomeFeedListHtml();
+      } else {
+        render();
+      }
+    }
+
+    function toggleHomeSortMenu(forceState) {
+      state.sort_menu_open = typeof forceState === "boolean" ? forceState : !state.sort_menu_open;
+      refreshHomeFeedWrapOrRender();
+    }
+
     function setHomeSortOpt(val) {
       state.sort_opt = val;
+      state.sort_menu_open = false;
       state.home_visible_cnt = 8;
-      render();
+      refreshHomeFeedWrapOrRender();
     }
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && state.sort_menu_open) {
+        toggleHomeSortMenu(false);
+      }
+    });
 
     function getFilteredHomePosts() {
       // 시작 시각이 1시간 이상 지난 번개 및 차단한 학우의 번개는 홈 피드에서 정리
@@ -4729,11 +4751,33 @@
         { key: "내일 이후", label: "내일 이후" }
       ];
       const sortOpts = [
-        { key: "추천·공강순", label: "⚡ 추천·공강순" },
-        { key: "곧 시작순", label: "⏰ 곧 시작순" },
-        { key: "가까운순", label: "📍 가까운순" },
-        { key: "매너온도순", label: "🌡️ 매너온도순" }
+        {
+          key: "추천·공강순",
+          label: "추천·공강순",
+          sub: "내 공강·마감 임박 맞춤 추천",
+          svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`
+        },
+        {
+          key: "곧 시작순",
+          label: "곧 시작순",
+          sub: "가장 빨리 모이는 번개부터",
+          svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>`
+        },
+        {
+          key: "가까운순",
+          label: "가까운순",
+          sub: "내 위치에서 가까운 건물부터",
+          svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`
+        },
+        {
+          key: "매너온도순",
+          label: "매너온도순",
+          sub: "방장 매너온도가 높은 순서",
+          svg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`
+        }
       ];
+      const activeSortObj = sortOpts.find(o => curSort.includes(o.key.replace('순',''))) || sortOpts[0];
+      const isSortOpen = Boolean(state.sort_menu_open);
 
       const filterHeaderHtml = `
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin: 4px 0 10px;">
@@ -4741,9 +4785,41 @@
             <span style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">모집 중인 번개</span>
             <span style="font-size:var(--fs-sm); color:var(--text-secondary); font-weight:600;">${list.length}개</span>
           </div>
-          <select aria-label="번개 정렬 기준" onchange="setHomeSortOpt(this.value)" style="height:38px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-sm); font-weight:700; cursor:pointer; outline:none;">
-            ${sortOpts.map(o => `<option value="${escHtml(o.key)}" ${curSort.includes(o.key.replace('순','')) ? 'selected' : ''}>${escHtml(o.label)}</option>`).join("")}
-          </select>
+          <div class="sort-v3-wrap">
+            <button type="button" class="sort-v3-trigger ${isSortOpen ? 'open' : ''}" aria-haspopup="listbox" aria-expanded="${isSortOpen}" onclick="toggleHomeSortMenu()">
+              <span style="display:inline-flex; align-items:center; color:#287D62;">${activeSortObj.svg}</span>
+              <span>${escHtml(activeSortObj.label)}</span>
+              <span class="sort-v3-chevron">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </button>
+            ${isSortOpen ? `
+              <div class="sort-v3-backdrop" onclick="toggleHomeSortMenu(false)"></div>
+              <div class="sort-v3-panel" role="listbox" aria-label="번개 정렬 기준">
+                <div class="sort-v3-sheet-head">
+                  <div class="sort-v3-grabber"></div>
+                  <div class="sort-v3-sheet-title">정렬 기준</div>
+                </div>
+                <div class="sort-v3-list">
+                  ${sortOpts.map(o => {
+                    const isSelected = (o.key === activeSortObj.key);
+                    return `
+                      <button type="button" role="option" aria-selected="${isSelected}" class="sort-v3-item ${isSelected ? 'active' : ''}" onclick="setHomeSortOpt('${escHtml(o.key)}')">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                          <span class="sort-v3-item-icon">${o.svg}</span>
+                          <div style="min-width:0;">
+                            <div class="sort-v3-item-label">${escHtml(o.label)}</div>
+                            <div class="sort-v3-item-sub">${escHtml(o.sub)}</div>
+                          </div>
+                        </div>
+                        ${isSelected ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+                      </button>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+            ` : ""}
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px;">
           ${timeChips.map(tc => {
