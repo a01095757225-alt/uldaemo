@@ -7801,9 +7801,10 @@
             </button>
           </div>
 
-          <!-- 하단 스마트 접이식 AI 대화 소재 추천 서랍 + 메시지 입력 바 -->
+          <!-- 하단 스마트 접이식 AI 대화 소재 추천 서랍 + 답장/수정 배너 + 메시지 입력 바 -->
           <div class="tk-room-footer" style="border-top:1px solid #EEF0EF;">
             <div id="ai_drawer_slot_${post.id}">${renderAiDrawerInnerHtml(post)}</div>
+            <div id="chat_compose_banner_${post.id}">${renderChatComposeBannerHtml(post.id)}</div>
 
             <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 4px;">
               ${getQuickChatPhrasesForCurrentUser().map(phrase => `
@@ -7868,7 +7869,127 @@
       sendChatMessage(postId);
     }
 
+    function renderChatComposeBannerHtml(postId) {
+      const pid = Number(postId);
+      if (state.chat_edit_target && Number(state.chat_edit_target.postId) === pid) {
+        return `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#FFF8EB; border:1px solid #FDE68A; border-radius:12px; padding:7px 12px; margin-bottom:8px; font-size:12px; font-weight:700; color:#92400E;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✏️ 메시지 수정 중</span>
+            <button type="button" onclick="cancelChatComposeMode(${pid})" style="border:none; background:none; color:#92400E; font-size:12px; font-weight:800; cursor:pointer; padding:0; flex-shrink:0;">✕ 취소</button>
+          </div>
+        `;
+      }
+      if (state.chat_reply_target && Number(state.chat_reply_target.postId) === pid) {
+        const rt = state.chat_reply_target;
+        return `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:12px; padding:7px 12px; margin-bottom:8px; font-size:12px; color:#1E6B52;">
+            <div style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <b>↳ ${escHtml(rt.sender_label)}님에게 답장:</b> <span style="color:#4E5968;">${escHtml(rt.text_preview)}</span>
+            </div>
+            <button type="button" onclick="cancelChatComposeMode(${pid})" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:800; cursor:pointer; padding:0; flex-shrink:0;">✕</button>
+          </div>
+        `;
+      }
+      return "";
+    }
+
+    function updateChatComposeBannerInPlace(postId) {
+      const el = document.getElementById(`chat_compose_banner_${postId}`);
+      if (el) el.innerHTML = renderChatComposeBannerHtml(postId);
+    }
+
+    function cancelChatComposeMode(postId) {
+      const wasEdit = Boolean(state.chat_edit_target && Number(state.chat_edit_target.postId) === Number(postId));
+      state.chat_edit_target = null;
+      state.chat_reply_target = null;
+      updateChatComposeBannerInPlace(postId);
+      if (wasEdit) {
+        const inp = document.getElementById(`chat_in_${postId}`);
+        if (inp) { inp.value = ""; inp.style.height = "44px"; }
+      }
+    }
+
+    function startChatQuoteReply(postId, msgId) {
+      const msg = (DB.messages || []).find(m => Number(m.id) === Number(msgId));
+      if (!msg || msg.deleted_all) return;
+      const isMe = String(msg.sender_id) === String(state.user_id);
+      const u = DB.users && DB.users[msg.sender_id];
+      const label = isMe ? "나" : ((u && u.nickname) ? u.nickname : "상대 학우");
+      state.open_react_msg_id = null;
+      state.chat_edit_target = null;
+      state.chat_reply_target = {
+        postId: Number(postId),
+        id: Number(msg.id),
+        sender_label: label,
+        text_preview: String(msg.text || "").slice(0, 50)
+      };
+      updateChatBoxDOM(postId, false);
+      updateChatComposeBannerInPlace(postId);
+      const inp = document.getElementById(`chat_in_${postId}`);
+      if (inp) inp.focus();
+    }
+
+    function startEditChatMessage(postId, msgId) {
+      const msg = (DB.messages || []).find(m => Number(m.id) === Number(msgId));
+      if (!msg || msg.deleted_all || String(msg.sender_id) !== String(state.user_id)) return;
+      if (Number(msg.id) < 0) return showToast("메시지 전송 직후에 수정할 수 있어요.");
+      state.open_react_msg_id = null;
+      state.chat_reply_target = null;
+      state.chat_edit_target = { postId: Number(postId), msgId: Number(msg.id) };
+      updateChatBoxDOM(postId, false);
+      updateChatComposeBannerInPlace(postId);
+      const inp = document.getElementById(`chat_in_${postId}`);
+      if (inp) {
+        inp.value = msg.text || "";
+        autoResizeChatInput(inp);
+        inp.focus();
+      }
+    }
+
+    function copyChatMessageText(msgId) {
+      const msg = (DB.messages || []).find(m => Number(m.id) === Number(msgId));
+      state.open_react_msg_id = null;
+      if (!msg || !msg.text) return;
+      try {
+        navigator.clipboard.writeText(msg.text);
+        showToast("메시지를 복사했어요.");
+      } catch (e) {
+        showToast("복사를 지원하지 않는 환경이에요.");
+      }
+      if (state.active_chat_post_id) updateChatBoxDOM(state.active_chat_post_id, false);
+    }
+
+    async function deleteChatMessage(postId, msgId, mode) {
+      const pid = Number(postId);
+      const mid = Number(msgId);
+      const msg = (DB.messages || []).find(m => Number(m.id) === mid);
+      state.open_react_msg_id = null;
+      if (!msg) return;
+      if (mid < 0) return showToast("메시지 전송 직후에 삭제할 수 있어요.");
+      const prevMsgs = (DB.messages || []).slice();
+      const prevCopy = Object.assign({}, msg);
+      if (mode === "all") {
+        msg.deleted_all = true;
+        msg.text = "";
+        msg.reactions = {};
+        delete msg.reply_to;
+      } else {
+        DB.messages = (DB.messages || []).filter(m => Number(m.id) !== mid);
+      }
+      if (!updateChatBoxDOM(pid, false)) render();
+      showToast(mode === "all" ? "모든 대화 상대에게서 삭제했어요." : "내 화면에서만 삭제했어요.");
+      const res = await callApiAction("delete_message", { post_id: pid, message_id: mid, mode });
+      if (!res.ok) {
+        if (mode === "all") Object.assign(msg, prevCopy);
+        else DB.messages = prevMsgs;
+        if (!updateChatBoxDOM(pid, false)) render();
+        return showToast(res.message || "메시지 삭제에 실패했어요.");
+      }
+      if (!updateChatBoxDOM(pid, false)) render();
+    }
+
     function renderMsgReactionsHtml(m, postId, isMe) {
+      if (m.deleted_all) return "";
       const myId = String(state.user_id || "");
       const reactions = m.reactions || {};
       const myTier = getTierByTemp(resolveUserTempForTier(myId));
@@ -7879,7 +8000,7 @@
       if (activeEntries.length === 0 && !isPickerOpen) return "";
 
       return `
-        <div class="chat-react-bar" style="justify-content:${isMe ? 'flex-end' : 'flex-start'};">
+        <div class="chat-react-bar" style="justify-content:${isMe ? 'flex-end' : 'flex-start'}; flex-wrap:wrap;">
           ${activeEntries.map(([emo, arr]) => {
             const mine = arr.map(String).includes(myId);
             return `<span class="chat-react-pill ${mine ? 'active' : ''}" onclick="event.stopPropagation(); toggleMsgReaction(${m.id}, '${emo}', ${postId})">${emo} ${arr.length}</span>`;
@@ -7888,6 +8009,19 @@
             <span class="chat-react-pill" onclick="event.stopPropagation(); state.open_react_msg_id=null; toggleMsgReaction(${m.id}, '${emo}', ${postId})">${emo}</span>
           `).join("") : ""}
         </div>
+        ${isPickerOpen ? `
+          <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; justify-content:${isMe ? 'flex-end' : 'flex-start'};">
+            <button type="button" onclick="event.stopPropagation(); startChatQuoteReply(${postId}, ${m.id})" style="height:26px; padding:0 9px; border-radius:999px; border:1px solid #E5EAE7; background:#FFFFFF; color:#333D4B; font-size:11px; font-weight:700; cursor:pointer;">↩ 답장</button>
+            <button type="button" onclick="event.stopPropagation(); copyChatMessageText(${m.id})" style="height:26px; padding:0 9px; border-radius:999px; border:1px solid #E5EAE7; background:#FFFFFF; color:#333D4B; font-size:11px; font-weight:700; cursor:pointer;">복사</button>
+            ${isMe ? `
+              <button type="button" onclick="event.stopPropagation(); startEditChatMessage(${postId}, ${m.id})" style="height:26px; padding:0 9px; border-radius:999px; border:1px solid #E5EAE7; background:#FFFFFF; color:#287D62; font-size:11px; font-weight:700; cursor:pointer;">수정</button>
+              <button type="button" onclick="event.stopPropagation(); deleteChatMessage(${postId}, ${m.id}, 'me')" style="height:26px; padding:0 9px; border-radius:999px; border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:11px; font-weight:700; cursor:pointer;">나만 삭제</button>
+              <button type="button" onclick="event.stopPropagation(); deleteChatMessage(${postId}, ${m.id}, 'all')" style="height:26px; padding:0 9px; border-radius:999px; border:1px solid #FECACA; background:#FFF5F5; color:#D93025; font-size:11px; font-weight:700; cursor:pointer;">전체 삭제</button>
+            ` : `
+              <button type="button" onclick="event.stopPropagation(); deleteChatMessage(${postId}, ${m.id}, 'me')" style="height:26px; padding:0 9px; border-radius:999px; border:1px solid #E5EAE7; background:#FFFFFF; color:#6B7684; font-size:11px; font-weight:700; cursor:pointer;">나만 삭제</button>
+            `}
+          </div>
+        ` : ""}
       `;
     }
 
@@ -7974,6 +8108,15 @@
         const isRead = isMe ? Boolean(m.is_read || (m.id <= lastPartnerTime)) : true;
         const showMeta = !isSameAsNext;
         const reactionsHtml = renderMsgReactionsHtml(m, postId, isMe);
+        const quoteHtml = (!m.deleted_all && m.reply_to && m.reply_to.text_preview) ? `
+          <div style="font-size:11.5px; padding:5px 8px; margin-bottom:6px; border-radius:8px; background:${isMe ? 'rgba(255,255,255,0.18)' : '#F2F4F3'}; border-left:2.5px solid ${isMe ? '#FFFFFF' : '#287D62'}; color:${isMe ? '#F2FBF6' : '#4E5968'}; line-height:1.35;">
+            <div style="font-weight:800; font-size:11px; margin-bottom:1px;">↳ ${escHtml(m.reply_to.sender_label || '답장')}</div>
+            <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:210px;">${escHtml(m.reply_to.text_preview)}</div>
+          </div>
+        ` : "";
+        const bodyHtml = m.deleted_all
+          ? `<span style="opacity:0.72; font-style:italic; font-size:13px;">삭제된 메시지입니다.</span>`
+          : `${quoteHtml}${escHtml(m.text)}${m.edited ? ` <span style="font-size:10.5px; opacity:0.72;">(수정됨)</span>` : ""}`;
 
         if (isMe) {
           return `
@@ -7984,7 +8127,7 @@
                     <span class="chat-read-badge">${isRead ? '' : '<span style="color:#287D62; font-weight:700;">1</span>'}</span>
                     ${showMeta ? `<span>${timeStr}</span>` : ""}
                   </div>
-                  <div class="chat-bubble-me" title="클릭하여 공감 남기기" onclick="toggleMsgReactionPicker(${m.id}, ${postId})">${escHtml(m.text)}</div>
+                  <div class="chat-bubble-me" style="${m.deleted_all ? 'opacity:0.65;' : ''}" title="${m.deleted_all ? '' : '클릭하여 공감·답장·수정·삭제'}" ${m.deleted_all ? '' : `onclick="toggleMsgReactionPicker(${m.id}, ${postId})"`}>${bodyHtml}</div>
                 </div>
                 ${reactionsHtml}
               </div>
@@ -8003,7 +8146,7 @@
               <div class="chat-bubble-col other">
                 ${!isSameAsPrev ? `<div class="chat-sender-name" style="color:#98A2B3; font-size:11.5px; font-weight:600;">${escHtml(blindSenderLabel)}</div>` : ""}
                 <div class="chat-bubble-wrap other">
-                  <div class="chat-bubble-other" title="클릭하여 공감(❤️·👍·🙌) 남기기" onclick="toggleMsgReactionPicker(${m.id}, ${postId})">${escHtml(m.text)}</div>
+                  <div class="chat-bubble-other" style="${m.deleted_all ? 'opacity:0.65;' : ''}" title="${m.deleted_all ? '' : '클릭하여 공감·답장·복사·삭제'}" ${m.deleted_all ? '' : `onclick="toggleMsgReactionPicker(${m.id}, ${postId})"`}>${bodyHtml}</div>
                   <div class="chat-meta other">
                     ${showMeta ? `<span>${timeStr}</span>` : ""}
                   </div>
@@ -8133,6 +8276,37 @@
       input.style.borderRadius = isPC() ? "12px" : "22px";
       input.focus();
 
+      // 수정 모드인 경우 edit_message 호출
+      if (state.chat_edit_target && Number(state.chat_edit_target.postId) === Number(postId)) {
+        const editMsgId = Number(state.chat_edit_target.msgId);
+        state.chat_edit_target = null;
+        updateChatComposeBannerInPlace(postId);
+        const targetMsg = (DB.messages || []).find(m => Number(m.id) === editMsgId);
+        const prevText = targetMsg ? targetMsg.text : "";
+        const prevEdited = targetMsg ? Boolean(targetMsg.edited) : false;
+        if (targetMsg) {
+          targetMsg.text = txt;
+          targetMsg.edited = true;
+          updateChatBoxDOM(postId, false);
+        }
+        const resEdit = await callApiAction("edit_message", { post_id: Number(postId), message_id: editMsgId, text: txt });
+        if (!resEdit.ok) {
+          if (targetMsg) { targetMsg.text = prevText; targetMsg.edited = prevEdited; updateChatBoxDOM(postId, false); }
+          return showToast(resEdit.message || "메시지 수정에 실패했어요.");
+        }
+        updateChatBoxDOM(postId, false);
+        showToast("메시지를 수정했어요.");
+        return;
+      }
+
+      const activeReply = (state.chat_reply_target && Number(state.chat_reply_target.postId) === Number(postId))
+        ? { id: state.chat_reply_target.id, sender_label: state.chat_reply_target.sender_label, text_preview: state.chat_reply_target.text_preview }
+        : null;
+      if (activeReply) {
+        state.chat_reply_target = null;
+        updateChatComposeBannerInPlace(postId);
+      }
+
       // 0ms 즉각 낙관적 말풍선 표시 (카카오톡처럼 딜레이 없이 바로 화면에 출력)
       const nowMs = Date.now();
       const tempMsgId = -nowMs;
@@ -8148,6 +8322,7 @@
         is_read: 0,
         reactions: {}
       };
+      if (activeReply) optimisticMsg.reply_to = activeReply;
       DB.messages = [...(DB.messages || []), optimisticMsg];
       if (!updateChatBoxDOM(postId, true)) {
         render();
@@ -8155,7 +8330,9 @@
         if (restored) restored.focus();
       }
 
-      const res = await callApiAction("send_message", { post_id: Number(postId), text: txt });
+      const sendPayload = { post_id: Number(postId), text: txt };
+      if (activeReply) sendPayload.reply_to = activeReply;
+      const res = await callApiAction("send_message", sendPayload);
       if (!res.ok) {
         DB.messages = (DB.messages || []).filter(m => m.id !== tempMsgId);
         if (!updateChatBoxDOM(postId, false)) render();
@@ -9274,8 +9451,8 @@
         const data = await res.json();
         if (data && data.ok && Array.isArray(data.messages)) {
           const prevRoomMsgs = (DB.messages || []).filter(m => Number(m.post_id) === pid);
-          const prevSig = JSON.stringify(prevRoomMsgs.filter(m => Number(m.id) > 0).map(m => [m.id, m.is_read, m.reactions]));
-          const nextSig = JSON.stringify(data.messages.map(m => [m.id, m.is_read, m.reactions]));
+          const prevSig = JSON.stringify(prevRoomMsgs.filter(m => Number(m.id) > 0).map(m => [m.id, m.text, m.edited, m.deleted_all, m.is_read, m.reactions]));
+          const nextSig = JSON.stringify(data.messages.map(m => [m.id, m.text, m.edited, m.deleted_all, m.is_read, m.reactions]));
           if (prevSig !== nextSig) {
             // 전송 중인 낙관적 임시 말풍선(음수 ID)은 보존하고 서버 확정 메시지와 병합
             const pendingTempMsgs = prevRoomMsgs.filter(m => Number(m.id) < 0 && !data.messages.some(sm => String(sm.sender_id) === String(state.user_id) && sm.text === m.text));

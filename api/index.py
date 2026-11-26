@@ -344,19 +344,30 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
         ipid = int(pid)
         if ipid not in accepted_post_ids:
             continue
+        if vid in [str(u) for u in (m.get("hidden_for") or [])]:
+            continue
+        is_del_all = bool(m.get("deleted_all"))
         sm = {
             "id": m.get("id"),
             "post_id": pid,
             "sender_id": "AI_BOT" if m.get("sender_id") == "AI_BOT" else pub_id(m.get("sender_id")),
-            "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
+            "text": "" if is_del_all else (_strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or "")),
             "created_at": m.get("created_at"),
             "is_read": int(m.get("is_read") or 0),
-            "reactions": {
+            "edited": bool(m.get("edited")) and not is_del_all,
+            "deleted_all": is_del_all,
+            "reactions": {} if is_del_all else ({
                 str(emo): [pub_id(u) for u in (arr or [])]
                 for emo, arr in (m.get("reactions") or {}).items()
                 if isinstance(arr, list)
-            } if isinstance(m.get("reactions"), dict) else {},
+            } if isinstance(m.get("reactions"), dict) else {}),
         }
+        if not is_del_all and isinstance(m.get("reply_to"), dict):
+            sm["reply_to"] = {
+                "id": m["reply_to"].get("id"),
+                "sender_label": str(m["reply_to"].get("sender_label") or "")[:24],
+                "text_preview": str(m["reply_to"].get("text_preview") or "")[:60],
+            }
         if m.get("flagged"):
             sm["flagged"] = True
         if m.get("sender_id") == "AI_BOT":
@@ -1238,7 +1249,7 @@ class handler(BaseHTTPRequestHandler):
 
         def _finish_mutation(db_obj: dict, actor_id: str, is_adm: bool, extra=None, deleted_post_ids=None, sync_users=None, sync_posts=None):
             if sync_users is None:
-                sync_users = action not in ("apply", "cancel_application", "accept", "reject", "send_message", "react_message", "mark_read", "mark_notifs_read", "mark_notifications_read", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply", "plaza_like_reply")
+                sync_users = action not in ("apply", "cancel_application", "accept", "reject", "send_message", "react_message", "mark_read", "edit_message", "delete_message", "mark_notifs_read", "mark_notifications_read", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply", "plaza_like_reply")
             if sync_posts is None:
                 sync_posts = action in ("create_post", "cancel_post", "close_post", "boost_post", "leave_chat", "delete_account")
             ok = save_cloud_db(db_obj, deleted_post_ids, sync_users=sync_users, sync_posts=sync_posts)
@@ -1545,19 +1556,30 @@ class handler(BaseHTTPRequestHandler):
             for m in (db_obj.get("messages") or []):
                 if not isinstance(m, dict) or int(m.get("post_id") or 0) != post_id:
                     continue
+                if actor_id in [str(u) for u in (m.get("hidden_for") or [])]:
+                    continue
+                is_del_all = bool(m.get("deleted_all"))
                 sm = {
                     "id": m.get("id"),
                     "post_id": post_id,
                     "sender_id": "AI_BOT" if m.get("sender_id") == "AI_BOT" else _mask_uid(str(m.get("sender_id") or ""), actor_id),
-                    "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
+                    "text": "" if is_del_all else (_strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or "")),
                     "created_at": m.get("created_at"),
                     "is_read": int(m.get("is_read") or 0),
-                    "reactions": {
+                    "edited": bool(m.get("edited")) and not is_del_all,
+                    "deleted_all": is_del_all,
+                    "reactions": {} if is_del_all else ({
                         str(emo): [_mask_uid(str(u), actor_id) for u in (arr or [])]
                         for emo, arr in (m.get("reactions") or {}).items()
                         if isinstance(arr, list)
-                    } if isinstance(m.get("reactions"), dict) else {},
+                    } if isinstance(m.get("reactions"), dict) else {}),
                 }
+                if not is_del_all and isinstance(m.get("reply_to"), dict):
+                    sm["reply_to"] = {
+                        "id": m["reply_to"].get("id"),
+                        "sender_label": str(m["reply_to"].get("sender_label") or "")[:24],
+                        "text_preview": str(m["reply_to"].get("text_preview") or "")[:60],
+                    }
                 if m.get("sender_id") == "AI_BOT":
                     sm["kind"] = str(m.get("kind") or "ai_icebreaker")
                     if isinstance(m.get("suggestions"), list):
@@ -1783,7 +1805,7 @@ class handler(BaseHTTPRequestHandler):
             _finish_mutation(db_obj, actor_id, is_adm)
             return
 
-        if action in ("send_message", "react_message", "mark_read"):
+        if action in ("send_message", "react_message", "mark_read", "edit_message", "delete_message"):
             db_obj, actor_id, is_adm = _require_auth()
             if not db_obj:
                 return
@@ -1812,7 +1834,7 @@ class handler(BaseHTTPRequestHandler):
                 if _contains_contact_info(txt):
                     self._send_json(400, {"ok": False, "blocked": True, "message": "연락처는 만나서 직접 주고받아요. 지금은 앱 안에서만 이야기해요"})
                     return
-                db_obj.setdefault("messages", []).append({
+                new_msg = {
                     "id": now_ms,
                     "post_id": post_id,
                     "sender_id": actor_id,
@@ -1820,8 +1842,69 @@ class handler(BaseHTTPRequestHandler):
                     "created_at": time.strftime("%H:%M"),
                     "is_read": 0,
                     "reactions": {},
-                })
+                }
+                raw_rt = data.get("reply_to")
+                if isinstance(raw_rt, dict) and raw_rt.get("id"):
+                    new_msg["reply_to"] = {
+                        "id": raw_rt.get("id"),
+                        "sender_label": str(raw_rt.get("sender_label") or "")[:24],
+                        "text_preview": str(raw_rt.get("text_preview") or "")[:60],
+                    }
+                db_obj.setdefault("messages", []).append(new_msg)
                 _finish_mutation(db_obj, actor_id, is_adm, extra={"message_id": now_ms})
+                return
+            elif action == "edit_message":
+                try:
+                    msg_id = int(data.get("message_id"))
+                except Exception:
+                    self._send_json(400, {"ok": False, "message": "잘못된 메시지 ID입니다."})
+                    return
+                new_txt = str(data.get("text") or "").strip()[:500]
+                if not new_txt:
+                    self._send_json(400, {"ok": False, "message": "수정할 내용을 입력해주세요."})
+                    return
+                if _contains_contact_info(new_txt):
+                    self._send_json(400, {"ok": False, "blocked": True, "message": "연락처는 만나서 직접 주고받아요. 지금은 앱 안에서만 이야기해요"})
+                    return
+                msg = next((m for m in (db_obj.get("messages") or []) if isinstance(m, dict) and int(m.get("id") or 0) == msg_id and int(m.get("post_id") or 0) == post_id), None)
+                if not msg or msg.get("deleted_all"):
+                    self._send_json(404, {"ok": False, "message": "수정할 메시지를 찾을 수 없습니다."})
+                    return
+                if str(msg.get("sender_id")) != actor_id:
+                    self._send_json(403, {"ok": False, "message": "본인이 보낸 메시지만 수정할 수 있습니다."})
+                    return
+                msg["text"] = new_txt
+                msg["edited"] = True
+                msg["updated_at"] = now_ms
+                _finish_mutation(db_obj, actor_id, is_adm)
+                return
+            elif action == "delete_message":
+                try:
+                    msg_id = int(data.get("message_id"))
+                except Exception:
+                    self._send_json(400, {"ok": False, "message": "잘못된 메시지 ID입니다."})
+                    return
+                mode = str(data.get("mode") or "me").strip().lower()
+                msg = next((m for m in (db_obj.get("messages") or []) if isinstance(m, dict) and int(m.get("id") or 0) == msg_id and int(m.get("post_id") or 0) == post_id), None)
+                if not msg:
+                    self._send_json(404, {"ok": False, "message": "삭제할 메시지를 찾을 수 없습니다."})
+                    return
+                if mode == "all":
+                    if str(msg.get("sender_id")) != actor_id:
+                        self._send_json(403, {"ok": False, "message": "본인이 보낸 메시지만 전체 삭제할 수 있습니다."})
+                        return
+                    msg["deleted_all"] = True
+                    msg["text"] = ""
+                    msg["reactions"] = {}
+                    msg.pop("reply_to", None)
+                    msg["updated_at"] = now_ms
+                else:
+                    hidden = [str(u) for u in (msg.get("hidden_for") or [])]
+                    if actor_id not in hidden:
+                        hidden.append(actor_id)
+                    msg["hidden_for"] = hidden
+                    msg["updated_at"] = now_ms
+                _finish_mutation(db_obj, actor_id, is_adm)
                 return
             elif action == "react_message":
                 try:
