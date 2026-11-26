@@ -3199,13 +3199,24 @@
         } else {
           document.body.classList.remove("has-fab");
         }
-        if (_savedChatScroll) {
-          const _newChatBox = document.getElementById(`chat_box_${_savedChatScroll.id}`);
-          if (_newChatBox) {
-            _newChatBox.scrollTop = _savedChatScroll.atBottom ? _newChatBox.scrollHeight : _savedChatScroll.scrollTop;
-          }
-          if (_savedChatScroll.winY > 0) {
-            try { window.scrollTo(0, _savedChatScroll.winY); } catch (e) {}
+        const _curChatIdAfter = state.active_chat_post_id ? Number(state.active_chat_post_id) : 0;
+        const _curChatBox = _curChatIdAfter ? document.getElementById(`chat_box_${_curChatIdAfter}`) : null;
+        if (_curChatBox) {
+          const _enteringRoom = !_savedChatScroll || Number(_savedChatScroll.id) !== _curChatIdAfter || Number(state._forceChatScrollBottom) === _curChatIdAfter;
+          if (_enteringRoom) {
+            state._forceChatScrollBottom = null;
+            const snapBottom = () => {
+              const b = document.getElementById(`chat_box_${_curChatIdAfter}`);
+              if (b) b.scrollTop = b.scrollHeight;
+            };
+            snapBottom();
+            requestAnimationFrame(snapBottom);
+            setTimeout(snapBottom, 80);
+          } else {
+            _curChatBox.scrollTop = _savedChatScroll.atBottom ? _curChatBox.scrollHeight : _savedChatScroll.scrollTop;
+            if (_savedChatScroll.winY > 0) {
+              try { window.scrollTo(0, _savedChatScroll.winY); } catch (e) {}
+            }
           }
         }
         updateScrollTopButton();
@@ -7409,6 +7420,7 @@
       const pid = Number(postId);
       state.active_chat_post_id = pid;
       state.chat_list_mode = false;
+      state._forceChatScrollBottom = pid;
       const triggeredMarkRead = markChatRoomReadOnServer(pid);
       render();
       setTimeout(() => {
@@ -7418,9 +7430,12 @@
           const inp = document.getElementById(`chat_in_${pid}`);
           if (inp) inp.focus();
         }
-      }, 30);
+      }, 40);
       if (!triggeredMarkRead) {
-        pullFromCloud(true);
+        pullFromCloud(true).then(() => {
+          const box = document.getElementById(`chat_box_${pid}`);
+          if (box) box.scrollTop = box.scrollHeight;
+        }).catch(() => {});
       }
       scheduleNextCloudPull(1500);
     }
