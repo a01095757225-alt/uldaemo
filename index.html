@@ -5907,37 +5907,77 @@
       render();
     }
 
-    function submitReply(kind, id) {
+    const _replySubmitting = new Set();
+    async function submitReply(kind, id) {
+      const key = `${kind}_${id}`;
+      if (_replySubmitting.has(key)) return;
       const item = findReplyTarget(kind, id);
       if (!item) return;
       const el = document.getElementById("reply_in_" + kind + id);
       const text = el ? el.value.trim() : "";
       if (text.length < 1) return showToast("답글 내용을 입력해주세요.");
       if (text.length > 200) return showToast("답글은 200자 이내로 입력해주세요.");
+      if (el) el.value = "";
+      _replySubmitting.add(key);
       item.replies = item.replies || [];
+      const tempRid = -Date.now();
       const now = new Date();
       item.replies.push({
-        id: Date.now(),
+        id: tempRid,
         author_id: state.user_id,
         text,
-        created_at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+        created_at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+        deleted: false
       });
       item.updated_at = Date.now();
       state.open_replies = state.open_replies || {};
       state.open_replies[kind + id] = true;
-      saveDB(true);
-      showToast("답글이 등록되었어요.");
       render();
+      try {
+        const payload = { kind, target_id: Number(id), text };
+        if (kind === "p") {
+          payload.poll_meta = {
+            id: item.id,
+            tag: item.tag || "",
+            question: item.question || "",
+            opt_a: item.opt_a || "",
+            opt_b: item.opt_b || ""
+          };
+        }
+        const res = await callApiAction("plaza_reply", payload);
+        if (!res.ok) {
+          item.replies = (item.replies || []).filter(r => r.id !== tempRid);
+          render();
+          return showToast(res.message || "답글 등록에 실패했어요.");
+        }
+        ensurePlazaDefaults(DB);
+        state.open_replies[kind + id] = true;
+        showToast("답글이 등록되었어요.");
+        render();
+      } finally {
+        _replySubmitting.delete(key);
+      }
     }
 
-    function deleteReply(kind, id, rid) {
+    async function deleteReply(kind, id, rid) {
       const item = findReplyTarget(kind, id);
       if (!item) return;
-      const r = (item.replies || []).find(x => x.id === rid);
-      if (!r || r.author_id !== state.user_id) return;
+      const r = (item.replies || []).find(x => Number(x.id) === Number(rid));
+      if (!r || String(r.author_id) !== String(state.user_id)) return;
       r.deleted = true;
       item.updated_at = Date.now();
-      saveDB(true);
+      render();
+      const res = await callApiAction("plaza_delete_reply", {
+        kind,
+        target_id: Number(id),
+        reply_id: Number(rid)
+      });
+      if (!res.ok) {
+        r.deleted = false;
+        render();
+        return showToast(res.message || "답글 삭제에 실패했어요.");
+      }
+      ensurePlazaDefaults(DB);
       render();
     }
 
@@ -7612,24 +7652,24 @@
           <div class="tk-room-footer" style="border-top:1px solid #EEF0EF;">
             ${(() => {
               const drawerState = state['ai_drawer_open_' + post.id];
-              const isAiOpen = (drawerState === undefined) ? (msgs.length <= 2) : Boolean(drawerState);
+              const isAiOpen = Boolean(drawerState);
               if (!isAiOpen) return "";
               const isAiLoading = Boolean(state['ai_loading_' + post.id]);
               const aiList = getAiSuggestionsForPost(post);
               return `
-                <div style="margin-bottom:10px; padding:11px 13px; background:#EEF8F3; border:1.5px solid #287D62; border-radius:16px;">
-                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
-                    <span style="font-size:12px; font-weight:800; color:#287D62; display:inline-flex; align-items:center; gap:4px;">
-                      <span>✨</span><span>AI 대화 소재 추천</span>
+                <div style="margin-bottom:8px; padding:8px 10px; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:14px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                    <span style="font-size:11.5px; font-weight:800; color:#287D62; display:inline-flex; align-items:center; gap:4px;">
+                      <span>✨</span><span>AI 대화 추천 (탭해서 입력)</span>
                     </span>
                     <div style="display:flex; align-items:center; gap:8px;">
                       <button type="button" ${isAiLoading ? 'disabled' : ''} onclick="triggerAiIcebreaker(${post.id})" style="border:none; background:none; color:#287D62; font-size:11.5px; font-weight:700; cursor:pointer; padding:0;">${isAiLoading ? '추천 중...' : '새로고침'}</button>
                       <button type="button" onclick="toggleAiDrawer(${post.id}, false)" aria-label="접기" style="border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;">✕</button>
                     </div>
                   </div>
-                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  <div style="display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding-bottom:2px;">
                     ${aiList.map((txt, idx) => `
-                      <button type="button" onclick="applyAiSuggestionToInput(${post.id}, ${idx})" style="flex:1 1 200px; text-align:left; background:#FFFFFF; border:1px solid #D3EAE0; border-radius:12px; padding:8px 11px; font-size:12.5px; font-weight:600; color:#191F28; line-height:1.4; cursor:pointer; word-break:keep-all;">
+                      <button type="button" onclick="applyAiSuggestionToInput(${post.id}, ${idx}); toggleAiDrawer(${post.id}, false);" style="flex-shrink:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; background:#FFFFFF; border:1px solid #D3EAE0; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; color:#191F28; cursor:pointer;">
                         ${escHtml(txt)}
                       </button>
                     `).join("")}
@@ -7660,12 +7700,16 @@
       `;
     }
 
-    function toggleMsgReaction(msgId, emoji, postId) {
+    async function toggleMsgReaction(msgId, emoji, postId) {
       const myId = String(state.user_id || "");
       if (!myId) return;
       const msg = (DB.messages || []).find(m => Number(m.id) === Number(msgId));
       if (!msg) return;
+      if (Number(msg.id) < 0) {
+        return showToast("메시지 전송 완료 직후에 공감을 달 수 있어요.");
+      }
       msg.reactions = msg.reactions || {};
+      const prevReactions = JSON.parse(JSON.stringify(msg.reactions));
       const curList = Array.isArray(msg.reactions[emoji]) ? msg.reactions[emoji].map(String) : [];
       if (curList.includes(myId)) {
         msg.reactions[emoji] = curList.filter(u => u !== myId);
@@ -7677,7 +7721,17 @@
       if (!updateChatBoxDOM(postId, false)) {
         render();
       }
-      saveDB(true);
+      const res = await callApiAction("react_message", {
+        post_id: Number(postId),
+        message_id: Number(msgId),
+        emoji
+      });
+      if (!res.ok) {
+        msg.reactions = prevReactions;
+        if (!updateChatBoxDOM(postId, false)) render();
+        return showToast(res.message || "공감 반영에 실패했어요.");
+      }
+      if (!updateChatBoxDOM(postId, false)) render();
     }
 
     function sendQuickChatPhrase(postId, phrase) {
@@ -7800,7 +7854,7 @@
               <div class="chat-bubble-col me">
                 <div class="chat-bubble-wrap me">
                   <div class="chat-meta me">
-                    <span class="chat-read-badge">${isRead ? (showMeta ? '읽음' : '') : '<span style="color:#287D62; font-weight:700;">1</span>'}</span>
+                    <span class="chat-read-badge">${isRead ? '' : '<span style="color:#287D62; font-weight:700;">1</span>'}</span>
                     ${showMeta ? `<span>${timeStr}</span>` : ""}
                   </div>
                   <div class="chat-bubble-me" title="클릭하여 공감 남기기" onclick="toggleMsgReactionPicker(${m.id}, ${postId})">${escHtml(m.text)}</div>

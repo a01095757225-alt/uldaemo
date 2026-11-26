@@ -351,7 +351,11 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
             "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
             "created_at": m.get("created_at"),
             "is_read": int(m.get("is_read") or 0),
-            "reactions": m.get("reactions") if isinstance(m.get("reactions"), dict) else {},
+            "reactions": {
+                str(emo): [pub_id(u) for u in (arr or [])]
+                for emo, arr in (m.get("reactions") or {}).items()
+                if isinstance(arr, list)
+            } if isinstance(m.get("reactions"), dict) else {},
         }
         if m.get("flagged"):
             sm["flagged"] = True
@@ -1540,7 +1544,11 @@ class handler(BaseHTTPRequestHandler):
                     "text": _strip_html_tags(m.get("text")) if m.get("sender_id") == "AI_BOT" else str(m.get("text") or ""),
                     "created_at": m.get("created_at"),
                     "is_read": int(m.get("is_read") or 0),
-                    "reactions": m.get("reactions") if isinstance(m.get("reactions"), dict) else {},
+                    "reactions": {
+                        str(emo): [_mask_uid(str(u), actor_id) for u in (arr or [])]
+                        for emo, arr in (m.get("reactions") or {}).items()
+                        if isinstance(arr, list)
+                    } if isinstance(m.get("reactions"), dict) else {},
                 }
                 if m.get("sender_id") == "AI_BOT":
                     sm["kind"] = str(m.get("kind") or "ai_icebreaker")
@@ -2095,17 +2103,43 @@ class handler(BaseHTTPRequestHandler):
             elif action == "plaza_reply":
                 kind = str(data.get("kind") or "t")
                 target_id = data.get("target_id")
-                txt = str(data.get("text") or "").strip()[:120]
+                txt = str(data.get("text") or "").strip()[:200]
                 if not txt or _contains_contact_info(txt):
-                    self._send_json(400, {"ok": False, "message": "답글 내용을 확인해주세요."})
+                    self._send_json(400, {"ok": False, "message": "답글 내용을 확인해주세요. (연락처·SNS 아이디 입력 불가)"})
                     return
-                arr = db_obj.get("polls" if kind == "p" else "plaza_talks") or []
+                arr = db_obj.setdefault("polls" if kind == "p" else "plaza_talks", [])
                 item = next((x for x in arr if isinstance(x, dict) and str(x.get("id")) == str(target_id)), None)
-                if item:
-                    item.setdefault("replies", []).append({
-                        "id": now_ms, "author_id": actor_id, "text": txt,
-                        "created_at": time.strftime("%m/%d %H:%M"), "deleted": False,
-                    })
+                if not item and kind == "p" and str(target_id).isdigit() and 501 <= int(target_id) <= 512:
+                    meta = data.get("poll_meta") if isinstance(data.get("poll_meta"), dict) else {}
+                    q_meta = str(meta.get("question") or "").strip()[:120]
+                    a_meta = str(meta.get("opt_a") or "").strip()[:60]
+                    b_meta = str(meta.get("opt_b") or "").strip()[:60]
+                    if q_meta and a_meta and b_meta:
+                        item = {
+                            "id": int(target_id),
+                            "tag": str(meta.get("tag") or "밸런스").strip()[:24],
+                            "question": q_meta,
+                            "opt_a": a_meta,
+                            "opt_b": b_meta,
+                            "votes_a": [],
+                            "votes_b": [],
+                            "replies": [],
+                        }
+                        arr.append(item)
+                if not item:
+                    self._send_json(404, {"ok": False, "message": "대상을 찾을 수 없습니다."})
+                    return
+                reps = item.setdefault("replies", [])
+                last_rid = max((int(r.get("id") or 0) for r in reps if isinstance(r, dict)), default=0)
+                new_rid = max(now_ms, last_rid + 1)
+                reps.append({
+                    "id": new_rid,
+                    "author_id": actor_id,
+                    "text": txt,
+                    "created_at": time.strftime("%m/%d %H:%M"),
+                    "deleted": False,
+                })
+                item["updated_at"] = now_ms
             elif action == "plaza_delete_reply":
                 kind = str(data.get("kind") or "t")
                 target_id = data.get("target_id")
