@@ -3187,3 +3187,174 @@ html, body {
     padding-bottom: env(safe-area-inset-bottom, 0px) !important;
   }
 }
+
+/* ===== Figma M17 v3 · 모바일 지도 (토스풍 둥근 · 겹침 없음 · 부드러운 탭 반응) ===== */
+.map-v3-wrap {
+  border-radius: 24px;
+  overflow: hidden;
+  background: #FFFFFF;
+  box-shadow: 0 4px 20px rgba(26, 31, 41, 0.06);
+}
+.map-v3-header {
+  background: #FFFFFF;
+  padding: 14px 14px 12px;
+  position: relative;
+  z-index: 5;
+}
+.map-v3-privacy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.map-v3-privacy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #EEF8F3;
+  color: #1F6A52;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.map-v3-switch {
+  min-width: 52px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.map-v3-switch-track {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: #D5DAE0;
+  position: relative;
+  transition: background 0.22s ease;
+}
+.map-v3-switch-track.on { background: #287D62; }
+.map-v3-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: left 0.22s ease;
+}
+.map-v3-switch-track.on .map-v3-switch-knob { left: 21px; }
+.map-v3-chips .cat-grid { display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; padding-right: 28px; }
+.map-v3-chips .cat-btn {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 16px !important;
+  background: #F4F6F8 !important;
+  color: #4E5968 !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 999px !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 700 !important;
+}
+.map-v3-chips .cat-btn.active {
+  background: #287D62 !important;
+  color: #FFFFFF !important;
+}
+.map-v3-canvas { position: relative; background: #E8EFEB; }
+.map-v3-locate {
+  position: absolute;
+  right: 14px;
+  bottom: 18px;
+  z-index: 450;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #FFFFFF;
+  box-shadow: 0 4px 16px rgba(26, 31, 41, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.map-v3-sheet {
+  margin-top: -20px;
+  position: relative;
+  z-index: 440;
+  background: #FFFFFF;
+  border-radius: 28px 28px 24px 24px;
+  padding: 12px 18px 22px;
+  box-shadow: 0 -6px 24px rgba(26, 31, 41, 0.08);
+}
+
+/* 지도 위 번개 알약: [아이콘 N개] */
+.custom-bubble-pin-wrapper { background: transparent !important; border: none !important; }
+.map-v3-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 5px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #191F28;
+  box-shadow: 0 4px 14px rgba(26, 31, 41, 0.18);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.map-v3-pin:active { transform: scale(0.94); }
+.map-v3-pin-ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #EEF8F3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.map-v3-pin-cnt { font-size: var(--fs-sm); font-weight: 800; }
+.map-v3-pin.is-selected {
+  background: #287D62;
+  color: #FFFFFF;
+  box-shadow: 0 6px 18px rgba(40, 125, 98, 0.38);
+  transform: scale(1.06);
+}
+.map-v3-pin.is-selected .map-v3-pin-ic { background: rgba(255, 255, 255, 0.22); }
+
+/* 지도/말풍선 클릭 시 이질적인 기본 효과 부드럽게 */
+.leaflet-container { font-family: inherit; background: #E8EFEB; outline: none; -webkit-tap-highlight-color: transparent; }
+.leaflet-marker-icon, .leaflet-marker-icon:focus, .leaflet-interactive:focus { outline: none !important; }
+.leaflet-popup-content-wrapper {
+  border-radius: 20px !important;
+  box-shadow: 0 8px 28px rgba(26, 31, 41, 0.16) !important;
+  padding: 2px !important;
+}
+.leaflet-popup-content { margin: 12px 14px !important; }
+.leaflet-popup-tip { box-shadow: none !important; }
+.leaflet-container a.leaflet-popup-close-button { width: 32px; height: 32px; font-size: 20px; line-height: 32px; color: #4E5968; }
+
+/* 버튼·카드·칩 눌렀을 때 딱딱한 색 변화 대신 부드러운 축소 반응 */
+button, .btn, .cat-btn, .quick-chip, .tk-feed-item, .tk-menu-row, .dock-btn, .side-nav-btn {
+  transition: transform 0.16s ease, background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+@media (hover: none) {
+  button:active, .btn:active, .cat-btn:active, .quick-chip:active, .tk-feed-item:active, .tk-menu-row:active {
+    transform: scale(0.97);
+    opacity: 0.92;
+  }
+  .cat-btn:hover, .btn:hover { transform: none; }
+}
