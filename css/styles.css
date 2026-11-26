@@ -2968,3 +2968,99 @@ body.fab-mini .fab-create span { display: none; }
   .applicant-row .applicant-actions { flex: 1 1 100%; }
   .applicant-row .applicant-actions > button { flex: 1; height: 44px !important; border-radius: var(--radius-btn) !important; }
 }
+
+/* ===== Figma v2 PC & Mobile 전체 레이아웃 싱크 ===== */
+:root {
+  --bg: #F4F6F8;
+}
+body {
+  background-color: #F4F6F8 !important;
+}
+.only-mobile-block { display: block; }
+.pc-v2-home-head { display: none !important; }
+@media (min-width: 1024px) {
+  .only-mobile-block { display: none !important; }
+  .pc-v2-home-head {
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .app-shell.wide .pc-sidebar {
+    width: 232px !important;
+    background: #FFFFFF !important;
+    border-right: 1px solid #E5E8EB !important;
+    padding: 24px 16px !important;
+  }
+  .side-nav-btn {
+    height: 44px;
+    min-height: 44px;
+    border-radius: 12px !important;
+    padding: 0 12px !important;
+    font-size: var(--fs-md) !important;
+    color: var(--text-secondary) !important;
+  }
+  .side-nav-btn.active {
+    background: #EEF8F3 !important;
+    color: #1F6A52 !important;
+    font-weight: 700 !important;
+  }
+  .side-dot {
+    background: #287D62 !important;
+    color: #FFFFFF !important;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .side-create-btn {
+    height: 48px !important;
+    border-radius: 12px !important;
+    background: #287D62 !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-shell {
+    padding: 6px 20px 104px !important;
+    background: #F4F6F8 !important;
+  }
+  /* Figma M05/M18/M20: 하단 고정 플랫 탭바 */
+  .floating-dock-wrap {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .floating-dock {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    background: #FFFFFF !important;
+    border: none !important;
+    border-top: 1px solid #E5E8EB !important;
+    box-shadow: none !important;
+    padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .dock-btn {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #4E5968 !important;
+  }
+  .dock-btn.active {
+    color: #287D62 !important;
+    font-weight: 700 !important;
+  }
+  .fade-scroll-wrap.on-bg::after {
+    background: linear-gradient(to left, rgba(244, 246, 248, 0.98), rgba(244, 246, 248, 0)) !important;
+  }
+}
