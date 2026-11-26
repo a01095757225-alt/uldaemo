@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3g" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3h" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -3081,7 +3081,7 @@
 
         if (!state.user_id || !currentUser) {
           saveSignupDraft();
-          root.className = "app-shell";
+          root.className = "app-shell auth-v3-shell";
           root.innerHTML = renderLoginView();
           restoreSignupDraft();
           return;
@@ -3458,207 +3458,425 @@
     })();
 
     // =========================================================
-    // 4. 로그인 & 신규 학우 가입 화면 (구글/네이버 실제 이메일 인증 포함)
+    // 4. 로그인 & 신규 학우 가입 화면 (v3 토스풍 M01~M04 / P01)
     // =========================================================
-    function renderLoginView() {
-      const buildingOpts = Object.keys(ULSAN_CAMPUS_COORDS);
+    function toggleAuthPwVis(inputId) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      el.type = el.type === "password" ? "text" : "password";
+      el.focus();
+    }
+
+    function updateSignupPwRulesDom(val) {
+      const v = String(val || "");
+      const okLen = v.length >= 8;
+      const okAlnum = /[A-Za-z]/.test(v) && /\d/.test(v);
+      const okSpec = /[^A-Za-z0-9]/.test(v);
+      const setRule = (id, ok) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle("ok", ok);
+        const svg = el.querySelector("svg");
+        if (svg) svg.setAttribute("stroke", ok ? "#1F6A52" : "#6B7684");
+      };
+      setRule("pw_rule_len", okLen);
+      setRule("pw_rule_alnum", okAlnum);
+      setRule("pw_rule_spec", okSpec);
+    }
+
+    function goSignupStep(targetStep) {
+      captureSignupFormDraft();
+      const curStep = Number(state.signup_step || 1);
+      if (targetStep > curStep) {
+        if (curStep === 1) {
+          const sid = (state.signup_sid || "").trim();
+          const pw = state.signup_pw || "";
+          const pwConfirmEl = document.getElementById("signup_pw_confirm");
+          const pwConfirm = pwConfirmEl ? pwConfirmEl.value : (state.signup_pw_confirm || "");
+          state.signup_pw_confirm = pwConfirm;
+          if (!sid) return showToast("학번을 입력해주세요.");
+          if (DEMO_USER_IDS.includes(sid)) return showToast("사용할 수 없는 학번입니다.");
+          if (!pw || pw.length < 4) return showToast("비밀번호를 4자리 이상 입력해주세요.");
+          if (pw !== pwConfirm) return showToast("비밀번호 확인이 일치하지 않아요.");
+        } else if (curStep === 2) {
+          const nick = (state.signup_nick || "").trim();
+          if (!nick || nick.length < 2) return showToast("닉네임을 2자 이상 입력해주세요.");
+        }
+      }
+      state.signup_step = Math.max(1, Math.min(3, targetStep));
+      render();
+      window.scrollTo(0, 0);
+    }
+
+    function renderAuthBrandRailHtml() {
       return `
-        <div class="uldaemo-card" style="background:linear-gradient(155deg, #287D62 0%, #1E634C 100%); color:#FFFFFF; padding:24px 20px; border:none; margin-top:6px;">
-          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-            <div style="width:44px; height:44px; border-radius:var(--radius-btn); overflow:hidden; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.18); flex-shrink:0;">
-              ${renderLogoSvg(44)}
-            </div>
-            <div>
-              <div style="font-size:var(--fs-xl); font-weight:900;">울대모</div>
-              <div style="font-size:var(--fs-xs); color:#DDF2E7; font-weight:600;">울산대생 다 모여라 · 캠퍼스 안심 번개</div>
-            </div>
+        <aside class="auth-v3-brand">
+          <div style="width:48px; height:48px; border-radius:19px; background:#FFFFFF; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; box-shadow:0 4px 12px rgba(0,0,0,0.10);">
+            ${renderLogoSvg(40)}
           </div>
-          <div style="font-size:var(--fs-lg); font-weight:700; line-height:1.45; margin-bottom:10px;">
-            공강 시간 학식·카공·산책 메이트,<br>신상 노출 걱정 없이 매너 온도로 안전하게 만나요!
+          <div style="font-size:28px; font-weight:800; line-height:36px; color:#FFFFFF; letter-spacing:-0.02em;">
+            울산대 학우와<br/>안심하고 만나요
           </div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap; font-size:var(--fs-xs); font-weight:700;">
-            <span style="background:rgba(255,255,255,0.16); padding:4px 9px; border-radius:var(--radius-chip);">🛡️ 수락 전 익명 보장</span>
-            <span style="background:rgba(255,255,255,0.16); padding:4px 9px; border-radius:var(--radius-chip);">🌡️ 36.5°C 매너온도</span>
-            <span style="background:rgba(255,255,255,0.16); padding:4px 9px; border-radius:var(--radius-chip);">💬 인앱 안심 채팅</span>
-          </div>
-        </div>
-
-        <div class="row-2" style="margin-bottom:10px;">
-          <button class="btn ${state.login_tab === 'login' ? 'btn-primary' : ''}" onclick="state.login_tab='login'; state.pw_reset_mode=false; render();">학번으로 로그인</button>
-          <button class="btn ${state.login_tab === 'signup' ? 'btn-primary' : ''}" onclick="state.login_tab='signup'; state.pw_reset_mode=false; render();">신규 학우 가입</button>
-        </div>
-
-        ${state.login_tab === "login" ? `
-          <div class="uldaemo-card">
-            <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); margin-bottom:4px;">기존 학우 로그인</div>
-            <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-bottom:12px;">
-              한 번 로그인하면 <b>30일간 자동 로그인</b>이 유지됩니다. 로그아웃 후 다시 로그인하거나 새 기기에서 접속할 때만 비밀번호를 입력합니다.
-            </div>
-            <label class="label">학번 (아이디)</label>
-            <input id="login_sid" class="input" value="${escHtml(state.pending_login_sid || '')}" placeholder="학번 8자리 (예: 20240001)" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
-            <label class="label">비밀번호</label>
-            <input id="login_pw" type="password" class="input" placeholder="비밀번호 4자리 이상" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
-            <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin:-2px 0 10px;">비밀번호가 없는 기존 계정은 아래 [비밀번호 최초 설정 · 재설정]에서 이메일 인증 후 설정해요.</div>
-            <button class="btn btn-primary" style="min-height:46px;" onclick="handleLoginSubmit()">울대모 시작하기</button>
-
-            <div style="margin-top:12px; padding-top:10px; border-top:1px solid #F2F4F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-              <span style="font-size:var(--fs-xs); color:var(--text-secondary);">비밀번호가 없거나 잊으셨나요?</span>
-              <button type="button" style="border:none; background:none; color:#287D62; font-size:var(--fs-sm); font-weight:800; cursor:pointer; padding:8px 4px; min-height:36px; display:inline-flex; align-items:center;" onclick="openPwResetFlow()">
-                ${state.pw_reset_mode ? '비밀번호 설정 창 닫기 ▲' : '비밀번호 최초 설정 · 재설정 →'}
-              </button>
-            </div>
-          </div>
-
-          ${state.pw_reset_mode ? `
-            <div class="uldaemo-card" style="border:1.5px solid #287D62; background:#F7F9F8;">
-              <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-                <span style="color:#287D62; display:inline-flex; align-items:center;">${getSvgIcon('shield', 16, '#287D62')}</span>
-                <span style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary);">기존 학우 비밀번호 최초 설정 · 재설정</span>
+          <div style="display:flex; flex-direction:column; gap:16px; margin-top:4px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:36px; height:36px; border-radius:14px; background:#1F6A52; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
               </div>
-              <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-bottom:12px; line-height:1.45;">
-                타인의 학번 도용을 막기 위해 <b>가입 시 등록한 본인 이메일(미등록 계정은 @ulsan.ac.kr 학교 메일) 인증</b> 후에만 비밀번호를 설정할 수 있어요.
+              <span style="font-size:16px; font-weight:500; line-height:24px; color:#FFFFFF;">연락처 없이 앱 안에서만 대화</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:36px; height:36px; border-radius:14px; background:#1F6A52; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </div>
+              <span style="font-size:16px; font-weight:500; line-height:24px; color:#FFFFFF;">수락 전엔 이름도 학과도 비밀</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:36px; height:36px; border-radius:14px; background:#1F6A52; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <span style="font-size:16px; font-weight:500; line-height:24px; color:#FFFFFF;">매너온도로 믿을 수 있는 만남</span>
+            </div>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderLoginView() {
+      const eyeSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4E5968" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+      const backSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
+      const checkSvg = (ok) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ok ? '#1F6A52' : '#6B7684'}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+      let mainHtml = "";
+
+      if (state.pw_reset_mode) {
+        // M04 비밀번호 재설정
+        mainHtml = `
+          <div class="auth-v3-step-shell">
+            <div class="auth-v3-appbar">
+              <button type="button" class="auth-v3-back-btn" aria-label="뒤로" onclick="state.pw_reset_mode=false; render();">${backSvg}</button>
+              <span class="auth-v3-appbar-title">비밀번호 재설정</span>
+            </div>
+            <div class="auth-v3-step-body">
+              <h1 class="auth-v3-step-title">학번을 입력하면<br/>재설정을 도와드려요</h1>
+
+              <div class="auth-v3-field">
+                <label class="auth-v3-label" for="reset_sid">학번</label>
+                <div class="auth-v3-input-box">
+                  <input id="reset_sid" value="${escHtml(state.pw_reset_sid || '')}" oninput="state.pw_reset_sid=this.value;" placeholder="20261234" inputmode="numeric" />
+                </div>
               </div>
 
-              <label class="label">학번</label>
-              <input id="reset_sid" class="input" value="${escHtml(state.pw_reset_sid || '')}" placeholder="가입한 학번 입력" />
-
-              <label class="label">가입 시 인증한 이메일 주소</label>
-              <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px; margin-bottom:8px;">
-                <input id="reset_email" class="input" style="margin-bottom:0;" value="${escHtml(state.pw_reset_email || '')}" placeholder="가입한 이메일 입력" />
-                <button class="btn" style="height:42px;" onclick="requestPwResetOtp()">인증번호 받기</button>
+              <div class="auth-v3-field">
+                <label class="auth-v3-label" for="reset_email">가입 시 인증한 이메일</label>
+                <div class="auth-v3-input-box">
+                  <input id="reset_email" type="email" value="${escHtml(state.pw_reset_email || '')}" oninput="state.pw_reset_email=this.value;" placeholder="가입한 이메일 입력" />
+                </div>
               </div>
 
               ${state.pw_reset_otp_sent ? `
-                <div style="font-size:var(--fs-xs); color:#287D62; font-weight:600; margin:4px 0 8px; line-height:1.45;">
-                  발송된 6자리 인증번호와 새로 사용할 비밀번호(4자리 이상)를 입력해주세요.<br>
-                  <span style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:500;">💡 메일이 안 보이면 <b>스팸메일함(또는 프로모션함)</b>을 꼭 확인해주세요.</span>
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label" for="reset_otp_code">이메일 인증번호 6자리</label>
+                  <div class="auth-v3-input-box">
+                    <input id="reset_otp_code" placeholder="6자리 인증번호 입력" inputmode="numeric" maxlength="6" />
+                  </div>
+                  <div style="font-size:12px; color:#1F6A52; line-height:18px;">메일이 안 보이면 스팸메일함(프로모션함)을 확인해주세요.</div>
                 </div>
-                <label class="label">이메일 인증번호 6자리</label>
-                <input id="reset_otp_code" class="input" placeholder="6자리 인증번호 입력" />
-                <label class="label">새 비밀번호 설정 (4자리 이상)</label>
-                <input id="reset_new_pw" type="password" class="input" placeholder="앞으로 사용할 비밀번호 (4자리 이상)" />
-                <button class="btn btn-primary" onclick="confirmPwResetAndLogin()">비밀번호 저장 후 바로 로그인</button>
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label" for="reset_new_pw">새 비밀번호</label>
+                  <div class="auth-v3-input-box">
+                    <input id="reset_new_pw" type="password" placeholder="4자리 이상 새 비밀번호" autocomplete="new-password" />
+                    <button type="button" class="auth-v3-eye-btn" aria-label="비밀번호 표시 전환" onclick="toggleAuthPwVis('reset_new_pw')">${eyeSvg}</button>
+                  </div>
+                </div>
               ` : ""}
-            </div>
-          ` : ""}
-        ` : `
-          <div class="uldaemo-card">
-            <div style="font-size:var(--fs-lg); font-weight:800; margin-bottom:6px;">신규 학우 블라인드 가입 (프로필 필수 목록)</div>
-            <div class="privacy-badge"><span>방장 수락 전까지 실명과 이메일은 절대 외부에 노출되지 않습니다.</span></div>
 
-            <label class="label">학번 (아이디) (필수)</label>
-            <input id="signup_sid" class="input" value="${escHtml(state.signup_sid || '')}" oninput="state.signup_sid=this.value;" placeholder="예: 20240001" />
-
-            <label class="label">로그인 비밀번호 설정 (4자리 이상) (필수)</label>
-            <input id="signup_pw" type="password" class="input" value="${escHtml(state.signup_pw || '')}" oninput="state.signup_pw=this.value;" placeholder="비밀번호 4자리 이상 (자동 로그인 유지)" autocomplete="new-password" />
-
-            <div style="margin: 10px 0;">
-              <div style="font-size:var(--fs-sm); font-weight:700; margin-bottom:4px;">Step 1. 이메일 본인 인증 (구글·네이버·학교메일 모두 가능)</div>
-              ${state.verified_email ? `
-                <div class="privacy-badge" style="background:#EEF8F3; border-color:#287D62;">
-                  <span>이메일 본인 인증 완료 (${state.verified_email.slice(0,2)}***@${state.verified_email.split('@')[1]})</span>
+              <div class="auth-v3-shadow-card" style="display:flex; align-items:flex-start; gap:10px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px;"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+                  <div style="font-size:13px; font-weight:600; line-height:20px; color:#191F28;">본인 확인 후 새 비밀번호를 만들어요</div>
+                  <div style="font-size:12px; line-height:18px; color:#4E5968;">운영진도 비밀번호는 볼 수 없어요</div>
                 </div>
+              </div>
+            </div>
+
+            <div class="auth-v3-bottom-bar">
+              ${state.pw_reset_otp_sent ? `
+                <button type="button" class="auth-v3-primary-btn" onclick="confirmPwResetAndLogin()">비밀번호 저장 후 로그인</button>
               ` : `
-                <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px;">
-                  <input id="signup_email" class="input" value="${state.pending_email}" placeholder="자주 쓰는 이메일 주소" />
-                  <button class="btn" style="height:44px;" onclick="requestEmailOtp()">인증 요청</button>
-                </div>
-                ${state.auth_code_sent ? `
-                  <div style="font-size:var(--fs-xs); color:#287D62; font-weight:600; margin:4px 0 6px; line-height:1.45;">
-                    입력하신 메일함으로 발송된 <b>6자리 인증번호</b>를 입력해주세요!<br>
-                    <span style="font-size:var(--fs-xs); color:var(--text-secondary); font-weight:500;">💡 10초 내로 안 오면 <b>스팸메일함(또는 프로모션함)</b>을 확인해주세요.</span>
-                  </div>
-                  <div style="display:grid; grid-template-columns: 2.2fr 1fr; gap:6px; margin-bottom:6px;">
-                    <input id="signup_otp_code" class="input" placeholder="인증번호 6자리 입력" />
-                    <button class="btn btn-primary" style="height:44px;" onclick="confirmEmailOtp()">인증 확인</button>
-                  </div>
-                ` : ""}
+                <button type="button" class="auth-v3-primary-btn" onclick="requestPwResetOtp()">재설정 요청</button>
               `}
+              <button type="button" class="auth-v3-ghost-btn" onclick="state.pw_reset_mode=false; render();">로그인으로 돌아가기</button>
             </div>
-
-            <div style="font-size:var(--fs-sm); font-weight:700; margin: 10px 0 6px;">Step 2. 블라인드 프로필 작성 (필수 항목)</div>
-            <label class="label">닉네임 (익명 표시용 · 실명 사용 금지) (필수)</label>
-            ${(() => {
-              if (!state.signup_nick) state.signup_nick = generateRandomCampusNickname();
-              const realNameWarn = looksLikeKoreanRealName(state.signup_nick);
-              return `
-                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
-                  <input id="signup_nick" class="input" style="flex:1; margin-bottom:0;" value="${escHtml(state.signup_nick)}" oninput="handleSignupNickInput(this.value)" placeholder="별명 입력 (실명 금지)" />
-                  <button type="button" class="btn" onclick="applyRandomSignupNickname()" style="width:auto; height:44px; padding:0 12px; background:#EEF8F3; color:#287D62; border:1px solid #C5E6D6; font-size:var(--fs-sm); font-weight:800; white-space:nowrap; flex-shrink:0;">🎲 랜덤 뽑기</button>
-                </div>
-                <div id="signup_nick_hint" style="font-size:var(--fs-xs); font-weight:700; color:${realNameWarn ? '#D92D20' : '#287D62'}; margin:0 0 10px; line-height:1.4;">
-                  ${realNameWarn
-                    ? '⚠️ 실명처럼 보여요! 사생활 보호를 위해 별명이나 [🎲 랜덤 뽑기]를 사용해 주세요.'
-                    : '🛡️ 실명(본명)은 입력하지 마세요! 랜덤 별명으로 안전하게 활동할 수 있어요.'}
-                </div>
-              `;
-            })()}
-
-            <div class="row-2">
-              <div>
-                <label class="label">프로필 아바타 (필수)</label>
-                <select id="signup_avatar" class="select" onchange="state.signup_avatar=this.value;">
-                  ${AVATARS.map(a => `<option value="${a}" ${state.signup_avatar === a ? 'selected' : ''}>${a}</option>`).join("")}
-                </select>
-              </div>
-              <div>
-                <label class="label">성별 (필수)</label>
-                <select id="signup_gender" class="select" onchange="state.signup_gender=this.value;">
-                  <option value="남성" ${(state.signup_gender || '남성') === '남성' ? 'selected' : ''}>남성</option>
-                  <option value="여성" ${state.signup_gender === '여성' ? 'selected' : ''}>여성</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="row-2">
-              <div>
-                <label class="label">학과 (필수)</label>
-                <input id="signup_dept" class="input" value="${escHtml(state.signup_dept || '')}" oninput="state.signup_dept=this.value;" placeholder="예: 컴퓨터공학과, 경영학과" />
-              </div>
-              <div>
-                <label class="label">MBTI (필수)</label>
-                <select id="signup_mbti" class="select" onchange="state.signup_mbti=this.value;">
-                  ${MBTIS.map(m => `<option value="${m}" ${state.signup_mbti === m ? 'selected' : ''}>${m}</option>`).join("")}
-                </select>
-              </div>
-            </div>
-
-            <div style="background:#F7F9F8; border:1px solid #E5EAE7; border-radius:var(--radius-card); padding:12px 14px; margin:10px 0 12px;">
-              <label style="display:flex; align-items:center; gap:8px; font-size:var(--fs-md); font-weight:800; color:var(--text-primary); cursor:pointer; padding-bottom:9px; margin-bottom:9px; border-bottom:1px solid #E5EAE7; min-height:36px;">
-                <input id="signup_agree_all" type="checkbox" ${state.signup_agree_age19 && state.signup_agree_terms && state.signup_agree_privacy ? 'checked' : ''} onchange="toggleAllSignupConsents(this.checked)" style="width:18px; height:18px; accent-color:#287D62;" />
-                <span>약관 및 만 19세 이상 전체 동의</span>
-              </label>
-              <div style="display:flex; flex-direction:column; gap:4px;">
-                <label style="display:flex; align-items:center; gap:8px; font-size:var(--fs-sm); font-weight:600; color:#333D4B; cursor:pointer; min-height:36px;">
-                  <input id="signup_agree_age19" type="checkbox" ${state.signup_agree_age19 ? 'checked' : ''} onchange="state.signup_agree_age19=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
-                  <span><b style="color:#287D62;">[필수]</b> 만 19세 이상 성인 학우입니다</span>
-                </label>
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px;">
-                  <label style="display:flex; align-items:center; gap:8px; font-size:var(--fs-sm); font-weight:600; color:#333D4B; cursor:pointer; flex:1;">
-                    <input id="signup_agree_terms" type="checkbox" ${state.signup_agree_terms ? 'checked' : ''} onchange="state.signup_agree_terms=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
-                    <span><b style="color:#287D62;">[필수]</b> 서비스 이용약관 및 비매너 무관용 원칙 동의</span>
-                  </label>
-                  <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:var(--text-secondary); font-size:var(--fs-xs); font-weight:700; text-decoration:underline; cursor:pointer; padding:8px 10px; min-height:36px; min-width:44px; flex-shrink:0;">보기</button>
-                </div>
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:36px;">
-                  <label style="display:flex; align-items:center; gap:8px; font-size:var(--fs-sm); font-weight:600; color:#333D4B; cursor:pointer; flex:1;">
-                    <input id="signup_agree_privacy" type="checkbox" ${state.signup_agree_privacy ? 'checked' : ''} onchange="state.signup_agree_privacy=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
-                    <span><b style="color:#287D62;">[필수]</b> 개인정보 수집 및 이용 동의</span>
-                  </label>
-                  <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:var(--text-secondary); font-size:var(--fs-xs); font-weight:700; text-decoration:underline; cursor:pointer; padding:8px 10px; min-height:36px; min-width:44px; flex-shrink:0;">보기</button>
-                </div>
-              </div>
-            </div>
-
-            <button class="btn btn-primary" style="margin-top:6px; min-height:46px;" onclick="handleSignupSubmit()">가입 완료 및 울대모 시작하기</button>
           </div>
-        `}
-        <div style="text-align:center; margin:12px 0 8px; font-size:var(--fs-xs); color:var(--text-secondary); display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap;">
-          <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:var(--text-secondary); font-size:var(--fs-xs); font-weight:600; cursor:pointer; padding:8px 6px; min-height:36px;">서비스 이용약관</button>
-          <span>·</span>
-          <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#287D62; font-size:var(--fs-xs); font-weight:800; cursor:pointer; padding:8px 6px; min-height:36px;">개인정보처리방침</button>
-          <span>·</span>
-          <span>만 19세 이상 대학생 전용</span>
+        `;
+      } else if (state.login_tab === "signup") {
+        const step = Number(state.signup_step || 1);
+        const pwVal = state.signup_pw || "";
+        const okLen = pwVal.length >= 8;
+        const okAlnum = /[A-Za-z]/.test(pwVal) && /\d/.test(pwVal);
+        const okSpec = /[^A-Za-z0-9]/.test(pwVal);
+        if (!state.signup_nick) state.signup_nick = generateRandomCampusNickname();
+        const realNameWarn = looksLikeKoreanRealName(state.signup_nick);
+
+        const stepBackHandler = step > 1
+          ? `goSignupStep(${step - 1})`
+          : `state.login_tab='login'; state.signup_step=1; render();`;
+
+        mainHtml = `
+          <div class="auth-v3-step-shell">
+            <div class="auth-v3-appbar">
+              <button type="button" class="auth-v3-back-btn" aria-label="뒤로" onclick="${stepBackHandler}">${backSvg}</button>
+              <span class="auth-v3-appbar-title">회원가입</span>
+            </div>
+            <div class="auth-v3-progress">
+              <div class="auth-v3-progress-seg ${step >= 1 ? 'active' : ''}"></div>
+              <div class="auth-v3-progress-seg ${step >= 2 ? 'active' : ''}"></div>
+              <div class="auth-v3-progress-seg ${step >= 3 ? 'active' : ''}"></div>
+            </div>
+
+            ${step === 1 ? `
+              <!-- M02 회원가입 1/3 · 계정 -->
+              <div class="auth-v3-step-body">
+                <div class="auth-v3-step-tag">1/3 · 계정 만들기</div>
+                <h1 class="auth-v3-step-title">학번과 비밀번호로<br/>계정을 만들어요</h1>
+
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label" for="signup_sid">학번</label>
+                  <div class="auth-v3-input-box">
+                    <input id="signup_sid" value="${escHtml(state.signup_sid || '')}" oninput="state.signup_sid=this.value;" placeholder="20261234" inputmode="numeric" />
+                  </div>
+                </div>
+
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label" for="signup_pw">비밀번호</label>
+                  <div class="auth-v3-input-box">
+                    <input id="signup_pw" type="password" value="${escHtml(pwVal)}" oninput="state.signup_pw=this.value; updateSignupPwRulesDom(this.value);" placeholder="비밀번호 입력 (4자리 이상)" autocomplete="new-password" />
+                    <button type="button" class="auth-v3-eye-btn" aria-label="비밀번호 표시 전환" onclick="toggleAuthPwVis('signup_pw')">${eyeSvg}</button>
+                  </div>
+                </div>
+
+                <div class="auth-v3-pw-rules">
+                  <span id="pw_rule_len" class="auth-v3-pw-rule ${okLen ? 'ok' : ''}">${checkSvg(okLen)} 8자 이상</span>
+                  <span id="pw_rule_alnum" class="auth-v3-pw-rule ${okAlnum ? 'ok' : ''}">${checkSvg(okAlnum)} 영문+숫자</span>
+                  <span id="pw_rule_spec" class="auth-v3-pw-rule ${okSpec ? 'ok' : ''}">${checkSvg(okSpec)} 특수문자</span>
+                </div>
+
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label" for="signup_pw_confirm">비밀번호 확인</label>
+                  <div class="auth-v3-input-box">
+                    <input id="signup_pw_confirm" type="password" value="${escHtml(state.signup_pw_confirm || '')}" oninput="state.signup_pw_confirm=this.value;" placeholder="한 번 더 입력" autocomplete="new-password" onkeydown="if(event.key==='Enter'){goSignupStep(2);}" />
+                  </div>
+                </div>
+              </div>
+              <div class="auth-v3-bottom-bar">
+                <button type="button" class="auth-v3-primary-btn" onclick="goSignupStep(2)">다음</button>
+              </div>
+            ` : step === 2 ? `
+              <!-- M03 회원가입 2/3 · 닉네임 -->
+              <div class="auth-v3-step-body">
+                <div class="auth-v3-step-tag">2/3 · 블라인드 닉네임</div>
+                <h1 class="auth-v3-step-title">학우들에게 보일<br/>닉네임을 정해요</h1>
+
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label" for="signup_nick">닉네임</label>
+                  <div class="auth-v3-input-box">
+                    <input id="signup_nick" value="${escHtml(state.signup_nick)}" oninput="handleSignupNickInput(this.value)" placeholder="별명 입력 (실명 금지)" maxlength="12" onkeydown="if(event.key==='Enter'){goSignupStep(3);}" />
+                    <button type="button" onclick="applyRandomSignupNickname()" style="border:none; background:none; color:#1F6A52; font-size:13px; font-weight:700; cursor:pointer; padding:6px 4px; flex-shrink:0;">랜덤</button>
+                  </div>
+                  <div id="signup_nick_hint" style="font-size:12px; line-height:18px; color:${realNameWarn ? '#D92D20' : '#4E5968'}; font-weight:${realNameWarn ? '700' : '400'};">
+                    ${realNameWarn
+                      ? '⚠️ 실명처럼 보여요! 사생활 보호를 위해 별명이나 [랜덤]을 사용해 주세요.'
+                      : '2~8자 · 실명이나 학번은 쓰지 않는 게 좋아요'}
+                  </div>
+                </div>
+
+                <div class="auth-v3-shadow-card" style="display:flex; flex-direction:column; gap:12px;">
+                  <div style="font-size:13px; font-weight:700; color:#4E5968;">상대에게는 이렇게 보여요</div>
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:48px; height:48px; border-radius:24px; background:#EEF8F3; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div style="min-width:0; flex:1;">
+                      <div id="signup_preview_nick" style="font-size:16px; font-weight:700; line-height:24px; color:#191F28; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(state.signup_nick)}</div>
+                      <div style="font-size:13px; line-height:20px; color:#4E5968;">매너온도 36.5° · 학교 인증</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px; padding:10px 12px; border-radius:10px; background:#F4F6F8;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4E5968" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    <span style="font-size:12px; font-weight:500; line-height:18px; color:#4E5968;">이름·학과는 수락 후에만 공개돼요</span>
+                  </div>
+                </div>
+              </div>
+              <div class="auth-v3-bottom-bar">
+                <button type="button" class="auth-v3-primary-btn" onclick="goSignupStep(3)">다음</button>
+              </div>
+            ` : `
+              <!-- 회원가입 3/3 · 본인 인증 및 기본 정보 -->
+              <div class="auth-v3-step-body" style="gap:16px;">
+                <div class="auth-v3-step-tag">3/3 · 본인 인증 및 기본 정보</div>
+                <h1 class="auth-v3-step-title">마지막으로 본인 인증과<br/>기본 정보를 입력해요</h1>
+
+                <div class="auth-v3-field">
+                  <label class="auth-v3-label">이메일 본인 인증 (구글·네이버·학교메일)</label>
+                  ${state.verified_email ? `
+                    <div class="auth-v3-safety-card" style="padding:12px 14px; border-radius:16px;">
+                      <span style="font-size:13px; font-weight:700; color:#1F6A52;">✓ 이메일 인증 완료 (${escHtml(state.verified_email.slice(0,2))}***@${escHtml(state.verified_email.split('@')[1] || '')})</span>
+                    </div>
+                  ` : `
+                    <div style="display:flex; gap:8px;">
+                      <div class="auth-v3-input-box" style="flex:1;">
+                        <input id="signup_email" type="email" value="${escHtml(state.pending_email || '')}" placeholder="자주 쓰는 이메일 주소" />
+                      </div>
+                      <button type="button" onclick="requestEmailOtp()" style="height:52px; padding:0 16px; border-radius:16px; border:none; background:#EEF8F3; color:#1F6A52; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;">인증 요청</button>
+                    </div>
+                    ${state.auth_code_sent ? `
+                      <div style="font-size:12px; color:#1F6A52; line-height:18px;">발송된 6자리 인증번호를 입력해주세요. (스팸메일함 확인)</div>
+                      <div style="display:flex; gap:8px;">
+                        <div class="auth-v3-input-box" style="flex:1;">
+                          <input id="signup_otp_code" placeholder="인증번호 6자리" inputmode="numeric" maxlength="6" />
+                        </div>
+                        <button type="button" onclick="confirmEmailOtp()" style="height:52px; padding:0 16px; border-radius:16px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;">인증 확인</button>
+                      </div>
+                    ` : ""}
+                  `}
+                </div>
+
+                <div class="row-2" style="gap:10px;">
+                  <div class="auth-v3-field">
+                    <label class="auth-v3-label" for="signup_avatar">아바타</label>
+                    <div class="auth-v3-input-box">
+                      <select id="signup_avatar" onchange="state.signup_avatar=this.value;">
+                        ${AVATARS.map(a => `<option value="${a}" ${state.signup_avatar === a ? 'selected' : ''}>${a}</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="auth-v3-field">
+                    <label class="auth-v3-label" for="signup_gender">성별</label>
+                    <div class="auth-v3-input-box">
+                      <select id="signup_gender" onchange="state.signup_gender=this.value;">
+                        <option value="남성" ${(state.signup_gender || '남성') === '남성' ? 'selected' : ''}>남성</option>
+                        <option value="여성" ${state.signup_gender === '여성' ? 'selected' : ''}>여성</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row-2" style="gap:10px;">
+                  <div class="auth-v3-field">
+                    <label class="auth-v3-label" for="signup_dept">학과</label>
+                    <div class="auth-v3-input-box">
+                      <input id="signup_dept" value="${escHtml(state.signup_dept || '')}" oninput="state.signup_dept=this.value;" placeholder="예: 컴퓨터공학과" />
+                    </div>
+                  </div>
+                  <div class="auth-v3-field">
+                    <label class="auth-v3-label" for="signup_mbti">MBTI</label>
+                    <div class="auth-v3-input-box">
+                      <select id="signup_mbti" onchange="state.signup_mbti=this.value;">
+                        ${MBTIS.map(m => `<option value="${m}" ${state.signup_mbti === m ? 'selected' : ''}>${m}</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="background:#F4F6F8; border-radius:20px; padding:14px 16px;">
+                  <label style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:#191F28; cursor:pointer; padding-bottom:10px; margin-bottom:8px; border-bottom:1px solid #E5E8EB;">
+                    <input id="signup_agree_all" type="checkbox" ${state.signup_agree_age19 && state.signup_agree_terms && state.signup_agree_privacy ? 'checked' : ''} onchange="toggleAllSignupConsents(this.checked)" style="width:18px; height:18px; accent-color:#287D62;" />
+                    <span>약관 및 만 19세 이상 전체 동의</span>
+                  </label>
+                  <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333D4B; cursor:pointer; min-height:32px;">
+                      <input id="signup_agree_age19" type="checkbox" ${state.signup_agree_age19 ? 'checked' : ''} onchange="state.signup_agree_age19=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
+                      <span><b style="color:#1F6A52;">[필수]</b> 만 19세 이상 성인 학우입니다</span>
+                    </label>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:32px;">
+                      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333D4B; cursor:pointer; flex:1;">
+                        <input id="signup_agree_terms" type="checkbox" ${state.signup_agree_terms ? 'checked' : ''} onchange="state.signup_agree_terms=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
+                        <span><b style="color:#1F6A52;">[필수]</b> 서비스 이용약관 동의</span>
+                      </label>
+                      <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:4px 6px;">보기</button>
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:32px;">
+                      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333D4B; cursor:pointer; flex:1;">
+                        <input id="signup_agree_privacy" type="checkbox" ${state.signup_agree_privacy ? 'checked' : ''} onchange="state.signup_agree_privacy=this.checked; syncSignupMasterCheckbox();" style="width:16px; height:16px; accent-color:#287D62;" />
+                        <span><b style="color:#1F6A52;">[필수]</b> 개인정보 수집 및 이용 동의</span>
+                      </label>
+                      <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:4px 6px;">보기</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="auth-v3-bottom-bar">
+                <button type="button" class="auth-v3-primary-btn" onclick="handleSignupSubmit()">가입 완료 및 울대모 시작하기</button>
+              </div>
+            `}
+          </div>
+        `;
+      } else {
+        // M01 / P01 로그인
+        mainHtml = `
+          <div class="auth-v3-login-body">
+            <!-- Mobile Hero (M01) -->
+            <div class="auth-v3-mobile-hero">
+              <div style="width:56px; height:56px; border-radius:22px; overflow:hidden; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(40,125,98,0.18);">
+                ${renderLogoSvg(56)}
+              </div>
+              <div style="font-size:28px; font-weight:800; line-height:36px; letter-spacing:-0.56px; color:#191F28;">울대모</div>
+              <div style="font-size:14px; font-weight:400; line-height:22px; color:#4E5968;">울산대 학우와 안심하고 만나요</div>
+            </div>
+
+            <!-- PC Title (P01) -->
+            <h1 class="auth-v3-pc-title">로그인</h1>
+
+            <div style="display:flex; flex-direction:column; gap:14px; width:100%;">
+              <div class="auth-v3-field">
+                <label class="auth-v3-label" for="login_sid">학번</label>
+                <div class="auth-v3-input-box">
+                  <input id="login_sid" value="${escHtml(state.pending_login_sid || '')}" placeholder="20261234" inputmode="numeric" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
+                </div>
+              </div>
+
+              <div class="auth-v3-field">
+                <label class="auth-v3-label" for="login_pw">비밀번호</label>
+                <div class="auth-v3-input-box">
+                  <input id="login_pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" onkeydown="if(event.key==='Enter'){handleLoginSubmit();}" />
+                  <button type="button" class="auth-v3-eye-btn" aria-label="비밀번호 표시 전환" onclick="toggleAuthPwVis('login_pw')">${eyeSvg}</button>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="auth-v3-primary-btn" onclick="handleLoginSubmit()">로그인</button>
+
+            <div class="auth-v3-links">
+              <button type="button" class="auth-v3-link-btn" onclick="openPwResetFlow()">비밀번호를 잊었어요</button>
+              <button type="button" class="auth-v3-link-btn primary" onclick="state.login_tab='signup'; state.signup_step=1; state.pw_reset_mode=false; render();">회원가입</button>
+            </div>
+
+            <div class="auth-v3-mobile-spacer" style="flex:1; min-height:20px;"></div>
+
+            <!-- Mobile Bottom Safety Card (M01) -->
+            <div class="auth-v3-safety-card">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                <div style="font-size:13px; font-weight:700; line-height:20px; color:#1F6A52;">연락처 없이 앱 안에서만 대화해요</div>
+                <div style="font-size:12px; font-weight:400; line-height:18px; color:#4E5968;">수락 전엔 이름도 학과도 비밀이에요</div>
+              </div>
+            </div>
+
+            <div style="text-align:center; margin-top:4px; font-size:12px; color:#6B7684; display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap;">
+              <button type="button" onclick="openPolicyDocModal('terms')" style="border:none; background:none; color:#6B7684; font-size:12px; font-weight:600; cursor:pointer; padding:4px;">서비스 이용약관</button>
+              <span>·</span>
+              <button type="button" onclick="openPolicyDocModal('privacy')" style="border:none; background:none; color:#1F6A52; font-size:12px; font-weight:700; cursor:pointer; padding:4px;">개인정보처리방침</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="auth-v3-root">
+          ${renderAuthBrandRailHtml()}
+          <main class="auth-v3-main">
+            ${mainHtml}
+          </main>
         </div>
         ${renderConfirmDialogHtml()}
         ${renderPolicyModalHtml()}
@@ -3864,13 +4082,16 @@
       return COMMON_KR_SURNAMES.has(s[0]);
     }
     function updateSignupNickHintDom(val) {
+      const previewEl = document.getElementById("signup_preview_nick");
+      if (previewEl) previewEl.textContent = String(val || "").trim() || "닉네임";
       const hintEl = document.getElementById("signup_nick_hint");
       if (!hintEl) return;
       const warn = looksLikeKoreanRealName(val);
-      hintEl.style.color = warn ? "#D92D20" : "#287D62";
+      hintEl.style.color = warn ? "#D92D20" : "#4E5968";
+      hintEl.style.fontWeight = warn ? "700" : "400";
       hintEl.textContent = warn
-        ? "⚠️ 실명처럼 보여요! 사생활 보호를 위해 별명이나 [🎲 랜덤 뽑기]를 사용해 주세요."
-        : "🛡️ 실명(본명)은 입력하지 마세요! 랜덤 별명으로 안전하게 활동할 수 있어요.";
+        ? "⚠️ 실명처럼 보여요! 사생활 보호를 위해 별명이나 [랜덤]을 사용해 주세요."
+        : "2~8자 · 실명이나 학번은 쓰지 않는 게 좋아요";
     }
     function handleSignupNickInput(val) {
       state.signup_nick = val;
@@ -3945,14 +4166,22 @@
     }
 
     async function handleSignupSubmit() {
-      const sid = document.getElementById("signup_sid").value.trim();
+      captureSignupFormDraft();
+      const sidEl = document.getElementById("signup_sid");
       const pwEl = document.getElementById("signup_pw");
-      const pw = pwEl ? pwEl.value : "";
-      const nick = document.getElementById("signup_nick").value.trim();
-      const avatar = document.getElementById("signup_avatar").value;
-      const gender = document.getElementById("signup_gender").value;
-      const dept = document.getElementById("signup_dept").value.trim();
-      const mbti = document.getElementById("signup_mbti").value;
+      const nickEl = document.getElementById("signup_nick");
+      const avatarEl = document.getElementById("signup_avatar");
+      const genderEl = document.getElementById("signup_gender");
+      const deptEl = document.getElementById("signup_dept");
+      const mbtiEl = document.getElementById("signup_mbti");
+
+      const sid = (sidEl ? sidEl.value.trim() : (state.signup_sid || "").trim());
+      const pw = (pwEl ? pwEl.value : (state.signup_pw || ""));
+      const nick = (nickEl ? nickEl.value.trim() : (state.signup_nick || "").trim());
+      const avatar = (avatarEl ? avatarEl.value : (state.signup_avatar || AVATARS[0]));
+      const gender = (genderEl ? genderEl.value : (state.signup_gender || "남성"));
+      const dept = (deptEl ? deptEl.value.trim() : (state.signup_dept || "").trim());
+      const mbti = (mbtiEl ? mbtiEl.value : (state.signup_mbti || MBTIS[0]));
 
       const agreeAge19 = document.getElementById("signup_agree_age19")?.checked || state.signup_agree_age19;
       const agreeTerms = document.getElementById("signup_agree_terms")?.checked || state.signup_agree_terms;
@@ -4000,6 +4229,8 @@
         if (data.db) applyServerSnapshot(data.db);
         state.signup_sid = "";
         state.signup_pw = "";
+        state.signup_pw_confirm = "";
+        state.signup_step = 1;
         state.signup_nick = "";
         state.signup_dept = "";
         openBlindOnboardingIfNew(sid);
