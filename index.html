@@ -5060,13 +5060,54 @@
       `;
     }
 
+    const DAILY_HOME_GREETINGS = [
+      ["오늘은 누구랑", "밥 먹을까요?"],
+      ["공강 시간,", "같이 카페 갈까요?"],
+      ["오늘 점심,", "혼밥은 잠깐 쉬어요"],
+      ["수업 끝나고", "가볍게 한 판 어때요?"],
+      ["오늘 저녁,", "같이 운동할 학우 찾아요"],
+      ["바보사거리 맛집,", "같이 가볼까요?"],
+      ["도서관 같이 갈", "카공 메이트 구해요"],
+      ["잠깐 쉬어갈", "커피 한 잔 어때요?"],
+      ["오늘 학식,", "혼자 먹기 아쉽다면?"],
+      ["수업 전 공강,", "같이 수다 떨까요?"],
+      ["오늘은 새로운", "캠퍼스 친구 어때요?"],
+      ["운동장 한 바퀴,", "같이 걸을까요?"],
+      ["시험 기간,", "같이 힘낼 카공 메이트"],
+      ["가볍게 만나서", "맛있는 거 먹어요"],
+      ["오늘 뭐 먹지?", "같이 골라볼까요?"],
+      ["무거동 핫플,", "함께 가볼 학우 찾아요"],
+      ["잠깐의 공강,", "심심할 땐 울대모"],
+      ["방과 후,", "가볍게 번개 어때요?"],
+      ["오늘은 어떤", "만남이 기다릴까요?"],
+      ["달달한 디저트,", "같이 먹을 사람?"],
+      ["혼자 공부하기", "지칠 땐 같이 해요"],
+      ["캠퍼스 산책,", "같이 걸을 학우 찾아요"],
+      ["든든한 한 끼,", "함께 먹을까요?"],
+      ["오늘 저녁은", "누구랑 보내볼까요?"],
+      ["스트레스 풀러", "같이 게임 한 판?"],
+      ["후문 맛집 투어,", "같이 떠날까요?"],
+      ["부담 없이,", "오늘 딱 한 번 만나요"],
+      ["기분 좋은 하루,", "함께 시작해볼까요?"]
+    ];
+
+    function getDailyHomeGreeting() {
+      const kstDayIndex = Math.floor((Date.now() + 9 * 60 * 60 * 1000) / 86400000);
+      const pair = DAILY_HOME_GREETINGS[((kstDayIndex % DAILY_HOME_GREETINGS.length) + DAILY_HOME_GREETINGS.length) % DAILY_HOME_GREETINGS.length] || DAILY_HOME_GREETINGS[0];
+      return {
+        pc: `${pair[0]} ${pair[1]}`,
+        mobileHtml: `${escHtml(pair[0])}<br/>${escHtml(pair[1])}`
+      };
+    }
+
     function renderHomeTab() {
       const currentUser = DB.users[state.user_id] || { nickname: "학우" };
+      const dailyGreeting = getDailyHomeGreeting();
       return `
         <!-- PC v2 헤더 (좌: 타이틀+안내 / 우: 검색) -->
         <div class="tk-pc-home-header pc-v2-home-head">
           <div style="min-width:0; flex:1;">
-            <h1 class="tk-page-title" style="margin:0 0 4px;">오늘은 누구랑 밥 먹을까요?</h1>
+            <h1 class="tk-page-title" style="margin:0 0 4px;">${escHtml(dailyGreeting.pc)}</h1>
             <div style="font-size:var(--fs-sm); font-weight:500; color:var(--text-secondary);">${escHtml(COPY.blindNotice)}</div>
           </div>
           <div class="tk-search-box" style="width:240px; flex-shrink:0; height:44px; border-radius:var(--radius-input); background:#FFFFFF; border:1px solid #E5E8EB;">
@@ -5077,7 +5118,7 @@
 
         <!-- Mobile v2 인사말 -->
         <div class="only-mobile-block" style="margin: 2px 0 14px;">
-          <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.4; letter-spacing:-0.02em;">오늘은 누구랑<br/>밥 먹을까요?</h1>
+          <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.4; letter-spacing:-0.02em;">${dailyGreeting.mobileHtml}</h1>
         </div>
 
         ${renderMobileHomeCafeteriaBar()}
