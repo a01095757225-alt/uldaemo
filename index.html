@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv2c" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv2d" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -6990,17 +6990,17 @@
                   </div>
                   <div id="uldaemo-roulette-wheel" class="roulette-wheel" style="transform:rotate(${_currentWheelDeg}deg);">
                     ${[0, 60, 120, 180, 240, 300].map(pegDeg => `
-                      <div class="roulette-peg" style="transform: rotate(${pegDeg - 90}deg) translate(94px, 0);"></div>
+                      <div class="roulette-peg" style="transform: rotate(${pegDeg - 90}deg) translate(121px, 0);"></div>
                     `).join("")}
                     ${items.map((it, idx) => {
                       const angle = idx * 60 + 30 - 90;
-                      const shortTxt = String(it.short || it.label || "").replace(/^[^\w가-힣+]+/, "").trim().slice(0, 4);
+                      const fullTxt = String(it.label || it.short || "").replace(/^[^\w가-힣+]+/, "").split("(")[0].trim();
                       const counterDeg = -(angle + _currentWheelDeg);
                       const isWonSlice = (state.last_roulette_win_idx === idx);
                       return `
-                        <div class="roulette-label" style="transform: rotate(${angle}deg) translate(62px, 0);">
+                        <div class="roulette-label" style="transform: rotate(${angle}deg) translate(80px, 0);">
                           <div class="roulette-label-inner ${isWonSlice ? 'is-winner' : ''}" data-base-angle="${angle}" style="transform: translate(-50%, -50%) rotate(${counterDeg}deg);">
-                            <span>${escHtml(shortTxt)}</span>
+                            <span>${escHtml(fullTxt)}</span>
                           </div>
                         </div>
                       `;
