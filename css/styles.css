@@ -2890,3 +2890,81 @@ html, body {
   overflow-x: clip;
   max-width: 100vw;
 }
+
+/* =====================================================
+   UI v2 (Figma 개선안 · 2026-11-26) — 공통 토큰 보강 + 홈
+   ===================================================== */
+:root {
+  --primary-text: #1F6A52;
+  --line: #E5E8EB;
+  --danger: #C9303E;
+  --danger-weak: #FDEDEE;
+}
+/* 한글이 단어 중간에서 줄바꿈되지 않게 (예: "비밀이 / 에요") */
+body, button, input, textarea, select, label, p, span, div {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+/* 카테고리 칩: 검정 → 브랜드 초록, 비활성은 흰 바탕 + 테두리 */
+.cat-btn {
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  color: var(--text-secondary);
+}
+.cat-btn:hover { background: #FFFFFF; border: 1px solid var(--primary); color: var(--primary-text); }
+.cat-btn.active, .cat-btn.active:hover {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #FFFFFF;
+}
+/* 번개 만들기 FAB: 스크롤하면 동그란 + 버튼으로 줄어들어 카드 버튼을 가리지 않음 */
+.fab-create { transition: width 0.2s ease, padding 0.2s ease, border-radius 0.2s ease; }
+body.fab-mini .fab-create {
+  width: 52px;
+  padding: 0;
+  justify-content: center;
+}
+body.fab-mini .fab-create span { display: none; }
+@media (max-width: 1023px) {
+  /* iOS는 16px 미만 입력창에 포커스하면 화면이 확대됨 */
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px !important; }
+  .fab-create {
+    right: 16px;
+    height: 52px;
+    font-size: var(--fs-md);
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  .home-blind-notice-text { font-size: var(--fs-sm) !important; }
+}
+/* 토스트: left:50% 때문에 폭이 화면 절반으로 줄던 문제 → 내용 폭 + 최대폭 제한, 모바일은 하단 탭 위로 */
+.toast {
+  width: max-content;
+  max-width: min(calc(100vw - 32px), 420px) !important;
+  text-align: left;
+  line-height: 1.4;
+}
+@media (max-width: 1023px) {
+  .toast { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 1023px) {
+  body.has-fab .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ===== UI v2 · 2~11단계 ===== */
+/* 칩 묶음을 줄바꿈 대신 한 줄 가로 스크롤로 (오른쪽이 흐려지는 힌트 포함) */
+.h-scroll-row {
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.h-scroll-row > * { flex-shrink: 0; white-space: nowrap; }
+@media (max-width: 640px) {
+  /* 신청자 관리: 정보 한 줄 + 버튼은 아래 줄에 같은 크기로 */
+  .applicant-row { flex-wrap: wrap; }
+  .applicant-row .applicant-info { flex: 1 1 100%; }
+  .applicant-row .applicant-actions { flex: 1 1 100%; }
+  .applicant-row .applicant-actions > button { flex: 1; height: 44px !important; border-radius: var(--radius-btn) !important; }
+}
