@@ -2015,6 +2015,8 @@ class handler(BaseHTTPRequestHandler):
             if "timetable" in data:
                 actor["timetable"] = data["timetable"] if isinstance(data["timetable"], dict) else {}
                 actor["timetable_saved"] = bool(actor["timetable"])
+            if "pw_hash" in data and isinstance(data["pw_hash"], str) and len(data["pw_hash"].strip()) >= 32:
+                actor["pw_hash"] = data["pw_hash"].strip()
             actor["updated_at"] = int(time.time() * 1000)
             _finish_mutation(db_obj, actor_id, is_adm)
             return

@@ -2213,6 +2213,9 @@
       const wasUnread = !n.is_read;
       n.is_read = 1;
       saveDB();
+      if (wasUnread && getSessionToken()) {
+        callApiAction("mark_notifications_read", {}).catch(() => {});
+      }
       if (n.message && (n.message.includes("채팅방") || n.message.includes("수락되었습니다") || n.message.includes("수락되었어요") || n.message.includes("대화방"))) {
         const matchedPost = n.post_id ? (DB.posts || []).find(p => Number(p.id) === Number(n.post_id)) : null;
         if (wasUnread && matchedPost) {
@@ -2990,6 +2993,15 @@
       try {
         const root = document.getElementById("app");
         const currentUser = DB.users[state.user_id];
+        // 리렌더 시 대화창 스크롤이 맨 위로 튀지 않도록 현재 스크롤 위치 보존
+        const _activeChatIdBefore = state.active_chat_post_id ? Number(state.active_chat_post_id) : 0;
+        const _prevChatBox = _activeChatIdBefore ? document.getElementById(`chat_box_${_activeChatIdBefore}`) : null;
+        const _savedChatScroll = _prevChatBox ? {
+          id: _activeChatIdBefore,
+          scrollTop: _prevChatBox.scrollTop,
+          atBottom: (_prevChatBox.scrollHeight - _prevChatBox.scrollTop - _prevChatBox.clientHeight) <= 44,
+          winY: window.scrollY || 0
+        } : null;
 
         if (!state.user_id || !currentUser) {
           saveSignupDraft();
@@ -3186,6 +3198,15 @@
           document.body.classList.add("has-fab");
         } else {
           document.body.classList.remove("has-fab");
+        }
+        if (_savedChatScroll) {
+          const _newChatBox = document.getElementById(`chat_box_${_savedChatScroll.id}`);
+          if (_newChatBox) {
+            _newChatBox.scrollTop = _savedChatScroll.atBottom ? _newChatBox.scrollHeight : _savedChatScroll.scrollTop;
+          }
+          if (_savedChatScroll.winY > 0) {
+            try { window.scrollTo(0, _savedChatScroll.winY); } catch (e) {}
+          }
         }
         updateScrollTopButton();
       } catch (renderErr) {
@@ -3989,6 +4010,9 @@
       DB.notifications.forEach(n => { if (n.user_id === state.user_id) n.is_read = 1; });
       saveDB();
       render();
+      if (getSessionToken()) {
+        callApiAction("mark_notifications_read", {}).catch(() => {});
+      }
     }
 
     function clearAllNotifs() {
@@ -4188,8 +4212,8 @@
       return true;
     }
 
-    function activatePostBoost(postId) {
-      const post = (DB.posts || []).find(p => p.id === postId);
+    async function activatePostBoost(postId) {
+      const post = (DB.posts || []).find(p => Number(p.id) === Number(postId));
       const meUser = DB.users[state.user_id];
       if (!post || !meUser) return;
       if (String(post.author_id) !== String(state.user_id)) return;
@@ -4201,9 +4225,16 @@
       post.is_boosted = true;
       post.boosted_at = Date.now();
       post.updated_at = Date.now();
-      saveDB(true);
       fireConfetti();
       showToast("⚡ 상단 부스트권 적용! 3시간 동안 홈 상단 부스트 슬롯에 우선 노출됩니다.");
+      render();
+      const res = await callApiAction("boost_post", { post_id: Number(postId) });
+      if (!res.ok) {
+        meUser.boost_coupons = coupons;
+        post.is_boosted = false;
+        render();
+        return showToast(res.message || "부스트 적용에 실패했어요.");
+      }
       render();
     }
 
@@ -5851,42 +5882,54 @@
       render();
     }
 
-    function submitPlazaTalk() {
+    async function submitPlazaTalk() {
       const txtEl = document.getElementById("plaza_talk_in");
       const catEl = document.getElementById("plaza_talk_cat");
       const text = txtEl ? txtEl.value.trim() : "";
       const category = catEl ? catEl.value : "🍚 밥약";
       if (text.length < 2) return showToast("한줄 잔디톡 내용을 2글자 이상 입력해주세요.");
+      if (txtEl) txtEl.value = "";
 
       const now = new Date();
       const timeLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       ensurePlazaDefaults(DB);
+      const tempId = -Date.now();
       DB.plaza_talks.unshift({
-        id: Date.now(),
+        id: tempId,
         author_id: state.user_id,
         text,
         category,
         created_at: timeLabel,
         created_ts: Date.now(),
-        likes: []
+        likes: [],
+        replies: []
       });
-      saveDB(true);
       showToast("🌱 한줄 이야기가 등록되었어요!");
+      render();
+      const res = await callApiAction("plaza_create_talk", { text });
+      if (!res.ok) {
+        DB.plaza_talks = (DB.plaza_talks || []).filter(t => t.id !== tempId);
+        render();
+        return showToast(res.message || "한줄 이야기 등록에 실패했어요.");
+      }
       render();
     }
 
-    function toggleTalkLike(talkId) {
+    async function toggleTalkLike(talkId) {
       ensurePlazaDefaults(DB);
-      const t = DB.plaza_talks.find(x => x.id === talkId);
-      if (!t) return;
+      const t = DB.plaza_talks.find(x => Number(x.id) === Number(talkId));
+      if (!t || Number(t.id) < 0) return;
       t.likes = t.likes || [];
+      const prevLikes = t.likes.slice();
       const idx = t.likes.indexOf(state.user_id);
       if (idx >= 0) t.likes.splice(idx, 1);
-      else {
-        t.likes.push(state.user_id);
-      }
-      saveDB(true);
+      else t.likes.push(state.user_id);
       render();
+      const res = await callApiAction("plaza_like_talk", { talk_id: Number(talkId) });
+      if (!res.ok) {
+        t.likes = prevLikes;
+        render();
+      }
     }
 
     // ===== 익명 답글 (밸런스 게임 / 한줄 이야기 공용) =====
@@ -7650,33 +7693,7 @@
 
           <!-- 하단 스마트 접이식 AI 대화 소재 추천 서랍 + 메시지 입력 바 -->
           <div class="tk-room-footer" style="border-top:1px solid #EEF0EF;">
-            ${(() => {
-              const drawerState = state['ai_drawer_open_' + post.id];
-              const isAiOpen = Boolean(drawerState);
-              if (!isAiOpen) return "";
-              const isAiLoading = Boolean(state['ai_loading_' + post.id]);
-              const aiList = getAiSuggestionsForPost(post);
-              return `
-                <div style="margin-bottom:8px; padding:8px 10px; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:14px;">
-                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                    <span style="font-size:11.5px; font-weight:800; color:#287D62; display:inline-flex; align-items:center; gap:4px;">
-                      <span>✨</span><span>AI 대화 추천 (탭해서 입력)</span>
-                    </span>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                      <button type="button" ${isAiLoading ? 'disabled' : ''} onclick="triggerAiIcebreaker(${post.id})" style="border:none; background:none; color:#287D62; font-size:11.5px; font-weight:700; cursor:pointer; padding:0;">${isAiLoading ? '추천 중...' : '새로고침'}</button>
-                      <button type="button" onclick="toggleAiDrawer(${post.id}, false)" aria-label="접기" style="border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;">✕</button>
-                    </div>
-                  </div>
-                  <div style="display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding-bottom:2px;">
-                    ${aiList.map((txt, idx) => `
-                      <button type="button" onclick="applyAiSuggestionToInput(${post.id}, ${idx}); toggleAiDrawer(${post.id}, false);" style="flex-shrink:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; background:#FFFFFF; border:1px solid #D3EAE0; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; color:#191F28; cursor:pointer;">
-                        ${escHtml(txt)}
-                      </button>
-                    `).join("")}
-                  </div>
-                </div>
-              `;
-            })()}
+            <div id="ai_drawer_slot_${post.id}">${renderAiDrawerInnerHtml(post)}</div>
 
             <div class="chat-quick-bar" style="margin-bottom:8px; display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding:2px 2px 4px;">
               ${getQuickChatPhrasesForCurrentUser().map(phrase => `
@@ -8094,12 +8111,66 @@
       ];
     }
 
+    function renderAiDrawerInnerHtml(post) {
+      if (!post) return "";
+      const isAiOpen = Boolean(state['ai_drawer_open_' + post.id]);
+      if (!isAiOpen) return "";
+      const isAiLoading = Boolean(state['ai_loading_' + post.id]);
+      const aiList = getAiSuggestionsForPost(post);
+      return `
+        <div style="margin-bottom:8px; padding:8px 10px; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+            <span style="font-size:11.5px; font-weight:800; color:#287D62; display:inline-flex; align-items:center; gap:4px;">
+              <span>✨</span><span>AI 대화 추천 (탭해서 입력)</span>
+            </span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" ${isAiLoading ? 'disabled' : ''} onclick="triggerAiIcebreaker(${post.id})" style="border:none; background:none; color:#287D62; font-size:11.5px; font-weight:700; cursor:pointer; padding:0;">${isAiLoading ? '추천 중...' : '새로고침'}</button>
+              <button type="button" onclick="toggleAiDrawer(${post.id}, false)" aria-label="접기" style="border:none; background:none; color:#6B7684; font-size:14px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;">✕</button>
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; padding-bottom:2px;">
+            ${aiList.map((txt, idx) => `
+              <button type="button" onclick="applyAiSuggestionToInput(${post.id}, ${idx}); toggleAiDrawer(${post.id}, false);" style="flex-shrink:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; background:#FFFFFF; border:1px solid #D3EAE0; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; color:#191F28; cursor:pointer;">
+                ${escHtml(txt)}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function updateAiDrawerInPlace(postId) {
+      const post = findChatPostById(postId);
+      const slot = document.getElementById(`ai_drawer_slot_${postId}`);
+      const box = document.getElementById(`chat_box_${postId}`);
+      if (!post || !slot) {
+        render();
+        return;
+      }
+      const beforeH = slot.offsetHeight || 0;
+      const wasAtBottom = box ? ((box.scrollHeight - box.scrollTop - box.clientHeight) <= 44) : false;
+      slot.innerHTML = renderAiDrawerInnerHtml(post);
+      const afterH = slot.offsetHeight || 0;
+      const delta = afterH - beforeH;
+      if (box && delta !== 0) {
+        // AI 서랍이 열릴 때 대화를 가리지 않도록 하단 여백 확보 + 현재 보고 있던 스크롤 위치 유지
+        box.style.paddingBottom = afterH > 0 ? `${afterH + 24}px` : "";
+        if (wasAtBottom) {
+          box.scrollTop = box.scrollHeight;
+        } else {
+          box.scrollTop = Math.max(0, box.scrollTop + delta);
+        }
+        if (delta > 0 && (window.innerHeight + window.scrollY >= document.body.scrollHeight - 120)) {
+          try { window.scrollBy(0, delta); } catch (e) {}
+        }
+      }
+    }
+
     function toggleAiDrawer(postId, forceState) {
       const key = 'ai_drawer_open_' + postId;
-      const msgs = (DB.messages || []).filter(m => Number(m.post_id) === Number(postId));
-      const cur = (state[key] === undefined) ? (msgs.length <= 2) : Boolean(state[key]);
+      const cur = Boolean(state[key]);
       state[key] = (typeof forceState === "boolean") ? forceState : !cur;
-      render();
+      updateAiDrawerInPlace(postId);
     }
 
     function applyAiSuggestionToInput(postId, idx) {
@@ -8122,7 +8193,7 @@
       if (!post || state['ai_loading_' + postId]) return;
       state['ai_loading_' + postId] = true;
       state['ai_drawer_open_' + postId] = true;
-      render();
+      updateAiDrawerInPlace(postId);
 
       const myId = String(state.user_id || "");
       const recentMsgs = (DB.messages || [])
@@ -8164,7 +8235,7 @@
       state['ai_loading_' + postId] = false;
       state['ai_suggestions_' + postId] = suggestions.slice(0, 2);
       state['ai_hint_' + postId] = suggestions[0];
-      render();
+      updateAiDrawerInPlace(postId);
       showToast("✨ 새로운 대화 소재를 추천했어요");
       const curInput = document.getElementById(`chat_in_${postId}`);
       if (curInput) curInput.focus();
@@ -8783,8 +8854,9 @@
         showToast(`⭐ '${c}' 선택됨! 다 고르셨다면 [✅ 설정 완료]를 눌러주세요.`);
       }
       u.updated_at = Date.now();
-      saveDB(true);
+      saveDB(false);
       refreshFavSection();
+      callApiAction("update_profile", { fav_cats: u.fav_cats || [], fav_muted: u.fav_muted || [] }).catch(() => {});
     }
     function toggleFavMute(i) {
       const u = DB.users[state.user_id];
@@ -8796,8 +8868,9 @@
       if (idx >= 0) { u.fav_muted.splice(idx, 1); showToast(`🔔 '${c}' 알림을 켰어요.`); }
       else { u.fav_muted.push(c); showToast(`🔕 '${c}' 알림을 껐어요.`); }
       u.updated_at = Date.now();
-      saveDB(true);
+      saveDB(false);
       refreshFavSection();
+      callApiAction("update_profile", { fav_cats: u.fav_cats || [], fav_muted: u.fav_muted || [] }).catch(() => {});
     }
     function addCustomFav() {
       const inp = document.getElementById("fav_custom_in");
@@ -8811,9 +8884,10 @@
       u.fav_cats.push(v);
       state.editing_fav_cats = true;
       u.updated_at = Date.now();
-      saveDB(true);
+      saveDB(false);
       showToast(`⭐ '${v}' 관심 카테고리로 추가됨!`);
       refreshFavSection();
+      callApiAction("update_profile", { fav_cats: u.fav_cats || [], fav_muted: u.fav_muted || [] }).catch(() => {});
     }
     // 새 번개가 올라오면 해당 카테고리를 관심으로 둔 다른 학우에게 알림
     function notifyFavCategory(post) {
@@ -9068,11 +9142,10 @@
       const inp = document.getElementById(inputId);
       const pw = inp ? inp.value.trim() : "";
       if (!pw || pw.length < 4) return showToast("비밀번호를 4자리 이상 입력해주세요.");
-      const u = DB.users[state.user_id];
-      if (!u) return;
-      u.pw_hash = await hashUserPw(state.user_id, pw);
-      u.updated_at = Date.now();
-      saveDB(true);
+      const pwHash = await hashUserPw(state.user_id, pw);
+      const res = await callApiAction("update_profile", { pw_hash: pwHash });
+      if (!res.ok) return showToast(res.message || "비밀번호 저장에 실패했어요.");
+      if (inp) inp.value = "";
       showToast("✅ 비밀번호가 안전하게 저장되었어요!");
       render();
     }
