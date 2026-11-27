@@ -4031,3 +4031,129 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   margin-top: 2px;
   line-height: 1.3;
 }
+
+/* =====================================================
+   v3 Daily Auto Check-in Sheet (Mobile Bottom Sheet + PC Mini Card)
+   ===================================================== */
+.checkin-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  background: rgba(25, 31, 40, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: sortV3FadeIn 0.18s ease-out;
+}
+.checkin-sheet-card {
+  width: 100%;
+  max-width: 480px;
+  background: #FFFFFF;
+  border-radius: 28px 28px 0 0;
+  padding: 12px 22px calc(24px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 36px rgba(25, 31, 40, 0.16);
+  animation: sortV3SheetUp 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.checkin-sheet-grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: #D1D6DB;
+  margin: 0 auto 4px;
+}
+.checkin-sheet-stamps {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.checkin-sheet-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.checkin-sheet-dot {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: #F2F4F6;
+  color: #8B95A1;
+}
+.checkin-sheet-dot.done {
+  background: #287D62;
+  color: #FFFFFF;
+}
+.checkin-sheet-dot.today {
+  background: #EEF8F3;
+  color: #1F6A52;
+  border: 1.5px solid #287D62;
+  box-shadow: 0 3px 10px rgba(40, 125, 98, 0.16);
+}
+.checkin-sheet-day-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8B95A1;
+}
+.checkin-sheet-day-lbl.today {
+  color: #1F6A52;
+  font-weight: 800;
+}
+.checkin-sheet-primary {
+  width: 100%;
+  height: 52px;
+  border: none;
+  border-radius: 16px;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.14s ease, transform 0.12s ease;
+}
+.checkin-sheet-primary:hover {
+  background: #226B54;
+}
+.checkin-sheet-primary:active {
+  transform: scale(0.985);
+}
+.checkin-sheet-later {
+  width: 100%;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #6B7684;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.checkin-sheet-later:hover {
+  background: #F4F6F8;
+}
+
+@media (min-width: 1024px) {
+  .checkin-sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+  .checkin-sheet-card {
+    max-width: 392px;
+    border-radius: 28px;
+    padding: 28px 24px 20px;
+    box-shadow: 0 20px 56px rgba(25, 31, 40, 0.18);
+    animation: sortV3PopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .checkin-sheet-grabber {
+    display: none;
+  }
+}
