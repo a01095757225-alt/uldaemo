@@ -10018,14 +10018,14 @@
       ];
 
       return `
-        <div class="profile-sheet-backdrop" onclick="if(event.target===this){ state.profile_section=null; render(); }">
+        <div class="profile-sheet-backdrop" onclick="if(event.target===this){ state.profile_sec=null; render(); }">
           <div class="profile-sheet-panel">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">프로필 정보 수정</div>
                 <span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:4px 10px; border-radius:var(--radius-chip);">블라인드 보호 중</span>
               </div>
-              <button type="button" aria-label="프로필 수정 닫기" onclick="state.profile_section=null; render();" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer;">✕</button>
+              <button type="button" aria-label="프로필 수정 닫기" onclick="state.profile_sec=null; render();" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer;">✕</button>
             </div>
 
             <!-- 1) 실시간 라이브 프로필 미리보기 카드 (기본: 수락 전 블라인드 / 2번째: 수락 후 공개) -->
@@ -10144,7 +10144,7 @@
       });
       if (!res.ok) return showToast(res.message || "프로필 저장에 실패했어요.");
       state.profile_edit_draft = null;
-      state.profile_section = null;
+      state.profile_sec = null;
       showToast("✅ 프로필이 수정되었어요!");
       render();
     }
