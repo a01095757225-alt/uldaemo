@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3j" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261126uiv3k" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -1080,6 +1080,96 @@
       try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate([20, 35, 30]); } catch (e) {}
       fireConfetti();
       render();
+    }
+
+    function getCheckinDismissKey(uid) {
+      return `uldaemo_checkin_dismissed_${uid || ""}`;
+    }
+
+    function shouldShowDailyCheckinSheet() {
+      if (!state.user_id || !DB.users[state.user_id]) return false;
+      if (state.checkin_sheet_preview) return true;
+      if (state.active_modal || state.blind_onboarding_open || state.confirm_dialog || state.withdraw_modal_open) return false;
+      const st = getUserStatsAndBadges(state.user_id);
+      if (st.checkedInToday) return false;
+      try {
+        if (localStorage.getItem(getCheckinDismissKey(state.user_id)) === getTodayStr()) return false;
+      } catch (e) {}
+      return true;
+    }
+
+    function dismissDailyCheckinSheet() {
+      state.checkin_sheet_preview = false;
+      try {
+        if (state.user_id) localStorage.setItem(getCheckinDismissKey(state.user_id), getTodayStr());
+      } catch (e) {}
+      render();
+    }
+
+    async function handleDailyCheckinFromSheet() {
+      const wasPreview = Boolean(state.checkin_sheet_preview);
+      state.checkin_sheet_preview = false;
+      try {
+        if (state.user_id) localStorage.setItem(getCheckinDismissKey(state.user_id), getTodayStr());
+      } catch (e) {}
+      const st = getUserStatsAndBadges(state.user_id);
+      if (wasPreview && st.checkedInToday) {
+        showToast("이미 오늘 출석을 완료했어요! 내일 또 참여해 주세요.");
+        render();
+        return;
+      }
+      await handleDailyCheckin();
+    }
+
+    function renderDailyCheckinSheetHtml() {
+      if (!shouldShowDailyCheckinSheet()) return "";
+      const st = getUserStatsAndBadges(state.user_id);
+      const completedCnt = Math.min(6, Number(st.streakDays || 0) % 7);
+      const nextStreak = Number(st.streakDays || 0) + (st.checkedInToday ? 0 : 1);
+      const targetDay = completedCnt + 1;
+      const checkSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+      return `
+        <div class="checkin-sheet-backdrop" role="dialog" aria-modal="true" aria-label="오늘의 출석체크" onclick="if(event.target===this){dismissDailyCheckinSheet();}">
+          <div class="checkin-sheet-card" onclick="event.stopPropagation()">
+            <div class="checkin-sheet-grabber"></div>
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:8px;">
+              <span style="display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:999px; background:#EEF8F3; color:#1F6A52; font-size:12px; font-weight:800;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>연속 ${nextStreak}일째 출석 도전</span>
+              </span>
+              <h2 style="margin:0; font-size:22px; font-weight:800; line-height:1.35; letter-spacing:-0.02em; color:#191F28;">
+                오늘 출석하고<br/>룰렛 티켓과 +3점 받아요
+              </h2>
+            </div>
+
+            <div class="checkin-sheet-stamps">
+              ${[1, 2, 3, 4, 5, 6, 7].map(d => {
+                const isDone = d <= completedCnt;
+                const isToday = d === targetDay;
+                return `
+                  <div class="checkin-sheet-day">
+                    <div class="checkin-sheet-dot ${isDone ? 'done' : (isToday ? 'today' : '')}">
+                      ${isDone ? checkSvg : (isToday ? '+3' : d)}
+                    </div>
+                    <span class="checkin-sheet-day-lbl ${isToday ? 'today' : ''}">${isToday ? '오늘' : `${d}일`}</span>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:14px; background:#F4F6F8; font-size:13px; color:#4E5968; font-weight:600;">
+              <span>오늘의 출석 혜택</span>
+              <span style="color:#1F6A52; font-weight:800;">룰렛 티켓 +1장 · 활동 +3점</span>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:6px; margin-top:2px;">
+              <button type="button" class="checkin-sheet-primary" onclick="handleDailyCheckinFromSheet()">오늘 출석하고 +3점 받기</button>
+              <button type="button" class="checkin-sheet-later" onclick="dismissDailyCheckinSheet()">다음에 할게요</button>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function openReviewModal(postId) {
@@ -3258,6 +3348,7 @@
           ${renderPolicyModalHtml()}
           ${renderBlindPreviewModalHtml()}
           ${renderBlindOnboardingHtml()}
+          ${renderDailyCheckinSheetHtml()}
         `;
 
         if (state.active_modal === "detail") {
@@ -4606,8 +4697,9 @@
     }
 
     document.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape" && state.sort_menu_open) {
-        toggleHomeSortMenu(false);
+      if (ev.key === "Escape") {
+        if (state.sort_menu_open) toggleHomeSortMenu(false);
+        else if (shouldShowDailyCheckinSheet()) dismissDailyCheckinSheet();
       }
     });
 
