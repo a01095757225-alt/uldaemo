@@ -4048,11 +4048,12 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   animation: sortV3FadeIn 0.18s ease-out;
 }
 .checkin-sheet-card {
+  box-sizing: border-box;
   width: 100%;
   max-width: 480px;
   background: #FFFFFF;
   border-radius: 28px 28px 0 0;
-  padding: 12px 22px calc(24px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -10px 36px rgba(25, 31, 40, 0.16);
   animation: sortV3SheetUp 0.24s cubic-bezier(0.22, 1, 0.36, 1);
   display: flex;
