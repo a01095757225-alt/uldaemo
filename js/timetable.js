@@ -735,17 +735,36 @@ function resetTimetableDraft() {
   showToast("시간표를 초기화했어요.");
 }
 
-function saveUserTimetable() {
+async function saveUserTimetable() {
   const u = DB.users[state.user_id];
   if (!u) return;
   const blocks = Array.isArray(state._tt_blocks_draft) ? state._tt_blocks_draft : getUserTimetableBlocks(u);
   const synced = syncLegacyFromBlocks(blocks);
-  u.timetable_blocks = JSON.parse(JSON.stringify(blocks));
+  const cleanBlocks = JSON.parse(JSON.stringify(blocks));
+  u.timetable_blocks = cleanBlocks;
   u.timetable = synced.timetable;
   u.timetable_names = synced.timetable_names;
-  u.timetable_saved = true;
+  u.timetable_saved = cleanBlocks.length > 0;
   u.updated_at = Date.now();
   saveDB(true);
+
+  if (typeof callApiAction === "function") {
+    try {
+      const res = await callApiAction("update_profile", {
+        timetable: cleanBlocks.length > 0 ? synced.timetable : {},
+        timetable_names: synced.timetable_names,
+        timetable_blocks: cleanBlocks
+      });
+      if (!res || !res.ok) {
+        showToast((res && res.message) || "시간표 서버 저장에 실패했어요. 다시 시도해 주세요.");
+        return;
+      }
+    } catch (e) {
+      showToast("시간표 서버 저장 중 오류가 발생했어요. 다시 시도해 주세요.");
+      return;
+    }
+  }
+
   state._tt_blocks_draft = null;
   state._tt_draft = null;
   state._tt_names_draft = null;
