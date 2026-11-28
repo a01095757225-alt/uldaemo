@@ -472,7 +472,7 @@ async function handleTimetableImageUpload(inputEl) {
   render();
   showToast("AI가 시간표 사진을 분석하고 있어요... (약 3~5초)");
   try {
-    const dataUrl = await compressTimetableImageToBase64(file, 800, 0.78);
+    const dataUrl = await compressTimetableImageToBase64(file, 1080, 0.85);
     const authPayload = typeof getApiAuthPayload === "function" ? getApiAuthPayload() : {};
     const res = await fetch("/api/index", {
       method: "POST",
@@ -732,13 +732,15 @@ function renderTimetableModal() {
     <div class="tt-v3-empty-state">
       <div class="tt-v3-empty-ic">${calendarSvg}</div>
       <h2 class="tt-v3-empty-title">시간표를 넣으면<br>공강 메이트를 찾아드려요</h2>
-      <p class="tt-v3-empty-sub">공강이 겹치는 학우와 바로 밥약·카공 번개를 열 수 있어요</p>
-      <div class="tt-v3-empty-privacy">${lockSvg}<span>사진은 분석 후 바로 지워져요</span></div>
-      <button type="button" class="tt-v3-empty-btn-primary" onclick="triggerTimetableImageUpload()" ${state._tt_ai_loading ? 'disabled' : ''}>
-        ${cameraSvg("#FFFFFF")}
-        <span>${state._tt_ai_loading ? 'AI가 시간표를 분석하고 있어요...' : '사진으로 자동 채우기'}</span>
-      </button>
-      ${!pcMode ? `<button type="button" class="tt-v3-empty-btn-secondary" onclick="ensureTimetableDrafts(); state.timetable_tab='edit'; render();">직접 입력할게요</button>` : ''}
+      <p class="tt-v3-empty-sub">${pcMode ? '왼쪽에서 시간표를 입력하고 저장하면 공강이 겹치는 학우가 여기에 표시돼요' : '공강이 겹치는 학우와 바로 밥약·카공 번개를 열 수 있어요'}</p>
+      ${!pcMode ? `
+        <div class="tt-v3-empty-privacy">${lockSvg}<span>사진은 분석 후 바로 지워져요</span></div>
+        <button type="button" class="tt-v3-empty-btn-primary" onclick="triggerTimetableImageUpload()" ${state._tt_ai_loading ? 'disabled' : ''}>
+          ${cameraSvg("#FFFFFF")}
+          <span>${state._tt_ai_loading ? 'AI가 시간표를 분석하고 있어요...' : '사진으로 자동 채우기'}</span>
+        </button>
+        <button type="button" class="tt-v3-empty-btn-secondary" onclick="ensureTimetableDrafts(); state.timetable_tab='edit'; render();">직접 입력할게요</button>
+      ` : ''}
     </div>
   `;
 
