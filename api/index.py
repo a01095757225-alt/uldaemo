@@ -461,9 +461,15 @@ GEMINI_MODEL_CANDIDATES = [
 
 def _gemini_one_call(model_name, url, body_obj, timeout_sec):
     try:
+        req_body = body_obj
+        if "3.8-flash" in model_name and "lite" not in model_name:
+            # gemini-3.8-flash 기본 thinking이 7초+ 걸려 Vercel 10초 제한에 걸리므로 가벼운 예산으로 제한
+            req_body = json.loads(json.dumps(body_obj))
+            gc = req_body.setdefault("generationConfig", {})
+            gc["thinkingConfig"] = {"thinkingBudget": 256}
         req = urllib.request.Request(
             url,
-            data=json.dumps(body_obj).encode("utf-8"),
+            data=json.dumps(req_body).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -478,7 +484,7 @@ def _gemini_one_call(model_name, url, body_obj, timeout_sec):
     except urllib.error.HTTPError as he:
         err_body = ""
         try:
-            err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:100]
+            err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:120]
         except Exception:
             pass
         return "", _scrub_secret(f"{model_name} HTTP {he.code}: {err_body}")
@@ -2230,6 +2236,23 @@ class handler(BaseHTTPRequestHandler):
             if "timetable" in data:
                 actor["timetable"] = data["timetable"] if isinstance(data["timetable"], dict) else {}
                 actor["timetable_saved"] = bool(actor["timetable"])
+            if "timetable_blocks" in data and isinstance(data["timetable_blocks"], list):
+                clean_blks = []
+                for b in data["timetable_blocks"][:80]:
+                    if not isinstance(b, dict):
+                        continue
+                    bd = str(b.get("day") or "").strip()[:1]
+                    if bd not in ("월", "화", "수", "목", "금"):
+                        continue
+                    try:
+                        sm = int(b.get("start_min"))
+                        em = int(b.get("end_min"))
+                    except Exception:
+                        continue
+                    sm = max(540, min(1170, (sm // 30) * 30))
+                    em = max(sm + 30, min(1200, ((em + 29) // 30) * 30))
+                    clean_blks.append({"day": bd, "name": str(b.get("name") or "").strip()[:60], "start_min": sm, "end_min": em})
+                actor["timetable_blocks"] = clean_blks
             if "timetable_names" in data and isinstance(data["timetable_names"], dict):
                 actor["timetable_names"] = {
                     str(k)[:12]: str(v or "").strip()[:60]
@@ -2674,28 +2697,30 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             tt_prompt = (
-                "너는 한국 대학교 에브리타임(Everytime) 및 포털 시간표 스크린샷을 정밀 분석하는 시각 OCR 전문가야.\n"
-                "첨부된 시간표 이미지의 월·화·수·목·금요일에 있는 모든 수업 블록을 찾아 JSON으로 반환해줘.\n\n"
-                "[가장 중요한 규칙: 에브리타임 시간표의 세로 칸 높이(수업 시간 길이) 읽기]\n"
-                "1) 왼쪽 세로축의 시간 숫자 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7은 각각 1시간짜리 가로 행(칸)을 의미하며 24시간제로 [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]시야.\n"
-                "   - 특히 오후 숫자 1=13시, 2=14시, 3=15시, 4=16시, 5=17시, 6=18시, 7=19시임을 절대 헷갈리지 마!\n"
-                "2) 에브리타임에서 과목 글자는 항상 색깔 블록의 맨 위쪽에만 적혀 있고, 2시간·3시간 연강 수업은 글자 아래로 색깔 박스가 가로선(격자선)을 뚫고 다음 시간 행까지 길게 이어져 있어.\n"
-                "3) 따라서 절대 글자 위치만 보지 말고, 각 색깔 박스의 [맨 윗변]이 시작하는 시간(start_hour)과 [맨 아랫변]이 끝나는 시간 행(end_hour, 포함)을 반드시 가로 격자선과 대조해서 세어줘!\n"
-                "   - 1시간 수업(1칸 높이): 색깔 박스가 1개 시간 행 안에서 끝남 (예: 9행에서 시작해 10행 가로선 위에서 끝남 -> start_hour: 9, end_hour: 9)\n"
-                "   - 2시간 수업(2칸 높이, 1시간 30분~2시간): 색깔 박스가 가로선 1개를 넘어 다음 시간 행의 절반 이상 또는 끝까지 내려옴 (예: 9행에서 시작해 10행 아래쪽까지 내려옴 -> start_hour: 9, end_hour: 10 / 12행~1행 -> start_hour: 12, end_hour: 13 / 6행~7행 -> start_hour: 18, end_hour: 19)\n"
-                "   - 3시간 수업(3칸 높이): 색깔 박스가 가로선 2개를 넘어 3개 시간 행에 걸쳐 있음 (예: 2행(14시)에서 시작해 3행(15시)을 지나 4행(16시) 아래쪽까지 내려옴 -> start_hour: 14, end_hour: 16)\n"
-                "   - 주의: 색깔 박스 아랫변이 다음 행 가로선에 딱 맞춰 끝나고 다음 행 안으로 들어가지 않았으면 그 다음 행은 포함하지 마! (예: 4행(16시)에서 시작해 5행(17시) 바닥(6행 시작선)에서 끝나면 start_hour: 16, end_hour: 17)\n"
-                "4) 과목명은 강의실 번호(예: 5-106, 7-613, 19호관)와 교수명만 제외하고, 줄이지 말고 전체 과목명을 그대로 적어줘.\n"
-                "5) 반드시 아래 JSON 스키마만 출력해:\n"
+                "너는 한국 대학교 에브리타임(Everytime) 시간표 스크린샷을 30분 단위로 정밀 판독하는 시각 OCR 전문가야.\n"
+                "첨부된 시간표 이미지에서 월, 화, 수, 목, 금 5개 요일 열을 왼쪽부터 오른쪽까지 하나도 빠짐없이 스캔해서 모든 수업 블록을 JSON으로 반환해줘.\n\n"
+                "[에브리타임 시각 격자 정밀 판독 규칙]\n"
+                "1) 왼쪽 시간축 숫자 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7은 각각 1시간 높이의 가로 행(칸)이며 24시간제로 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00이야.\n"
+                "   - 오후 숫자 1=13:00, 2=14:00, 3=15:00, 4=16:00, 5=17:00, 6=18:00, 7=19:00이며, 7행의 바닥선은 20:00이야.\n"
+                "2) 색깔 블록의 [맨 윗변]과 [맨 아랫변]이 가로 격자선 대비 어느 위치에 있는지 30분 단위(HH:00 또는 HH:30)로 읽어줘:\n"
+                "   - 한 칸 높이의 80~100%를 채우면 1시간 수업 (예: 9행 상단~10행 선 바로 위 -> start: \"09:00\", end: \"10:00\")\n"
+                "   - 한 칸을 지나 다음 칸의 절반(약 50%)에서 끝나면 1시간 30분 수업 (예: 4행 상단~5행 절반 -> start: \"16:00\", end: \"17:30\")\n"
+                "   - 두 칸 높이의 85~100%를 채우면 2시간 수업 (예: 9행 상단~10행 바닥 근처 -> start: \"09:00\", end: \"11:00\" / 4행~5행 바닥(6행 선) -> start: \"16:00\", end: \"18:00\" / 6행~7행 바닥 -> start: \"18:00\", end: \"20:00\")\n"
+                "   - 세 칸 높이의 85~100%를 채우면 3시간 수업 (예: 2행 상단~4행 바닥 근처 -> start: \"14:00\", end: \"17:00\")\n"
+                "3) 절대 과목 글자가 있는 첫 칸만 보지 말고, 반드시 색깔 박스의 맨 아래쪽 끝선이 닿는 시간 행을 기준으로 end를 계산해!\n"
+                "4) 같은 과목이 여러 요일에 있으면 요일별로 각각 빠짐없이 모두 출력해! (예: 월요일과 화요일에 둘 다 있으면 2개, 목요일과 금요일에 둘 다 있으면 2개)\n"
+                "5) 과목명은 강의실 번호(5-106, 7-613, 19호관 등)만 빼고 줄이지 말고 전체 이름을 그대로 적어줘.\n"
+                "6) 반드시 아래 JSON 스키마만 출력해:\n"
                 "{\n"
                 "  \"courses\": [\n"
-                "    {\"day\": \"화\", \"name\": \"인본적사고와공동체의가치\", \"start_hour\": 9, \"end_hour\": 10},\n"
-                "    {\"day\": \"금\", \"name\": \"미적분학II\", \"start_hour\": 9, \"end_hour\": 9},\n"
-                "    {\"day\": \"목\", \"name\": \"기초프로그래밍II\", \"start_hour\": 14, \"end_hour\": 16},\n"
-                "    {\"day\": \"수\", \"name\": \"스터디\", \"start_hour\": 18, \"end_hour\": 19}\n"
+                "    {\"day\": \"월\", \"name\": \"ICT융합개론\", \"start\": \"16:00\", \"end\": \"17:00\"},\n"
+                "    {\"day\": \"화\", \"name\": \"인본적사고와공동체의가치\", \"start\": \"09:00\", \"end\": \"11:00\"},\n"
+                "    {\"day\": \"목\", \"name\": \"기초프로그래밍II\", \"start\": \"14:00\", \"end\": \"17:00\"},\n"
+                "    {\"day\": \"금\", \"name\": \"미적분학II\", \"start\": \"09:00\", \"end\": \"10:00\"},\n"
+                "    {\"day\": \"금\", \"name\": \"멘토멘티\", \"start\": \"16:00\", \"end\": \"18:00\"}\n"
                 "  ]\n"
                 "}\n"
-                "6) 시간표가 전혀 보이지 않으면 {\"courses\": []}를 반환해."
+                "7) 시간표가 전혀 보이지 않으면 {\"courses\": []}를 반환해."
             )
             parsed, err_detail = call_gemini_vision_json(tt_prompt, raw_img, mime)
             if not isinstance(parsed, dict):
@@ -2707,9 +2732,26 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json(502, {"ok": False, "message": hint_msg, "detail": err_detail[:180]})
                 return
 
+            def _parse_hhmm_to_min(val, is_end=False):
+                s = str(val or "").strip()
+                m = re.match(r"^(\d{1,2})(?::(\d{1,2}))?$", s)
+                if not m:
+                    return None
+                hh = int(m.group(1))
+                mm = int(m.group(2) or 0)
+                if 1 <= hh <= 7:
+                    hh += 12
+                elif hh == 8 and is_end:
+                    hh = 20
+                total = hh * 60 + mm
+                # 30분 단위로 반올림 스냅 (예: 09:50 -> 10:00, 17:25 -> 17:30)
+                snapped = int(round(total / 30.0)) * 30
+                return max(540, min(1200, snapped))
+
             valid_days = ("월", "화", "수", "목", "금")
             clean_tt = {d: [] for d in valid_days}
             clean_names = {}
+            clean_blocks = []
             courses_list = parsed.get("courses") if isinstance(parsed.get("courses"), list) else None
             if courses_list is not None:
                 day_sets = {d: set() for d in valid_days}
@@ -2719,28 +2761,31 @@ class handler(BaseHTTPRequestHandler):
                     d = str(item.get("day") or "").strip()[:1]
                     if d not in day_sets:
                         continue
-                    try:
-                        sh = int(item.get("start_hour"))
-                        eh = int(item.get("end_hour"))
-                    except Exception:
+                    sm = _parse_hhmm_to_min(item.get("start"), False)
+                    em = _parse_hhmm_to_min(item.get("end"), True)
+                    if sm is None and item.get("start_hour") is not None:
+                        sm = _parse_hhmm_to_min(item.get("start_hour"), False)
+                    if em is None and item.get("end_hour") is not None:
+                        em_h = _parse_hhmm_to_min(item.get("end_hour"), False)
+                        em = (em_h + 60) if em_h is not None else None
+                    if sm is None:
                         continue
-                    if 1 <= sh <= 7:
-                        sh += 12
-                    if 1 <= eh <= 7:
-                        eh += 12
-                    if eh < sh:
-                        eh = sh
+                    if em is None or em <= sm:
+                        em = min(1200, sm + 60)
                     nm = str(item.get("name") or "").strip()[:60]
-                    for h in range(max(9, sh), min(19, eh) + 1):
+                    clean_blocks.append({"day": d, "name": nm, "start_min": sm, "end_min": em})
+                    # 호환성용 1시간 교시(1~11) 배열도 함께 동기화
+                    first_h = sm // 60
+                    last_h = (em - 1) // 60
+                    for h in range(max(9, first_h), min(19, last_h) + 1):
                         p_idx = h - 8
                         if 1 <= p_idx <= 11:
                             day_sets[d].add(p_idx)
                             if nm:
                                 clean_names[f"{d}_{p_idx}"] = nm
-                total_slots = 0
+                total_slots = len(clean_blocks)
                 for d in valid_days:
                     clean_tt[d] = sorted(day_sets[d])
-                    total_slots += len(clean_tt[d])
             else:
                 raw_tt = parsed.get("timetable") if isinstance(parsed.get("timetable"), dict) else {}
                 raw_names = parsed.get("timetable_names") if isinstance(parsed.get("timetable_names"), dict) else {}
@@ -2760,6 +2805,7 @@ class handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "timetable": clean_tt,
                 "timetable_names": clean_names,
+                "timetable_blocks": clean_blocks,
                 "count": total_slots,
             })
             return

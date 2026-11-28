@@ -4620,7 +4620,7 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
 .tt-et-grid {
   display: grid;
   grid-template-columns: 28px repeat(5, minmax(0, 1fr));
-  grid-template-rows: 30px repeat(11, minmax(44px, auto));
+  grid-template-rows: 30px repeat(22, minmax(22px, auto));
   column-gap: 4px;
   width: 100%;
   background: #FFFFFF;
@@ -4652,7 +4652,7 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   font-weight: 800;
 }
 .tt-et-today-col {
-  grid-row: 2 / 13;
+  grid-row: 2 / 24;
   background: rgba(40, 125, 98, 0.045);
   border-radius: 12px;
   pointer-events: none;
@@ -4663,7 +4663,7 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: 3px 6px 0 0;
+  padding: 2px 6px 0 0;
   font-size: 10.5px;
   font-weight: 600;
   color: #B0B8C1;
@@ -4682,6 +4682,9 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   justify-content: center;
   transition: background 0.12s ease;
   -webkit-tap-highlight-color: transparent;
+}
+.tt-et-empty.half {
+  border-top: 1px dashed #F4F6F8;
 }
 .tt-et-empty:hover {
   background: rgba(40, 125, 98, 0.05);
@@ -5150,6 +5153,30 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   cursor: pointer;
 }
 
+.tt-v3-time-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tt-v3-time-select {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid #E5E8EB;
+  background: #F7F8FA;
+  font-size: 14px;
+  font-weight: 700;
+  color: #191F28;
+  outline: none;
+  cursor: pointer;
+}
+.tt-v3-time-select:focus {
+  border-color: #287D62;
+  background: #FFFFFF;
+}
 @media (min-width: 1024px) {
   .tt-v3-page {
     padding-bottom: 32px;
@@ -5160,7 +5187,7 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   }
   .tt-et-grid {
     grid-template-columns: 34px repeat(5, minmax(0, 1fr));
-    grid-template-rows: 32px repeat(11, minmax(46px, auto));
+    grid-template-rows: 32px repeat(22, minmax(24px, auto));
     column-gap: 6px;
   }
   .tt-et-block {
@@ -5196,7 +5223,7 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
 @media (max-width: 420px) {
   .tt-et-grid {
     grid-template-columns: 22px repeat(5, minmax(0, 1fr));
-    grid-template-rows: 28px repeat(11, minmax(42px, auto));
+    grid-template-rows: 28px repeat(22, minmax(21px, auto));
     column-gap: 3px;
   }
   .tt-et-block {
