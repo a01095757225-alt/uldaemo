@@ -3351,6 +3351,7 @@
           ${renderBlindOnboardingHtml()}
           ${renderDailyCheckinSheetHtml()}
           ${state.nav_tab === "마이" && !state.active_modal && state.profile_sec ? renderProfileSectionModalHtml(currentUser) : ""}
+          ${state.nav_tab === "광장" && !state.active_modal && state.show_poll_form ? renderCreatePollModalHtml() : ""}
           <div id="home-sort-mobile-sheet-root">${renderHomeSortMobileSheetHtml()}</div>
         `;
 
@@ -4771,6 +4772,7 @@
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") {
         if (state.sort_menu_open) toggleHomeSortMenu(false);
+        else if (state.show_poll_form) { state.show_poll_form = false; render(); }
         else if (state.profile_sec) { state.profile_sec = null; render(); }
         else if (shouldShowDailyCheckinSheet()) dismissDailyCheckinSheet();
       }
@@ -6519,49 +6521,166 @@
       }
     }
 
-    async function createNewBalancePoll() {
+    const POLL_TAG_PRESETS = ["음식", "대학 공감", "연애", "인생·만약에", "캠퍼스"];
+
+    function capturePollFormDraft() {
       const qEl = document.getElementById("plaza_poll_q");
       const aEl = document.getElementById("plaza_poll_a");
       const bEl = document.getElementById("plaza_poll_b");
-      const tagEl = document.getElementById("plaza_poll_tag");
-      const q = qEl ? qEl.value.trim() : "";
-      const a = aEl ? aEl.value.trim() : "";
-      const b = bEl ? bEl.value.trim() : "";
-      const tag = tagEl ? tagEl.value : "💘 연애 레전드";
+      const customEl = document.getElementById("plaza_poll_custom_tag");
+      if (qEl) state.poll_draft_q = qEl.value;
+      if (aEl) state.poll_draft_a = aEl.value;
+      if (bEl) state.poll_draft_b = bEl.value;
+      if (customEl) state.poll_draft_custom_tag = customEl.value;
+    }
+
+    function selectPollDraftTag(tagKey) {
+      capturePollFormDraft();
+      state.poll_draft_tag = tagKey;
+      render();
+      if (tagKey === "__custom__") {
+        setTimeout(() => {
+          const el = document.getElementById("plaza_poll_custom_tag");
+          if (el) el.focus();
+        }, 40);
+      }
+    }
+
+    function openCreatePollModal() {
+      state.show_poll_form = true;
+      if (!state.poll_draft_tag) state.poll_draft_tag = "음식";
+      render();
+    }
+
+    function closeCreatePollModal() {
+      capturePollFormDraft();
+      state.show_poll_form = false;
+      render();
+    }
+
+    function renderCreatePollModalHtml() {
+      const selTag = state.poll_draft_tag || "음식";
+      const isCustomTag = (selTag === "__custom__");
+      return `
+        <div class="profile-sheet-backdrop" role="dialog" aria-modal="true" aria-label="새 밸런스 투표 만들기" onclick="if(event.target===this){ closeCreatePollModal(); }">
+          <div class="profile-sheet-panel" onclick="event.stopPropagation()">
+            <div class="profile-sheet-grabber"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px;">
+              <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">새 밸런스 투표 만들기</div>
+              <button type="button" aria-label="밸런스 투표 만들기 닫기" onclick="closeCreatePollModal()" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer;">✕</button>
+            </div>
+
+            <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary); margin-bottom:8px;">주제 선택 (또는 직접 입력)</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+              ${POLL_TAG_PRESETS.map(t => `
+                <button type="button" onclick="selectPollDraftTag('${escHtml(t)}')" style="height:36px; padding:0 13px; border-radius:999px; border:${selTag === t ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${selTag === t ? '#EEF8F3' : '#FFFFFF'}; color:${selTag === t ? '#1F6A52' : '#4E5968'}; font-size:var(--fs-sm); font-weight:${selTag === t ? '800' : '600'}; cursor:pointer;">
+                  ${escHtml(t)}
+                </button>
+              `).join("")}
+              <button type="button" onclick="selectPollDraftTag('__custom__')" style="height:36px; padding:0 13px; border-radius:999px; border:${isCustomTag ? '1.5px solid #287D62' : '1px dashed #B0BAC4'}; background:${isCustomTag ? '#EEF8F3' : '#F9FAFB'}; color:${isCustomTag ? '#1F6A52' : '#4E5968'}; font-size:var(--fs-sm); font-weight:${isCustomTag ? '800' : '700'}; cursor:pointer;">
+                + 직접 입력
+              </button>
+            </div>
+
+            ${isCustomTag ? `
+              <input id="plaza_poll_custom_tag" class="input" maxlength="16" value="${escHtml(state.poll_draft_custom_tag || '')}" oninput="state.poll_draft_custom_tag=this.value;" placeholder="원하는 주제를 직접 입력 (예: 시험기간, 자취, 취미)" style="margin-bottom:10px;" />
+            ` : ""}
+
+            <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary); margin-bottom:6px;">질문</div>
+            <input id="plaza_poll_q" class="input" maxlength="80" value="${escHtml(state.poll_draft_q || '')}" oninput="state.poll_draft_q=this.value;" placeholder="예: 1교시 매일 듣기 vs 공강 4시간 버티기" style="margin-bottom:12px;" />
+
+            <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary); margin-bottom:6px;">선택지 A · B</div>
+            <div class="row-2" style="gap:8px; margin-bottom:16px;">
+              <input id="plaza_poll_a" class="input" maxlength="36" value="${escHtml(state.poll_draft_a || '')}" oninput="state.poll_draft_a=this.value;" placeholder="선택지 A" style="margin-bottom:0;" />
+              <input id="plaza_poll_b" class="input" maxlength="36" value="${escHtml(state.poll_draft_b || '')}" oninput="state.poll_draft_b=this.value;" placeholder="선택지 B" style="margin-bottom:0;" />
+            </div>
+
+            <button type="button" class="btn btn-primary" style="min-height:50px; border-radius:16px; font-size:var(--fs-md); font-weight:800;" onclick="createNewBalancePoll()">투표 등록하기</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function createNewBalancePoll() {
+      capturePollFormDraft();
+      const q = String(state.poll_draft_q || "").trim();
+      const a = String(state.poll_draft_a || "").trim();
+      const b = String(state.poll_draft_b || "").trim();
+      const selTag = state.poll_draft_tag || "음식";
+      const tag = selTag === "__custom__"
+        ? String(state.poll_draft_custom_tag || "").trim().slice(0, 16)
+        : selTag;
+      if (selTag === "__custom__" && !tag) {
+        return showToast("직접 입력할 주제를 적어주세요!");
+      }
       if (q.length < 3 || !a || !b) {
-        return showToast("질문과 A, B 선택지를 모두 입력해주세요!");
+        return showToast("질문(3자 이상)과 A, B 선택지를 모두 입력해주세요!");
       }
       const formattedQ = q.startsWith("⚖️") ? q : `⚖️ ${q}`;
+      const clearDraftAndShow = () => {
+        state.poll_draft_q = "";
+        state.poll_draft_a = "";
+        state.poll_draft_b = "";
+        state.poll_draft_custom_tag = "";
+        state.poll_draft_tag = "음식";
+        state.show_poll_form = false;
+        state.plaza_poll_filter = "all";
+        state.polls_visible_cnt = Math.max(2, Number(state.polls_visible_cnt || 1));
+      };
       if (getSessionToken()) {
         const res = await callApiAction("plaza_create_poll", {
-          tag,
+          tag: tag || "밸런스",
           question: formattedQ,
           opt_a: a,
           opt_b: b
         });
         if (!res.ok) return showToast(res.message || "투표 등록에 실패했어요.");
         ensurePlazaDefaults(DB);
-        state.show_poll_form = false;
-        state.polls_show_all = true;
-        showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
+        clearDraftAndShow();
+        showToast("⚖️ 새 밸런스 투표가 등록되었어요!");
         render();
         return;
       }
       ensurePlazaDefaults(DB);
       DB.polls.unshift({
         id: Date.now(),
-        tag,
+        tag: tag || "밸런스",
         question: formattedQ,
         opt_a: a,
         opt_b: b,
         votes_a: [state.user_id],
-        votes_b: []
+        votes_b: [],
+        replies: [],
+        author_id: state.user_id
       });
-      state.show_poll_form = false;
-      state.polls_show_all = true;
+      clearDraftAndShow();
       saveDB(false);
-      showToast("⚖️ 새 밸런스 게임이 등록되었어요!");
+      showToast("⚖️ 새 밸런스 투표가 등록되었어요!");
       render();
+    }
+
+    function deleteBalancePoll(pollId) {
+      openConfirmSheet({
+        title: "밸런스 투표를 삭제할까요?",
+        desc: "삭제한 투표와 참여 기록은 다시 복구할 수 없어요.",
+        confirmText: "삭제하기",
+        cancelText: "취소",
+        isDanger: true,
+        onConfirm: async () => {
+          if (getSessionToken()) {
+            const res = await callApiAction("plaza_delete_poll", { poll_id: pollId });
+            if (!res.ok) return showToast(res.message || "투표 삭제에 실패했어요.");
+            ensurePlazaDefaults(DB);
+            showToast("밸런스 투표가 삭제되었어요.");
+            render();
+            return;
+          }
+          DB.polls = (DB.polls || []).filter(p => String(p.id) !== String(pollId));
+          saveDB(false);
+          showToast("밸런스 투표가 삭제되었어요.");
+          render();
+        }
+      });
     }
 
     function drawRandomViralPoll() {
@@ -7526,14 +7645,17 @@
         if (aCustom !== bCustom) return bCustom - aCustom;
         return Number(b.id || 0) - Number(a.id || 0);
       });
-      const curPollCat = state.plaza_poll_cat || "전체";
-      const polls = curPollCat === "전체"
-        ? allPolls
-        : allPolls.filter(p => (p.tag || "").includes(curPollCat));
+      const curPollFilter = state.plaza_poll_filter || "all";
+      const customPollsAll = allPolls.filter(p => !rotatingIds.has(Number(p.id)));
+      const myPollsAll = customPollsAll.filter(p => String(p.author_id || "") === String(state.user_id));
+      const polls = curPollFilter === "mine"
+        ? myPollsAll
+        : (curPollFilter === "custom" ? customPollsAll : allPolls);
       const talks = (DB.plaza_talks || []).filter(t => t && !isPlazaTalkExpired(t) && !isUserBlocked(t.author_id));
-      const showAll = Boolean(state.polls_show_all);
-      const visiblePolls = showAll ? polls : polls.slice(0, 1);
+      const visibleLimit = Math.max(1, Number(state.polls_visible_cnt || 1));
+      const visiblePolls = polls.slice(0, visibleLimit);
       const hiddenCount = Math.max(0, polls.length - visiblePolls.length);
+      const isExpanded = visibleLimit > 1 || curPollFilter !== "all";
 
       return `
         <div class="tk-plaza-wrap">
@@ -7551,8 +7673,8 @@
                 </button>
               `}
               ${state.plaza_view === 'balance' ? `
-                <button type="button" onclick="state.show_poll_form=!state.show_poll_form; render();" aria-label="${state.show_poll_form ? '글쓰기 닫기' : '새 밸런스 투표 글쓰기'}" style="height:40px; padding:0 14px; border-radius:14px; border:none; background:${state.show_poll_form ? '#191F28' : '#EEF8F3'}; color:${state.show_poll_form ? '#FFFFFF' : '#1F6A52'}; font-size:var(--fs-sm); font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
-                  <span>${state.show_poll_form ? '✕ 닫기' : '+ 글쓰기'}</span>
+                <button type="button" onclick="openCreatePollModal()" aria-label="새 밸런스 투표 만들기" style="height:40px; padding:0 14px; border-radius:14px; border:none; background:#EEF8F3; color:#1F6A52; font-size:var(--fs-sm); font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
+                  <span>+ 투표 만들기</span>
                 </button>
               ` : ""}
             </div>
@@ -7569,25 +7691,30 @@
           </div>
 
           ${state.plaza_view === 'roulette' ? `<div id="plaza-roulette-card-wrap">${renderStampAndRouletteCard()}</div>` : `
-            ${state.show_poll_form ? `
-              <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:18px; margin-bottom:16px;">
-                <div style="font-size:var(--fs-lg); font-weight:800; margin-bottom:10px; color:var(--text-primary);">새로운 밸런스 투표 만들기</div>
-                <select id="plaza_poll_tag" class="select">
-                  <option value="음식">음식</option>
-                  <option value="대학 공감">대학 공감</option>
-                  <option value="연애">연애</option>
-                  <option value="인생·만약에">인생·만약에</option>
-                </select>
-                <input id="plaza_poll_q" class="input" placeholder="질문 입력 (예: 점심 학식 vs 배달)" />
-                <div class="row-2">
-                  <input id="plaza_poll_a" class="input" placeholder="선택지 A (예: 학식)" />
-                  <input id="plaza_poll_b" class="input" placeholder="선택지 B (예: 배달)" />
-                </div>
-                <button class="btn btn-primary" onclick="createNewBalancePoll()">등록하기</button>
+            ${isExpanded || customPollsAll.length > 0 ? `
+              <div style="display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px;">
+                ${[
+                  { k: "all", lbl: `전체 ${allPolls.length}` },
+                  { k: "custom", lbl: `학우 투표 ${customPollsAll.length}` },
+                  { k: "mine", lbl: `내가 만든 투표 ${myPollsAll.length}` }
+                ].map(f => {
+                  const on = curPollFilter === f.k;
+                  return `
+                    <button type="button" onclick="state.plaza_poll_filter='${f.k}'; state.polls_visible_cnt=${f.k === 'all' ? 1 : 3}; render();" style="height:34px; padding:0 13px; border-radius:999px; border:${on ? '1.5px solid #287D62' : '1px solid #E5E8EB'}; background:${on ? '#EEF8F3' : '#FFFFFF'}; color:${on ? '#1F6A52' : '#6B7684'}; font-size:var(--fs-xs); font-weight:${on ? '800' : '600'}; cursor:pointer; flex-shrink:0;">
+                      ${f.lbl}
+                    </button>
+                  `;
+                }).join("")}
               </div>
             ` : ""}
 
-            ${visiblePolls.map(p => {
+            ${visiblePolls.length === 0 ? `
+              <div style="background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-card); padding:24px 16px; margin-bottom:16px; text-align:center;">
+                <div style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary); margin-bottom:4px;">${curPollFilter === 'mine' ? '아직 내가 만든 밸런스 투표가 없어요' : '아직 등록된 학우 투표가 없어요'}</div>
+                <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-bottom:12px;">원하는 주제로 첫 밸런스 투표를 만들어보세요!</div>
+                <button type="button" class="btn btn-primary" style="width:auto; padding:0 18px; min-height:40px;" onclick="openCreatePollModal()">+ 새 밸런스 투표 만들기</button>
+              </div>
+            ` : visiblePolls.map(p => {
               const va = (p.votes_a || []).length;
               const vb = (p.votes_b || []).length;
               const total = va + vb;
@@ -7598,16 +7725,22 @@
               const progressPct = total >= 5 ? pctA : Math.min(100, Math.round((total / 5) * 100));
               const isFeaturedCycle = Number(p.id) === Number(cycleInfo.activePollId);
               const isCustomPoll = !rotatingIds.has(Number(p.id));
+              const canDeletePoll = isCustomPoll && (String(p.author_id || "") === String(state.user_id) || isCurrentUserAdmin());
 
               return `
-                <div style="background:#FFFFFF; border:1.5px solid ${isFeaturedCycle ? '#C5E6D6' : '#E5E8EB'}; border-radius:var(--radius-card); padding:20px; margin-bottom:20px;">
+                <div style="background:#FFFFFF; border:1.5px solid ${isFeaturedCycle ? '#C5E6D6' : '#E5E8EB'}; border-radius:var(--radius-card); padding:20px; margin-bottom:16px;">
                   <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
                     <span style="font-size:var(--fs-sm); font-weight:800; color:#287D62;">${isFeaturedCycle ? escHtml(COPY.balanceCycleBadge) : (isCustomPoll ? '학우가 만든 투표' : '지난 밸런스')}</span>
-                    ${isFeaturedCycle ? `
-                      <span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:var(--radius-chip);">${escHtml(cycleInfo.countdownText)}</span>
-                    ` : `
-                      <span style="font-size:var(--fs-xs); font-weight:600; color:var(--text-secondary);">${escHtml(p.tag || '밸런스')}</span>
-                    `}
+                    <div style="display:inline-flex; align-items:center; gap:8px;">
+                      ${isFeaturedCycle ? `
+                        <span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:var(--radius-chip);">${escHtml(cycleInfo.countdownText)}</span>
+                      ` : `
+                        <span style="font-size:var(--fs-xs); font-weight:600; color:var(--text-secondary); background:#F4F6F8; padding:3px 9px; border-radius:999px;">${escHtml(p.tag || '밸런스')}</span>
+                      `}
+                      ${canDeletePoll ? `
+                        <button type="button" onclick="deleteBalancePoll(${p.id})" style="border:none; background:transparent; color:#C53030; font-size:var(--fs-xs); font-weight:700; cursor:pointer; padding:4px 6px; border-radius:8px;">삭제</button>
+                      ` : ""}
+                    </div>
                   </div>
                   <div style="font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.35; letter-spacing:-0.02em; margin-bottom:14px;">${escHtml(cleanQ)}</div>
 
@@ -7653,9 +7786,18 @@
             }).join("")}
 
             ${polls.length > 1 ? `
-              <button type="button" style="width:100%; height:44px; border:1px solid #E5E8EB; border-radius:var(--radius-btn); background:#FFFFFF; color:#4E5968; font-size:var(--fs-sm); font-weight:700; cursor:pointer; margin-bottom:18px;" onclick="state.polls_show_all=!state.polls_show_all; render();">
-                ${showAll ? escHtml(COPY.balanceCollapseBtn) : escHtml(COPY.balanceMoreBtn(hiddenCount))}
-              </button>
+              <div style="display:flex; gap:8px; margin-bottom:18px;">
+                ${hiddenCount > 0 ? `
+                  <button type="button" style="flex:1; height:44px; border:1px solid #E5E8EB; border-radius:var(--radius-btn); background:#FFFFFF; color:#4E5968; font-size:var(--fs-sm); font-weight:700; cursor:pointer;" onclick="state.polls_visible_cnt=(Number(state.polls_visible_cnt||1)+3); render();">
+                    다른 밸런스 투표 더보기 (${Math.min(3, hiddenCount)} / ${hiddenCount}개 남음)
+                  </button>
+                ` : ""}
+                ${visibleLimit > 1 ? `
+                  <button type="button" style="height:44px; padding:0 16px; border:1px solid #E5E8EB; border-radius:var(--radius-btn); background:#F4F6F8; color:#4E5968; font-size:var(--fs-sm); font-weight:700; cursor:pointer; ${hiddenCount === 0 ? 'flex:1;' : 'flex-shrink:0;'}" onclick="state.polls_visible_cnt=1; render();">
+                    접기
+                  </button>
+                ` : ""}
+              </div>
             ` : ""}
 
             <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:16px 0 10px;">

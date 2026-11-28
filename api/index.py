@@ -2122,7 +2122,7 @@ class handler(BaseHTTPRequestHandler):
             _finish_mutation(db_obj, actor_id, is_adm)
             return
 
-        if action in ("plaza_vote", "plaza_create_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply", "plaza_like_reply"):
+        if action in ("plaza_vote", "plaza_create_poll", "plaza_delete_poll", "plaza_create_talk", "plaza_like_talk", "plaza_reply", "plaza_delete_reply", "plaza_like_reply"):
             db_obj, actor_id, is_adm = _require_auth()
             if not db_obj:
                 return
@@ -2161,15 +2161,33 @@ class handler(BaseHTTPRequestHandler):
                 q = str(data.get("question") or "").strip()[:100]
                 a = str(data.get("opt_a") or "").strip()[:40]
                 b = str(data.get("opt_b") or "").strip()[:40]
-                tag = str(data.get("tag") or "💘 연애 레전드").strip()[:20]
+                tag = str(data.get("tag") or "밸런스").strip()[:20] or "밸런스"
                 if len(q) < 3 or not a or not b:
                     self._send_json(400, {"ok": False, "message": "질문과 A, B 선택지를 모두 입력해주세요."})
+                    return
+                if _contains_contact_info(q) or _contains_contact_info(a) or _contains_contact_info(b) or _contains_contact_info(tag):
+                    self._send_json(400, {"ok": False, "message": "외부 연락처나 SNS 아이디는 올릴 수 없어요."})
                     return
                 db_obj.setdefault("polls", []).insert(0, {
                     "id": now_ms, "tag": tag, "question": q, "opt_a": a, "opt_b": b,
                     "votes_a": [], "votes_b": [], "replies": [], "author_id": actor_id,
                 })
                 db_obj["polls"] = db_obj["polls"][:50]
+            elif action == "plaza_delete_poll":
+                poll_id = data.get("poll_id")
+                polls_arr = db_obj.get("polls") or []
+                target = next((p for p in polls_arr if isinstance(p, dict) and str(p.get("id")) == str(poll_id)), None)
+                if not target:
+                    self._send_json(404, {"ok": False, "message": "삭제할 투표를 찾을 수 없어요."})
+                    return
+                if str(poll_id).isdigit() and 501 <= int(poll_id) <= 512 and not is_adm:
+                    self._send_json(403, {"ok": False, "message": "기본 제공 밸런스 투표는 삭제할 수 없어요."})
+                    return
+                owner_id = str(target.get("author_id") or "")
+                if owner_id != actor_id and not is_adm:
+                    self._send_json(403, {"ok": False, "message": "본인이 만든 밸런스 투표만 삭제할 수 있어요."})
+                    return
+                db_obj["polls"] = [p for p in polls_arr if not (isinstance(p, dict) and str(p.get("id")) == str(poll_id))]
             elif action == "plaza_create_talk":
                 txt = str(data.get("text") or "").strip()[:120]
                 if not txt:
