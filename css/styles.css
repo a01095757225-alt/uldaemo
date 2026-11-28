@@ -4308,6 +4308,53 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   font-weight: 800;
   line-height: 1.2;
 }
+.cal-grid-v3 {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.cal-dow-v3 {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8B95A1;
+  padding-bottom: 4px;
+}
+.cal-cell-v3 {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #191F28;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.cal-cell-v3:hover:not(:disabled) {
+  background: #F4F6F8;
+}
+.cal-cell-v3:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.cal-cell-v3.today {
+  background: #EEF8F3;
+  color: #1F6A52;
+}
+.cal-cell-v3.active {
+  background: #287D62 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 12px rgba(40, 125, 98, 0.24);
+}
+.cal-cell-v3:disabled {
+  color: #CBD5E1;
+  cursor: default;
+}
 .time-wheel-v3 {
   position: relative;
   height: 168px;
