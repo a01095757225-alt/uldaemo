@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3p" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3o" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -3359,9 +3359,6 @@
           <div id="home-sort-mobile-sheet-root">${renderHomeSortMobileSheetHtml()}</div>
         `;
 
-        if (state.active_modal === "create") {
-          requestAnimationFrame(() => initCreateTimeWheel(false));
-        }
         if (state.active_modal === "detail") {
           setTimeout(initDetailMap, 60);
         }
@@ -5656,61 +5653,6 @@
       "초면이어도 어색하지 않게 이끌어드려요"
     ];
 
-    const TIME_WHEEL_AMPMS = ["AM", "PM"];
-    const TIME_WHEEL_HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-    const TIME_WHEEL_MINS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
-    const TIME_WHEEL_ITEM_H = 44;
-
-    function getUpcomingCreateDates(count = 14) {
-      const dows = ["일", "월", "화", "수", "목", "금", "토"];
-      const list = [];
-      const base = new Date();
-      base.setHours(0, 0, 0, 0);
-      for (let i = 0; i < count; i++) {
-        const d = new Date(base);
-        d.setDate(base.getDate() + i);
-        const y = d.getFullYear();
-        const m = d.getMonth() + 1;
-        const day = d.getDate();
-        const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        const topLbl = i === 0 ? "오늘" : (i === 1 ? "내일" : dows[d.getDay()]);
-        const numLbl = (i >= 2 && day === 1) ? `${m}/${day}` : String(day);
-        const summaryLbl = i === 0 ? "오늘" : (i === 1 ? "내일" : `${m}월 ${day}일(${dows[d.getDay()]})`);
-        list.push({ iso, topLbl, numLbl, summaryLbl, dow: dows[d.getDay()] });
-      }
-      return list;
-    }
-
-    function updateCreateDateTimeSummary() {
-      const sumEl = document.getElementById("c_datetime_summary");
-      const dateEl = document.getElementById("c_date");
-      const ampmEl = document.getElementById("c_time_ampm");
-      const hrEl = document.getElementById("c_time_hour");
-      const minEl = document.getElementById("c_time_min");
-      if (!sumEl || !dateEl || !ampmEl || !hrEl || !minEl) return;
-      const dates = getUpcomingCreateDates(14);
-      const found = dates.find(d => d.iso === dateEl.value);
-      const dateLbl = found ? found.summaryLbl : dateEl.value;
-      const apLbl = ampmEl.value === "PM" ? "오후" : "오전";
-      const hLbl = `${hrEl.value}시`;
-      const mVal = String(minEl.value || "00").padStart(2, "0");
-      const mLbl = mVal === "00" ? "" : ` ${mVal}분`;
-      sumEl.textContent = `${dateLbl} · ${apLbl} ${hLbl}${mLbl}`;
-    }
-
-    function selectCreateDate(dateStr, scrollPill = false) {
-      const dateEl = document.getElementById("c_date");
-      if (dateEl) dateEl.value = dateStr;
-      document.querySelectorAll(".date-pill-v3").forEach(btn => {
-        const on = btn.getAttribute("data-date") === dateStr;
-        btn.classList.toggle("active", on);
-        if (on && scrollPill) {
-          try { btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } catch (e) {}
-        }
-      });
-      updateCreateDateTimeSummary();
-    }
-
     function syncCreateTimeFromParts() {
       const ampmEl = document.getElementById("c_time_ampm");
       const hrEl = document.getElementById("c_time_hour");
@@ -5723,72 +5665,26 @@
       if (!isPm && h === 12) h = 0;
       const mm = String(minEl.value || "00").padStart(2, "0");
       hiddenEl.value = `${String(h).padStart(2, "0")}:${mm}`;
-      updateCreateDateTimeSummary();
     }
 
-    function markWheelActiveItem(col, idx) {
-      if (!col) return;
-      const items = col.querySelectorAll(".time-wheel-item");
-      items.forEach((it, i) => it.classList.toggle("active", i === idx));
-    }
-
-    function snapTimeWheelCol(kind, idx, smooth = true) {
-      const col = document.getElementById(`wheel_${kind}`);
-      const list = kind === "ampm" ? TIME_WHEEL_AMPMS : (kind === "hour" ? TIME_WHEEL_HOURS : TIME_WHEEL_MINS);
-      const clamped = Math.max(0, Math.min(list.length - 1, idx));
-      if (col) {
-        col.scrollTo({ top: clamped * TIME_WHEEL_ITEM_H, behavior: smooth ? "smooth" : "auto" });
-        markWheelActiveItem(col, clamped);
-      }
-      const hiddenPart = document.getElementById(kind === "ampm" ? "c_time_ampm" : (kind === "hour" ? "c_time_hour" : "c_time_min"));
-      if (hiddenPart) hiddenPart.value = String(list[clamped]);
-      syncCreateTimeFromParts();
-    }
-
-    const _wheelScrollRaf = {};
-    function handleTimeWheelScroll(kind) {
-      if (_wheelScrollRaf[kind]) cancelAnimationFrame(_wheelScrollRaf[kind]);
-      _wheelScrollRaf[kind] = requestAnimationFrame(() => {
-        const col = document.getElementById(`wheel_${kind}`);
-        if (!col) return;
-        const list = kind === "ampm" ? TIME_WHEEL_AMPMS : (kind === "hour" ? TIME_WHEEL_HOURS : TIME_WHEEL_MINS);
-        const idx = Math.max(0, Math.min(list.length - 1, Math.round(col.scrollTop / TIME_WHEEL_ITEM_H)));
-        markWheelActiveItem(col, idx);
-        const hiddenPart = document.getElementById(kind === "ampm" ? "c_time_ampm" : (kind === "hour" ? "c_time_hour" : "c_time_min"));
-        if (hiddenPart && hiddenPart.value !== String(list[idx])) {
-          hiddenPart.value = String(list[idx]);
-          syncCreateTimeFromParts();
-        }
-      });
-    }
-
-    function initCreateTimeWheel(smooth = false) {
-      const hiddenEl = document.getElementById("c_time");
-      if (!hiddenEl) return;
-      setCreateTimeInputs(hiddenEl.value || "12:30", smooth);
-      const dateEl = document.getElementById("c_date");
-      if (dateEl) selectCreateDate(dateEl.value, false);
-    }
-
-    function setCreateTimeInputs(hhmm, smooth = true) {
+    function setCreateTimeInputs(hhmm) {
       const parts = String(hhmm || "12:30").split(":");
       let h24 = parseInt(parts[0], 10);
       let m = parseInt(parts[1], 10);
       if (isNaN(h24)) h24 = 12;
       if (isNaN(m)) m = 30;
-      const roundedMin = (Math.round(m / 5) * 5) % 60;
-      if (m >= 58) h24 = (h24 + 1) % 24;
+      const roundedMin = (Math.round(m / 10) * 10) % 60;
+      if (m >= 55) h24 = (h24 + 1) % 24;
       const isPm = h24 >= 12;
       const h12 = (h24 % 12) || 12;
-      const minStr = String(roundedMin).padStart(2, "0");
-
-      const ampmIdx = isPm ? 1 : 0;
-      const hrIdx = Math.max(0, TIME_WHEEL_HOURS.indexOf(h12));
-      const minIdx = Math.max(0, TIME_WHEEL_MINS.indexOf(minStr));
-
-      snapTimeWheelCol("ampm", ampmIdx, smooth);
-      snapTimeWheelCol("hour", hrIdx, smooth);
-      snapTimeWheelCol("min", minIdx, smooth);
+      const ampmEl = document.getElementById("c_time_ampm");
+      const hrEl = document.getElementById("c_time_hour");
+      const minEl = document.getElementById("c_time_min");
+      const hiddenEl = document.getElementById("c_time");
+      if (ampmEl) ampmEl.value = isPm ? "PM" : "AM";
+      if (hrEl) hrEl.value = String(h12);
+      if (minEl) minEl.value = String(roundedMin).padStart(2, "0");
+      if (hiddenEl) hiddenEl.value = `${String(h24).padStart(2, "0")}:${String(roundedMin).padStart(2, "0")}`;
     }
 
     function renderCreateComboOptions(kind, filterText = "") {
@@ -5860,18 +5756,18 @@
       let hhmm = "12:30";
       if (type === "now") {
         now.setMinutes(now.getMinutes() + 10);
-        selectCreateDate(getTodayStr(), true);
+        dateEl.value = getTodayStr();
         hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       } else if (type === "30min") {
         now.setMinutes(now.getMinutes() + 30);
-        selectCreateDate(getTodayStr(), true);
+        dateEl.value = getTodayStr();
         hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       } else if (type === "1hour") {
         now.setMinutes(now.getMinutes() + 60);
-        selectCreateDate(getTodayStr(), true);
+        dateEl.value = getTodayStr();
         hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       } else if (type === "dinner") {
-        selectCreateDate(getTodayStr(), true);
+        dateEl.value = getTodayStr();
         hhmm = "18:30";
       } else if (type === "tomorrow_lunch") {
         const tm = new Date();
@@ -5879,10 +5775,10 @@
         const y = tm.getFullYear();
         const m = String(tm.getMonth() + 1).padStart(2, '0');
         const d = String(tm.getDate()).padStart(2, '0');
-        selectCreateDate(`${y}-${m}-${d}`, true);
+        dateEl.value = `${y}-${m}-${d}`;
         hhmm = "12:30";
       }
-      setCreateTimeInputs(hhmm, true);
+      setCreateTimeInputs(hhmm);
       document.querySelectorAll(".time-quick-chip").forEach(c => c.classList.remove("active"));
       const target = document.getElementById(`time_chip_${type}`);
       if (target) target.classList.add("active");
@@ -6097,9 +5993,9 @@
                   ${renderCreateTitleChipsHtml(defaultCat)}
                 </div>
 
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                   <span style="font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary);">만날 시간</span>
-                  <span id="c_datetime_summary" style="font-size:var(--fs-sm); font-weight:800; color:#287D62;">오늘 · 오후 12시 30분</span>
+                  ${freeSlots.length > 0 ? `<span style="font-size:var(--fs-xs); font-weight:700; color:#287D62;">내 시간표 공강 자동 추천</span>` : ""}
                 </div>
                 <div class="h-scroll-row" style="display:flex; gap:6px; margin-bottom:10px;">
                   ${freeSlots.map(sl => `
@@ -6112,63 +6008,27 @@
                   <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:var(--text-secondary);" onclick="setCreateQuickTime('tomorrow_lunch')">내일 점심</button>
                 </div>
                 ${(() => {
-                  const initDate = state.prefill_date || getTodayStr();
                   const initT = String(state.prefill_time || "12:30").split(":");
                   const initH24 = parseInt(initT[0], 10) || 12;
-                  const initM = String((Math.round((parseInt(initT[1], 10) || 30) / 5) * 5) % 60).padStart(2, "0");
+                  const initM = String((Math.round((parseInt(initT[1], 10) || 30) / 10) * 10) % 60).padStart(2, "0");
                   const initAmPm = initH24 >= 12 ? "PM" : "AM";
                   const initH12 = (initH24 % 12) || 12;
                   const initVal = `${String(initH24).padStart(2, "0")}:${initM}`;
-                  const upcomingDates = getUpcomingCreateDates(14);
                   return `
-                    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px;">
-                      <!-- 14일 가로 스크롤 날짜 스트립 -->
-                      <div class="date-strip-v3" role="radiogroup" aria-label="날짜 선택">
-                        ${upcomingDates.map(d => `
-                          <button type="button" class="date-pill-v3 ${d.iso === initDate ? 'active' : ''}" data-date="${d.iso}" onclick="selectCreateDate('${d.iso}', true)">
-                            <span class="date-pill-dow">${escHtml(d.topLbl)}</span>
-                            <span class="date-pill-num">${escHtml(d.numLbl)}</span>
-                          </button>
-                        `).join("")}
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+                      <input id="c_date" type="date" class="input" value="${escHtml(state.prefill_date || getTodayStr())}" min="${getTodayStr()}" style="width:100%; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 12px; margin-bottom:0;" />
+                      <div style="display:flex; gap:8px; width:100%;">
+                        <select id="c_time_ampm" class="select" onchange="syncCreateTimeFromParts()" style="flex:1; min-width:0; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 10px; margin-bottom:0;">
+                          <option value="AM" ${initAmPm === "AM" ? "selected" : ""}>오전</option>
+                          <option value="PM" ${initAmPm === "PM" ? "selected" : ""}>오후</option>
+                        </select>
+                        <select id="c_time_hour" class="select" onchange="syncCreateTimeFromParts()" style="flex:1; min-width:0; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 10px; margin-bottom:0;">
+                          ${[12,1,2,3,4,5,6,7,8,9,10,11].map(h => `<option value="${h}" ${initH12 === h ? "selected" : ""}>${h}시</option>`).join("")}
+                        </select>
+                        <select id="c_time_min" class="select" onchange="syncCreateTimeFromParts()" style="flex:1; min-width:0; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 10px; margin-bottom:0;">
+                          ${["00","10","20","30","40","50"].map(m => `<option value="${m}" ${initM === m ? "selected" : ""}>${m}분</option>`).join("")}
+                        </select>
                       </div>
-
-                      <!-- 아이폰 알람 스타일 3열 스크롤 휠 시간 선택기 -->
-                      <div class="time-wheel-v3" aria-label="시간 스크롤 선택">
-                        <div class="time-wheel-highlight"></div>
-                        <div class="time-wheel-fade-top"></div>
-                        <div class="time-wheel-fade-bottom"></div>
-
-                        <div id="wheel_ampm" class="time-wheel-col" onscroll="handleTimeWheelScroll('ampm')">
-                          <div class="time-wheel-spacer"></div>
-                          ${TIME_WHEEL_AMPMS.map((v, idx) => `
-                            <button type="button" class="time-wheel-item ${v === initAmPm ? 'active' : ''}" onclick="snapTimeWheelCol('ampm', ${idx}, true)">${v === 'AM' ? '오전' : '오후'}</button>
-                          `).join("")}
-                          <div class="time-wheel-spacer"></div>
-                        </div>
-
-                        <div id="wheel_hour" class="time-wheel-col" onscroll="handleTimeWheelScroll('hour')">
-                          <div class="time-wheel-spacer"></div>
-                          ${TIME_WHEEL_HOURS.map((h, idx) => `
-                            <button type="button" class="time-wheel-item ${h === initH12 ? 'active' : ''}" onclick="snapTimeWheelCol('hour', ${idx}, true)">${h}시</button>
-                          `).join("")}
-                          <div class="time-wheel-spacer"></div>
-                        </div>
-
-                        <div class="time-wheel-colon">:</div>
-
-                        <div id="wheel_min" class="time-wheel-col" onscroll="handleTimeWheelScroll('min')">
-                          <div class="time-wheel-spacer"></div>
-                          ${TIME_WHEEL_MINS.map((m, idx) => `
-                            <button type="button" class="time-wheel-item ${m === initM ? 'active' : ''}" onclick="snapTimeWheelCol('min', ${idx}, true)">${m}분</button>
-                          `).join("")}
-                          <div class="time-wheel-spacer"></div>
-                        </div>
-                      </div>
-
-                      <input id="c_date" type="hidden" value="${escHtml(initDate)}" />
-                      <input id="c_time_ampm" type="hidden" value="${initAmPm}" />
-                      <input id="c_time_hour" type="hidden" value="${initH12}" />
-                      <input id="c_time_min" type="hidden" value="${initM}" />
                       <input id="c_time" type="hidden" value="${escHtml(initVal)}" />
                     </div>
                   `;
