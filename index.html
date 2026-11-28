@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3m" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3n" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -3350,6 +3350,7 @@
           ${renderBlindPreviewModalHtml()}
           ${renderBlindOnboardingHtml()}
           ${renderDailyCheckinSheetHtml()}
+          ${state.nav_tab === "마이" && !state.active_modal && state.profile_sec ? renderProfileSectionModalHtml(currentUser) : ""}
           <div id="home-sort-mobile-sheet-root">${renderHomeSortMobileSheetHtml()}</div>
         `;
 
@@ -4770,6 +4771,7 @@
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") {
         if (state.sort_menu_open) toggleHomeSortMenu(false);
+        else if (state.profile_sec) { state.profile_sec = null; render(); }
         else if (shouldShowDailyCheckinSheet()) dismissDailyCheckinSheet();
       }
     });
@@ -9492,22 +9494,8 @@
             </div>
           </div>
 
-          ${sec === 'reviews' ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
-              <div style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary); margin-bottom:8px;">받은 매너 후기</div>
-              ${myReviews.length === 0
-                ? renderEmptyStateBox('check', '아직 받은 후기가 없어요', '번개 모임 후 학우들과 따뜻한 후기를 나눠보세요')
-                : myReviews.map(r => `
-                  <div style="padding:10px 0; border-bottom:1px solid #EEF0EF;">
-                    <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary);">${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
-                    ${r.detail ? `<div style="font-size:var(--fs-sm); color:#4E5968; margin-top:4px; background:#F7F9F8; padding:8px 10px; border-radius:var(--radius-btn); border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
-                  </div>
-                `).join("")}
-            </div>
-          ` : ''}
-
           <!-- 인증 뱃지 4종 박스 -->
-          <button type="button" onclick="toggleProfileSection('badges')" style="width:100%; height:56px; background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:0 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:${sec === 'badges' ? '8px' : '16px'}; cursor:pointer;">
+          <button type="button" onclick="toggleProfileSection('badges')" style="width:100%; height:56px; background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:0 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; cursor:pointer;">
             <span style="font-size:var(--fs-lg); font-weight:700; color:var(--text-primary);">인증 뱃지</span>
             <span style="display:inline-flex; align-items:center; gap:10px;">
               <span style="display:inline-flex; align-items:center; gap:6px;">
@@ -9515,28 +9503,9 @@
                   <span style="width:20px; height:20px; border-radius:var(--radius-btn); background:${b.earned ? '#287D62' : '#FFFFFF'}; border:1.5px solid ${b.earned ? '#287D62' : '#D0D5DD'}; display:inline-block;"></span>
                 `).join("")}
               </span>
-              <span style="font-size:var(--fs-sm); color:#287D62; font-weight:700;">${myStats.badges.length}/4 ${sec === 'badges' ? '▾' : '›'}</span>
+              <span style="font-size:var(--fs-sm); color:#287D62; font-weight:700;">${myStats.badges.length}/4 ›</span>
             </span>
           </button>
-          ${sec === 'badges' ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:16px;">
-              <div style="font-size:var(--fs-sm); color:var(--text-secondary); margin-bottom:12px;">40.0°C 달성 또는 좋은 평가 15회 이상이면 받을 수 있어요</div>
-              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
-                ${myStats.badgeCatalog.map(b => `
-                  <div style="background:#F7F9F8; border-radius:var(--radius-btn); padding:12px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                      <span style="font-size:var(--fs-md); font-weight:700; color:${b.earned ? '#287D62' : '#191F28'};">${escHtml(b.label)}</span>
-                      <span style="font-size:var(--fs-xs); font-weight:700; color:${b.earned ? '#287D62' : '#8B95A1'};">${b.earned ? '인증 완료' : b.progressText}</span>
-                    </div>
-                    <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-bottom:6px;">${escHtml(b.condText)}</div>
-                    <div style="height:5px; background:#E5E8EB; border-radius:var(--radius-chip); overflow:hidden;">
-                      <div style="width:${b.progressPct}%; height:100%; background:#287D62; border-radius:var(--radius-chip);"></div>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-          ` : ''}
 
           <!-- 활동 / 설정 2열 카드 (PC에서 좌우 2열, 모바일에서 상하) -->
           <div class="pc-profile-2col">
@@ -9547,14 +9516,14 @@
                 <span style="font-size:var(--fs-md); font-weight:700;">내가 신청한 번개</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
                   <span style="font-size:var(--fs-sm); color:var(--text-secondary);">${myAppliedList.length}건</span>
-                  <span class="tk-menu-arrow">${sec === 'myapps' ? '▾' : '›'}</span>
+                  <span class="tk-menu-arrow">›</span>
                 </span>
               </button>
               <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('myposts')">
                 <span style="font-size:var(--fs-md); font-weight:700;">내가 만든 번개</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
                   <span style="font-size:var(--fs-sm); color:var(--text-secondary);">진행 ${myPosts.length}건${myPastPosts.length > 0 ? ` · 지난 ${myPastPosts.length}건` : ''}</span>
-                  <span class="tk-menu-arrow">${sec === 'myposts' ? '▾' : '›'}</span>
+                  <span class="tk-menu-arrow">›</span>
                 </span>
               </button>
               <button type="button" class="tk-menu-row" style="padding:12px 4px 4px; margin:0; border-radius:0;" onclick="openTimetableModal()">
@@ -9571,18 +9540,18 @@
               <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-secondary); margin-bottom:6px;">설정</div>
               <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('edit')">
                 <span style="font-size:var(--fs-md); font-weight:700;">프로필 정보 수정</span>
-                <span class="tk-menu-arrow">${sec === 'edit' ? '▾' : '›'}</span>
+                <span class="tk-menu-arrow">›</span>
               </button>
               <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('fav')">
                 <span style="font-size:var(--fs-md); font-weight:700;">관심 카테고리 · 알림</span>
-                <span class="tk-menu-arrow">${sec === 'fav' ? '▾' : '›'}</span>
+                <span class="tk-menu-arrow">›</span>
               </button>
               ${!isCurrentUserAdmin() ? `
                 <button type="button" class="tk-menu-row" style="padding:12px 4px; margin:0; border-bottom:1px solid #F2F4F3; border-radius:0;" onclick="toggleProfileSection('pw')">
                   <span style="font-size:var(--fs-md); font-weight:700;">비밀번호 변경</span>
                   <span style="display:inline-flex; align-items:center; gap:8px;">
                     <span style="font-size:var(--fs-sm); color:${user.pw_hash ? '#287D62' : '#8B95A1'};">${user.pw_hash ? '설정됨' : '미설정'}</span>
-                    <span class="tk-menu-arrow">${sec === 'pw' ? '▾' : '›'}</span>
+                    <span class="tk-menu-arrow">›</span>
                   </span>
                 </button>
               ` : ""}
@@ -9590,7 +9559,7 @@
                 <span style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary);">개인정보 · 차단 · 회원 탈퇴</span>
                 <span style="display:inline-flex; align-items:center; gap:8px;">
                   ${getMyBlockedUsers().length > 0 ? `<span style="font-size:var(--fs-xs); color:var(--text-secondary);">차단 ${getMyBlockedUsers().length}명</span>` : ''}
-                  <span class="tk-menu-arrow">${sec === 'privacy' ? '▾' : '›'}</span>
+                  <span class="tk-menu-arrow">›</span>
                 </span>
               </button>
               <div style="margin-top:8px; padding-top:8px; border-top:1.5px solid #E5E8EB;">
@@ -9605,69 +9574,137 @@
             </div>
           </div>
 
-          <!-- 펼쳐진 상세 패널 영역 -->
-          ${sec === 'myapps' ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
-              <div style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary); margin-bottom:8px;">내가 신청한 번개</div>
-              ${myAppliedList.length === 0
-                ? renderEmptyStateBox('compass', '아직 신청한 번개가 없어요', '오늘 공강에 같이할 학우를 찾아봐요', '번개 보러 가기', "switchTab('홈')")
-                : myAppliedList.map(item => `
-                  <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${item.post.id})">
-                    <span style="font-size:var(--fs-md); font-weight:600; color:var(--text-primary);">${escHtml(item.post.title)}</span>
-                    <span style="font-size:var(--fs-xs); color:#287D62; font-weight:700;">${escHtml(item.app.status)} ›</span>
-                  </div>
-                `).join("")}
-            </div>
-          ` : ''}
-
-          ${sec === 'myposts' ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
-              <div style="font-size:var(--fs-md); font-weight:800; color:var(--text-primary); margin-bottom:8px;">내가 만든 번개</div>
-              ${myPosts.length === 0
-                ? renderEmptyStateBox('plus', COPY.homeEmptyTitle, COPY.homeEmptySub, '번개 열기', "state.active_modal='create'; render();")
-                : myPosts.map(p => `
-                  <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
-                    <span style="font-size:var(--fs-md); font-weight:600; color:var(--text-primary);">${escHtml(p.title)}</span>
-                    <span style="font-size:var(--fs-xs); color:#287D62; font-weight:700;">${escHtml(p.status)} ›</span>
-                  </div>
-                `).join("")}
-              ${myPastPosts.length > 0 ? `
-                <details style="margin-top:10px; padding-top:10px; border-top:1px solid #E5EAE7;">
-                  <summary style="font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary); cursor:pointer;">지난 번개 ${myPastPosts.length}건 보기</summary>
-                  <div style="margin-top:6px;">
-                    ${myPastPosts.map(p => `
-                      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; cursor:pointer;" onclick="openDetailModal(${p.id})">
-                        <span style="font-size:var(--fs-sm); color:var(--text-secondary);">${escHtml(p.title)}</span>
-                        <span style="font-size:var(--fs-xs); color:var(--text-secondary);">종료 ›</span>
-                      </div>
-                    `).join("")}
-                  </div>
-                </details>
-              ` : ""}
-            </div>
-          ` : ''}
-
-          ${sec === 'edit' ? renderProfileEditPanel(user, myTier) : ''}
-
-          ${sec === 'fav' ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
-              <div id="fav-wrap">${renderFavSection(user)}</div>
-            </div>
-          ` : ''}
-
-          ${sec === 'pw' && !isCurrentUserAdmin() ? `
-            <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:16px; margin-bottom:12px;">
-              <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); margin-bottom:10px;">비밀번호 변경</div>
-              <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                <input id="edit_user_pw" type="password" class="input" style="margin-bottom:0;" placeholder="${user.pw_hash ? '새 비밀번호 입력 (4자리 이상)' : '사용할 비밀번호 입력 (4자리 이상)'}" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('edit_user_pw')" />
-                <button type="button" class="btn btn-primary" style="width:auto; padding:0 16px; min-height:44px;" onclick="saveUserPasswordFromProfile('edit_user_pw')">저장</button>
-              </div>
-            </div>
-          ` : ''}
-
-          ${sec === 'privacy' ? renderPrivacyAndAccountPanel(user) : ''}
         </div>
       `;
+    }
+
+    function wrapProfileSectionSheet(title, innerHtml, badgeHtml = "") {
+      return `
+        <div class="profile-sheet-backdrop" role="dialog" aria-modal="true" aria-label="${escHtml(title)}" onclick="if(event.target===this){ state.profile_sec=null; render(); }">
+          <div class="profile-sheet-panel" onclick="event.stopPropagation()">
+            <div class="profile-sheet-grabber"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">${escHtml(title)}</div>
+                ${badgeHtml}
+              </div>
+              <button type="button" aria-label="${escHtml(title)} 닫기" onclick="state.profile_sec=null; render();" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; flex-shrink:0;">✕</button>
+            </div>
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProfileSectionModalHtml(user) {
+      if (!user || !state.profile_sec) return "";
+      const sec = state.profile_sec;
+      const myStats = getUserStatsAndBadges(state.user_id);
+      const rawTemp = (user && user.manner_temp !== undefined && user.manner_temp !== null && user.manner_temp !== "") ? myStats.userTemp : undefined;
+      const myTier = getTierByTemp(rawTemp);
+      const myAllPosts = (DB.posts || []).filter(p => String(p.author_id) === String(state.user_id) && p.status !== "취소됨");
+      const myPosts = myAllPosts.filter(p => !isPostExpired(p));
+      const myPastPosts = myAllPosts.filter(p => isPostExpired(p));
+      const myAppliedList = (DB.applications || []).filter(a => String(a.applicant_id) === String(state.user_id) && a.status !== "취소됨" && a.status !== "나감").map(a => {
+        const p = (DB.posts || []).find(post => Number(post.id) === Number(a.post_id));
+        return p && p.status !== "취소됨" ? { app: a, post: p } : null;
+      }).filter(Boolean);
+      const myReviews = (DB.reviews || []).filter(r => String(r.to_id) === String(state.user_id) && !r.is_none);
+
+      if (sec === "edit") {
+        return renderProfileEditPanel(user, myTier);
+      }
+      if (sec === "myapps") {
+        const body = myAppliedList.length === 0
+          ? renderEmptyStateBox('compass', '아직 신청한 번개가 없어요', '오늘 공강에 같이할 학우를 찾아봐요', '번개 보러 가기', "state.profile_sec=null; switchTab('홈')")
+          : `<div style="display:flex; flex-direction:column; gap:4px;">
+              ${myAppliedList.map(item => `
+                <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 10px; border-radius:14px; background:#F7F9F8; cursor:pointer;" onclick="state.profile_sec=null; openDetailModal(${item.post.id})">
+                  <span style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(item.post.title)}</span>
+                  <span style="font-size:var(--fs-xs); color:#287D62; font-weight:800; flex-shrink:0;">${escHtml(item.app.status)} ›</span>
+                </div>
+              `).join("")}
+            </div>`;
+        return wrapProfileSectionSheet("내가 신청한 번개", body, `<span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">${myAppliedList.length}건</span>`);
+      }
+      if (sec === "myposts") {
+        const body = `
+          ${myPosts.length === 0
+            ? renderEmptyStateBox('plus', COPY.homeEmptyTitle, COPY.homeEmptySub, '번개 열기', "state.profile_sec=null; state.active_modal='create'; render();")
+            : `<div style="display:flex; flex-direction:column; gap:6px;">
+                ${myPosts.map(p => `
+                  <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 10px; border-radius:14px; background:#F7F9F8; cursor:pointer;" onclick="state.profile_sec=null; openDetailModal(${p.id})">
+                    <span style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(p.title)}</span>
+                    <span style="font-size:var(--fs-xs); color:#287D62; font-weight:800; flex-shrink:0;">${escHtml(p.status)} ›</span>
+                  </div>
+                `).join("")}
+              </div>`}
+          ${myPastPosts.length > 0 ? `
+            <details style="margin-top:14px; padding-top:12px; border-top:1px solid #EEF0EF;" ${myPosts.length === 0 ? 'open' : ''}>
+              <summary style="font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary); cursor:pointer;">지난 번개 ${myPastPosts.length}건 보기</summary>
+              <div style="display:flex; flex-direction:column; gap:4px; margin-top:8px;">
+                ${myPastPosts.map(p => `
+                  <div class="press-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px; border-radius:12px; cursor:pointer;" onclick="state.profile_sec=null; openDetailModal(${p.id})">
+                    <span style="font-size:var(--fs-sm); color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(p.title)}</span>
+                    <span style="font-size:var(--fs-xs); color:var(--text-secondary); flex-shrink:0;">종료 ›</span>
+                  </div>
+                `).join("")}
+              </div>
+            </details>
+          ` : ""}
+        `;
+        return wrapProfileSectionSheet("내가 만든 번개", body, `<span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">진행 ${myPosts.length}건</span>`);
+      }
+      if (sec === "reviews") {
+        const body = myReviews.length === 0
+          ? renderEmptyStateBox('check', '아직 받은 후기가 없어요', '번개 모임 후 학우들과 따뜻한 후기를 나눠보세요')
+          : `<div style="display:flex; flex-direction:column; gap:8px;">
+              ${myReviews.map(r => `
+                <div style="padding:12px 14px; border-radius:16px; background:#F7F9F8;">
+                  <div style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary);">${escHtml(r.keyword || r.tag || "매너가 좋아요")}</div>
+                  ${r.detail ? `<div style="font-size:var(--fs-sm); color:#4E5968; margin-top:6px; background:#FFFFFF; padding:8px 10px; border-radius:12px; border:1px solid #E5EAE7;">"${escHtml(r.detail)}"</div>` : ""}
+                </div>
+              `).join("")}
+            </div>`;
+        return wrapProfileSectionSheet("받은 매너 후기", body, `<span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">${myReviews.length}건</span>`);
+      }
+      if (sec === "badges") {
+        const body = `
+          <div style="font-size:var(--fs-sm); color:var(--text-secondary); margin-bottom:12px;">40.0°C 달성 또는 좋은 평가 15회 이상이면 받을 수 있어요</div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
+            ${myStats.badgeCatalog.map(b => `
+              <div style="background:#F7F9F8; border-radius:16px; padding:12px 14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-size:var(--fs-md); font-weight:700; color:${b.earned ? '#287D62' : '#191F28'};">${escHtml(b.label)}</span>
+                  <span style="font-size:var(--fs-xs); font-weight:700; color:${b.earned ? '#287D62' : '#8B95A1'};">${b.earned ? '인증 완료' : b.progressText}</span>
+                </div>
+                <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-bottom:6px;">${escHtml(b.condText)}</div>
+                <div style="height:5px; background:#E5E8EB; border-radius:var(--radius-chip); overflow:hidden;">
+                  <div style="width:${b.progressPct}%; height:100%; background:#287D62; border-radius:var(--radius-chip);"></div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+        return wrapProfileSectionSheet("인증 뱃지", body, `<span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; background:#EEF8F3; padding:3px 9px; border-radius:999px;">${myStats.badges.length}/4</span>`);
+      }
+      if (sec === "fav") {
+        return wrapProfileSectionSheet("관심 카테고리 · 알림", `<div id="fav-wrap">${renderFavSection(user)}</div>`);
+      }
+      if (sec === "pw" && !isCurrentUserAdmin()) {
+        const body = `
+          <div style="font-size:var(--fs-sm); color:var(--text-secondary); margin-bottom:12px;">앞으로 로그인할 때 사용할 비밀번호(4자리 이상)를 입력해주세요.</div>
+          <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+            <input id="edit_user_pw" type="password" class="input" style="margin-bottom:0;" placeholder="${user.pw_hash ? '새 비밀번호 입력 (4자리 이상)' : '사용할 비밀번호 입력 (4자리 이상)'}" onkeydown="if(event.key==='Enter') saveUserPasswordFromProfile('edit_user_pw')" />
+            <button type="button" class="btn btn-primary" style="width:auto; padding:0 18px; min-height:48px;" onclick="saveUserPasswordFromProfile('edit_user_pw')">저장</button>
+          </div>
+        `;
+        return wrapProfileSectionSheet("비밀번호 변경", body);
+      }
+      if (sec === "privacy") {
+        return wrapProfileSectionSheet("개인정보 · 차단 · 회원 탈퇴", renderPrivacyAndAccountPanel(user));
+      }
+      return "";
     }
 
     function renderPrivacyAndAccountPanel(user) {
@@ -9681,8 +9718,7 @@
       })();
 
       return `
-        <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:var(--radius-card); padding:18px; margin-bottom:12px;">
-          <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary); margin-bottom:4px;">🛡️ 개인정보 · 위치 · 차단 · 회원 탈퇴</div>
+        <div>
           <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-bottom:14px;">울대모는 만 19세 이상 학우의 사생활을 철저히 보호하며 언제든 열람·초기화·탈퇴할 수 있습니다.</div>
 
           <!-- 1) 내 개인정보 보호 현황 -->
@@ -10040,7 +10076,8 @@
 
       return `
         <div class="profile-sheet-backdrop" onclick="if(event.target===this){ state.profile_sec=null; render(); }">
-          <div class="profile-sheet-panel">
+          <div class="profile-sheet-panel" onclick="event.stopPropagation()">
+            <div class="profile-sheet-grabber"></div>
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">프로필 정보 수정</div>
