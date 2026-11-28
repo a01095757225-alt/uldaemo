@@ -18,7 +18,7 @@ from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from email.utils import formataddr, formatdate, make_msgid
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 DEFAULT_SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "uldaemo.official@gmail.com")
 DEFAULT_SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
@@ -435,45 +435,32 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
     }
 
 
+def _gemini_endpoint_candidates(models):
+    key = (GEMINI_API_KEY or "").strip()
+    is_vertex_express = key.startswith("AQ.")
+    endpoints = []
+    if is_vertex_express:
+        for m in models:
+            endpoints.append((m, f"https://aiplatform.googleapis.com/v1/publishers/google/models/{m}:generateContent"))
+        endpoints.append((models[0], f"https://generativelanguage.googleapis.com/v1beta/models/{models[0]}:generateContent"))
+    else:
+        for m in models:
+            endpoints.append((m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"))
+        endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1/publishers/google/models/{models[0]}:generateContent"))
+    return endpoints
+
+
 def call_gemini_api(prompt: str) -> str:
-    try:
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-        payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=payload,
-            headers={
-                "x-goog-api-key": GEMINI_API_KEY,
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
+    if not GEMINI_API_KEY:
         return ""
-
-
-def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
-    if not GEMINI_API_KEY or not image_b64:
-        return None, "missing_key"
-    models = ["gemini-2.5-flash", "gemini-flash-latest"]
-    last_err = "unknown"
-    for model_name in models:
+    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash"]):
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+            gen_cfg = {"temperature": 0.2}
+            if "2.5" in model_name:
+                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
             payload = json.dumps({
-                "contents": [{
-                    "parts": [
-                        {"text": prompt},
-                        {"inlineData": {"mimeType": mime_type, "data": image_b64}},
-                    ]
-                }],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.1,
-                },
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": gen_cfg,
             }).encode("utf-8")
             req = urllib.request.Request(
                 url,
@@ -484,21 +471,69 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=22) as resp:
+            with urllib.request.urlopen(req, timeout=6) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", str(raw_text).strip())
-                return json.loads(cleaned), ""
+                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
+                if chunks:
+                    return "\n".join(chunks).strip()
+        except Exception:
+            continue
+    return ""
+
+
+def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
+    if not GEMINI_API_KEY or not image_b64:
+        return None, "missing_key"
+    last_err = "unknown"
+    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash"]):
+        try:
+            gen_cfg = {
+                "responseMimeType": "application/json",
+                "temperature": 0.1,
+            }
+            if "2.5" in model_name:
+                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
+            payload = json.dumps({
+                "contents": [{
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {"inlineData": {"mimeType": mime_type, "data": image_b64}},
+                    ],
+                }],
+                "generationConfig": gen_cfg,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={
+                    "x-goog-api-key": GEMINI_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
+                raw_text = "\n".join(chunks).strip()
+                cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_text)
+                try:
+                    return json.loads(cleaned), ""
+                except Exception:
+                    m_obj = re.search(r"\{[\s\S]*\}", cleaned)
+                    if m_obj:
+                        return json.loads(m_obj.group(0)), ""
+                    last_err = f"json_parse:{cleaned[:120]}"
         except urllib.error.HTTPError as he:
             err_body = ""
             try:
-                err_body = he.read().decode("utf-8", "ignore")[:220]
+                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:220]
             except Exception:
                 pass
             last_err = f"HTTP {he.code}: {err_body}"
-            if he.code in (400, 401, 403):
-                # 키 오류면 다음 모델 시도 불필요할 수 있으나 모델 미지원 400일 수도 있어 계속 시도
-                continue
+            continue
         except Exception as ex:
             last_err = str(ex)[:160]
     return None, last_err
