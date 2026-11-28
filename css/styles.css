@@ -2176,9 +2176,12 @@ body { background: #FFFFFF; color:var(--text-primary); letter-spacing: -0.02em; 
   }
   .pc-tt-2col {
     display: grid;
-    grid-template-columns: 1.15fr 1fr;
+    grid-template-columns: 1.25fr 1fr;
     gap: 20px;
     align-items: start;
+  }
+  .pc-tt-2col > * {
+    min-width: 0;
   }
   .pc-cafe-3col {
     display: grid;
@@ -4445,4 +4448,140 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   color: #287D62;
   padding: 0 2px;
   pointer-events: none;
+}
+
+/* ===== 에브리타임 스타일 시간표 그리드 (9시~오후7시 · 과목별 컬러 · 전체 과목명) ===== */
+.tt-et-wrap {
+  background: #FFFFFF;
+  border: 1px solid #E5E8EB;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  user-select: none;
+}
+.tt-et-grid {
+  display: grid;
+  grid-template-columns: 28px repeat(5, minmax(0, 1fr));
+  grid-template-rows: 28px repeat(11, minmax(46px, auto));
+  width: 100%;
+  background: #FFFFFF;
+}
+.tt-et-corner {
+  grid-column: 1;
+  grid-row: 1;
+  background: #F7F9F8;
+  border-right: 1px solid #ECEFF1;
+  border-bottom: 1px solid #ECEFF1;
+}
+.tt-et-day {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4E5968;
+  background: #F7F9F8;
+  border-bottom: 1px solid #ECEFF1;
+  border-right: 1px solid #ECEFF1;
+}
+.tt-et-day:last-of-type {
+  border-right: none;
+}
+.tt-et-hour {
+  grid-column: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8B95A1;
+  background: #FAFBFB;
+  border-right: 1px solid #ECEFF1;
+  border-bottom: 1px solid #F0F2F4;
+}
+.tt-et-empty {
+  border: none;
+  border-right: 1px solid #F0F2F4;
+  border-bottom: 1px solid #F0F2F4;
+  background: #FFFFFF;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  transition: background 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tt-et-empty:hover {
+  background: #F2FAF6;
+}
+.tt-et-block {
+  position: relative;
+  z-index: 2;
+  margin: 2px;
+  padding: 5px 5px 6px;
+  border-radius: 9px;
+  border: 1.5px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 0;
+  overflow: visible;
+}
+.tt-et-block:active {
+  transform: scale(0.98);
+}
+.tt-et-block.selected {
+  box-shadow: 0 0 0 2px #191F28;
+  z-index: 3;
+}
+.tt-et-block-name {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.28;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  width: 100%;
+}
+.tt-et-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #F7F9F8;
+  border: 1px solid #E5E8EB;
+  border-radius: 14px;
+  padding: 6px 8px 6px 12px;
+  margin-bottom: 14px;
+}
+.tt-et-del-btn {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: none;
+  background: #FDECEC;
+  color: #D93838;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+@media (max-width: 420px) {
+  .tt-et-grid {
+    grid-template-columns: 24px repeat(5, minmax(0, 1fr));
+    grid-template-rows: 26px repeat(11, minmax(44px, auto));
+  }
+  .tt-et-block {
+    padding: 4px 4px 5px;
+    border-radius: 7px;
+  }
+  .tt-et-block-name {
+    font-size: 10px;
+    line-height: 1.25;
+  }
 }

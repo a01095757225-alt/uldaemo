@@ -2211,6 +2211,12 @@ class handler(BaseHTTPRequestHandler):
             if "timetable" in data:
                 actor["timetable"] = data["timetable"] if isinstance(data["timetable"], dict) else {}
                 actor["timetable_saved"] = bool(actor["timetable"])
+            if "timetable_names" in data and isinstance(data["timetable_names"], dict):
+                actor["timetable_names"] = {
+                    str(k)[:12]: str(v or "").strip()[:60]
+                    for k, v in data["timetable_names"].items()
+                    if str(v or "").strip()
+                }
             if "pw_hash" in data and isinstance(data["pw_hash"], str) and len(data["pw_hash"].strip()) >= 32:
                 actor["pw_hash"] = data["pw_hash"].strip()
             actor["updated_at"] = int(time.time() * 1000)
@@ -2651,17 +2657,18 @@ class handler(BaseHTTPRequestHandler):
             tt_prompt = (
                 "너는 한국 대학교(울산대학교, 에브리타임 앱 등) 시간표 스크린샷을 분석하는 OCR 도우미야.\n"
                 "첨부된 시간표 이미지에서 월, 화, 수, 목, 금요일의 수업 시간과 과목명을 정확하게 읽어 JSON으로 반환해줘.\n"
-                "교시 기준:\n"
-                "- 1교시: 09:00~10:00, 2교시: 10:00~11:00, 3교시: 11:00~12:00\n"
-                "- 4교시: 12:00~13:00, 5교시: 13:00~14:00, 6교시: 14:00~15:00\n"
-                "- 7교시: 15:00~16:00, 8교시: 16:00~17:00, 9교시: 17:00~18:00\n"
+                "에브리타임 시간대(1~11) 매핑 기준:\n"
+                "- 1: 오전 9시 (09:00~10:00), 2: 오전 10시 (10:00~11:00), 3: 오전 11시 (11:00~12:00)\n"
+                "- 4: 오후 12시 (12:00~13:00), 5: 오후 1시 (13:00~14:00), 6: 오후 2시 (14:00~15:00)\n"
+                "- 7: 오후 3시 (15:00~16:00), 8: 오후 4시 (16:00~17:00), 9: 오후 5시 (17:00~18:00)\n"
+                "- 10: 오후 6시 (18:00~19:00), 11: 오후 7시 (19:00~20:00)\n"
                 "규칙:\n"
-                "1) 수업이 해당 시간대에 20분 이상 걸쳐 있으면 그 교시를 포함해줘.\n"
-                "2) 과목명은 강의실 번호/교수명 없이 깔끔한 과목명만 최대 12자로 적어줘.\n"
+                "1) 수업이 해당 시간대에 20분 이상 걸쳐 있으면 그 시간 번호(1~11)를 포함해줘.\n"
+                "2) 과목명은 강의실 번호/교수명만 빼고 줄이지 말고 전체 과목명을 그대로 적어줘.\n"
                 "3) 반드시 아래 JSON 스키마만 출력해:\n"
                 "{\n"
                 "  \"timetable\": {\"월\": [1,2], \"화\": [], \"수\": [], \"목\": [], \"금\": []},\n"
-                "  \"timetable_names\": {\"월_1\": \"자료구조\", \"월_2\": \"자료구조\"}\n"
+                "  \"timetable_names\": {\"월_1\": \"인본적사고와공동체의가치\", \"월_2\": \"인본적사고와공동체의가치\"}\n"
                 "}\n"
                 "4) 시간표가 전혀 보이지 않으면 모든 요일을 빈 배열 []로 반환해."
             )
@@ -2683,12 +2690,12 @@ class handler(BaseHTTPRequestHandler):
             total_slots = 0
             for d in valid_days:
                 arr = raw_tt.get(d) if isinstance(raw_tt.get(d), list) else []
-                periods = sorted({int(p) for p in arr if str(p).isdigit() and 1 <= int(p) <= 9})
+                periods = sorted({int(p) for p in arr if str(p).isdigit() and 1 <= int(p) <= 11})
                 clean_tt[d] = periods
                 total_slots += len(periods)
                 for p in periods:
                     k = f"{d}_{p}"
-                    nm = str(raw_names.get(k) or "").strip()[:16]
+                    nm = str(raw_names.get(k) or "").strip()[:60]
                     if nm:
                         clean_names[k] = nm
 
