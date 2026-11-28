@@ -451,40 +451,77 @@ def _scrub_secret(text: str) -> str:
     return s
 
 
+GEMINI_MODEL_CANDIDATES = [
+    "gemini-3.8-flash",
+    "gemini-3.8-flash-lite",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+]
+
+
+def _gemini_one_call(model_name, url, body_obj, timeout_sec):
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body_obj).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
+        txt = "\n".join(chunks).strip()
+        if txt:
+            return txt, ""
+        return "", f"{model_name}:empty"
+    except urllib.error.HTTPError as he:
+        err_body = ""
+        try:
+            err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:100]
+        except Exception:
+            pass
+        return "", _scrub_secret(f"{model_name} HTTP {he.code}: {err_body}")
+    except Exception as ex:
+        return "", _scrub_secret(f"{model_name} {str(ex)[:80]}")
+
+
+def _gemini_race(body_obj, validator=None, timeout_sec=8.5):
+    """여러 모델에 동시에 요청하고 먼저 유효하게 성공한 응답을 사용 (Vercel 10초 제한 대응)."""
+    from concurrent.futures import as_completed
+    cands = _gemini_endpoint_candidates(GEMINI_MODEL_CANDIDATES)
+    errs = []
+    ex = ThreadPoolExecutor(max_workers=len(cands))
+    try:
+        futs = [ex.submit(_gemini_one_call, m, u, body_obj, timeout_sec) for m, u in cands]
+        try:
+            for fut in as_completed(futs, timeout=timeout_sec + 0.8):
+                txt, err = fut.result()
+                if txt:
+                    if validator is None:
+                        return txt, ""
+                    val = validator(txt)
+                    if val is not None:
+                        return val, ""
+                    errs.append("invalid_output")
+                else:
+                    errs.append(err)
+        except Exception:
+            errs.append("race_timeout")
+    finally:
+        ex.shutdown(wait=False)
+    return None, " | ".join(errs)[:360]
+
+
 def _call_gemini_text_with_diag(prompt: str):
     if not GEMINI_API_KEY:
         return "", "missing_key"
-    errs = []
-    for model_name, url in _gemini_endpoint_candidates(["gemini-3.8-flash", "gemini-flash-latest"]):
-        try:
-            payload = json.dumps({
-                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2},
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=7) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
-                if chunks:
-                    return "\n".join(chunks).strip(), ""
-                errs.append(f"{model_name}:empty_parts")
-        except urllib.error.HTTPError as he:
-            err_body = ""
-            try:
-                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:180]
-            except Exception:
-                pass
-            errs.append(_scrub_secret(f"{model_name} HTTP {he.code}: {err_body}"))
-            continue
-        except Exception as ex:
-            errs.append(_scrub_secret(f"{model_name} {str(ex)[:120]}"))
-    return "", " | ".join(errs)
+    body = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.2},
+    }
+    val, err = _gemini_race(body, timeout_sec=6)
+    return (val or ""), err
 
 
 def call_gemini_api(prompt: str) -> str:
@@ -492,55 +529,35 @@ def call_gemini_api(prompt: str) -> str:
     return txt
 
 
+def _parse_json_loose(txt):
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", str(txt).strip())
+    try:
+        obj = json.loads(cleaned)
+    except Exception:
+        m_obj = re.search(r"\{[\s\S]*\}", cleaned)
+        if not m_obj:
+            return None
+        try:
+            obj = json.loads(m_obj.group(0))
+        except Exception:
+            return None
+    return obj if isinstance(obj, dict) else None
+
+
 def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
     if not GEMINI_API_KEY or not image_b64:
         return None, "missing_key"
-    errs = []
-    for model_name, url in _gemini_endpoint_candidates(["gemini-3.8-flash", "gemini-flash-latest"]):
-        try:
-            payload = json.dumps({
-                "contents": [{
-                    "role": "user",
-                    "parts": [
-                        {"text": prompt},
-                        {"inlineData": {"mimeType": mime_type, "data": image_b64}},
-                    ],
-                }],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.1,
-                },
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=9) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
-                raw_text = "\n".join(chunks).strip()
-                cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_text)
-                try:
-                    return json.loads(cleaned), ""
-                except Exception:
-                    m_obj = re.search(r"\{[\s\S]*\}", cleaned)
-                    if m_obj:
-                        return json.loads(m_obj.group(0)), ""
-                    errs.append(f"{model_name}:json_parse:{cleaned[:100]}")
-        except urllib.error.HTTPError as he:
-            err_body = ""
-            try:
-                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:180]
-            except Exception:
-                pass
-            errs.append(_scrub_secret(f"{model_name} HTTP {he.code}: {err_body}"))
-            continue
-        except Exception as ex:
-            errs.append(_scrub_secret(f"{model_name} {str(ex)[:120]}"))
-    return None, " | ".join(errs)
+    body = {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": prompt},
+                {"inlineData": {"mimeType": mime_type, "data": image_b64}},
+            ],
+        }],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1},
+    }
+    return _gemini_race(body, validator=_parse_json_loose, timeout_sec=8.5)
 
 
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
