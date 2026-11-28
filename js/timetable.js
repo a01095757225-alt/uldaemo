@@ -329,7 +329,7 @@ async function handleTimetableImageUpload(inputEl) {
   render();
   showToast("AI가 시간표 사진을 분석하고 있어요... (약 3~5초)");
   try {
-    const dataUrl = await compressTimetableImageToBase64(file, 1080, 0.82);
+    const dataUrl = await compressTimetableImageToBase64(file, 800, 0.78);
     const authPayload = typeof getApiAuthPayload === "function" ? getApiAuthPayload() : {};
     const res = await fetch("/api/index", {
       method: "POST",
@@ -343,6 +343,7 @@ async function handleTimetableImageUpload(inputEl) {
     const data = await res.json();
     state._tt_ai_loading = false;
     if (!data || !data.ok) {
+      if (data && data.detail) console.warn("[울대모 시간표 OCR]", data.detail);
       render();
       return showToast((data && data.message) || "시간표 인식에 실패했어요. 다시 시도해 주세요.");
     }
