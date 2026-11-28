@@ -541,7 +541,7 @@ function compressTimetableImageToBase64(file, maxDim = 1080, quality = 0.82) {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           const dataUrl = canvas.toDataURL("image/jpeg", quality);
-          resolve(dataUrl);
+          resolve({ dataUrl, canvas });
         } catch (err) {
           reject(err);
         }
@@ -550,6 +550,107 @@ function compressTimetableImageToBase64(file, maxDim = 1080, quality = 0.82) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function refineTimetableBlocksWithPixelHeights(canvas, blocks) {
+  try {
+    if (!canvas || !Array.isArray(blocks) || blocks.length < 2) return blocks;
+    const w = canvas.width;
+    const h = canvas.height;
+    if (w < 120 || h < 160) return blocks;
+    const ctx = canvas.getContext("2d");
+    const imgData = ctx.getImageData(0, 0, w, h).data;
+    const isColoredAt = (x, y) => {
+      const ix = Math.max(0, Math.min(w - 1, Math.round(x)));
+      const iy = Math.max(0, Math.min(h - 1, Math.round(y)));
+      const off = (iy * w + ix) * 4;
+      const r = imgData[off], g = imgData[off + 1], b = imgData[off + 2];
+      return (Math.max(r, g, b) - Math.min(r, g, b)) > 24;
+    };
+
+    // 1) 시간표 컬러 블록의 좌우 경계 탐지 (상단/하단 앱 바 제외: y 12%..82%)
+    const yMin = Math.floor(h * 0.12);
+    const yMax = Math.floor(h * 0.82);
+    let leftX = w, rightX = 0;
+    for (let y = yMin; y < yMax; y += 3) {
+      for (let x = Math.floor(w * 0.05); x < w - 2; x += 2) {
+        if (isColoredAt(x, y)) {
+          if (x < leftX) leftX = x;
+          if (x > rightX) rightX = x;
+        }
+      }
+    }
+    if (rightX - leftX < w * 0.55) return blocks;
+
+    // 2) 월~금 5개 요일 열 중심에서 세로 컬러 블록 구간 추출
+    const gridW = rightX - leftX;
+    const colW = gridW / 5;
+    const daySegs = {};
+    TT_DAYS.forEach((d, di) => {
+      const cx = leftX + colW * (di + 0.5);
+      const segs = [];
+      let inBlk = false;
+      let sY = 0;
+      for (let y = yMin; y <= yMax; y++) {
+        // 글자 픽셀로 끊기지 않도록 3개 x지점 중 하나라도 컬러면 블록 내부로 판정
+        const colHit = isColoredAt(cx, y) || isColoredAt(cx - colW * 0.22, y) || isColoredAt(cx + colW * 0.22, y);
+        if (colHit && !inBlk) {
+          inBlk = true;
+          sY = y;
+        } else if (!colHit && inBlk) {
+          inBlk = false;
+          if (y - sY >= Math.max(14, h * 0.018)) {
+            segs.push({ y1: sY, y2: y, h: y - sY });
+          }
+        }
+      }
+      if (inBlk && yMax - sY >= Math.max(14, h * 0.018)) {
+        segs.push({ y1: sY, y2: yMax, h: yMax - sY });
+      }
+      daySegs[d] = segs;
+    });
+
+    // 3) 요일별로 OCR 블록과 픽셀 세그먼트를 위에서 아래로 1:1 매칭
+    const pairs = [];
+    TT_DAYS.forEach(d => {
+      const dBlocks = blocks
+        .map((b, idx) => ({ b, idx }))
+        .filter(x => x.b.day === d)
+        .sort((a, b) => a.b.start_min - b.b.start_min);
+      const segs = daySegs[d] || [];
+      if (dBlocks.length > 0 && dBlocks.length === segs.length) {
+        dBlocks.forEach((item, i) => pairs.push({ idx: item.idx, b: item.b, seg: segs[i] }));
+      }
+    });
+    if (pairs.length < 3) return blocks;
+
+    // 4) 서로 다른 시작 시간을 가진 블록 쌍으로 1시간당 픽셀 높이(pxPerHour) 정밀 계산
+    const ratios = [];
+    for (let i = 0; i < pairs.length; i++) {
+      for (let j = i + 1; j < pairs.length; j++) {
+        const dHours = (pairs[j].b.start_min - pairs[i].b.start_min) / 60;
+        const dY = pairs[j].seg.y1 - pairs[i].seg.y1;
+        if (Math.abs(dHours) >= 1 && dY * dHours > 0) {
+          const r = dY / dHours;
+          if (r > h * 0.025 && r < h * 0.15) ratios.push(r);
+        }
+      }
+    }
+    if (ratios.length < 2) return blocks;
+    ratios.sort((a, b) => a - b);
+    const pxPerHour = ratios[Math.floor(ratios.length / 2)];
+
+    // 5) 각 블록의 실제 픽셀 높이로 30분 단위 정밀 수업 길이 보정
+    const refined = blocks.map(b => Object.assign({}, b));
+    pairs.forEach(({ idx, b, seg }) => {
+      const rawHours = seg.h / pxPerHour;
+      const snappedMins = Math.max(30, Math.min(360, Math.round((rawHours + 0.12) * 2) * 30));
+      refined[idx].end_min = Math.min(1200, Number(b.start_min) + snappedMins);
+    });
+    return refined;
+  } catch (e) {
+    return blocks;
+  }
 }
 
 async function handleTimetableImageUpload(inputEl) {
@@ -562,7 +663,7 @@ async function handleTimetableImageUpload(inputEl) {
   render();
   showToast("AI가 시간표 사진을 분석하고 있어요... (약 3~5초)");
   try {
-    const dataUrl = await compressTimetableImageToBase64(file, 960, 0.82);
+    const { dataUrl, canvas } = await compressTimetableImageToBase64(file, 960, 0.82);
     const authPayload = typeof getApiAuthPayload === "function" ? getApiAuthPayload() : {};
     const res = await fetch("/api/index", {
       method: "POST",
@@ -585,9 +686,10 @@ async function handleTimetableImageUpload(inputEl) {
       render();
       return showToast("사진에서 수업을 찾지 못했어요. 요일과 시간이 잘 보이는 캡처로 올려주세요.");
     }
-    state._tt_blocks_draft = Array.isArray(data.timetable_blocks) && data.timetable_blocks.length
+    const rawBlocks = Array.isArray(data.timetable_blocks) && data.timetable_blocks.length
       ? data.timetable_blocks
       : buildBlocksFromLegacy(data.timetable || {}, data.timetable_names || {});
+    state._tt_blocks_draft = refineTimetableBlocksWithPixelHeights(canvas, rawBlocks);
     const synced = syncLegacyFromBlocks(state._tt_blocks_draft);
     state._tt_draft = synced.timetable;
     state._tt_names_draft = synced.timetable_names;
