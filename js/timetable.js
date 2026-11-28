@@ -261,13 +261,105 @@ function toggleTimetableSlot(day, period) {
 function updateSelectedSlotCourseName(val) {
   if (!state._tt_selected_slot) return;
   state._tt_names_draft = state._tt_names_draft || {};
-  const clean = String(val || "").trim().slice(0, 12);
+  const clean = String(val || "").trim().slice(0, 16);
   if (clean) state._tt_names_draft[state._tt_selected_slot] = clean;
   else delete state._tt_names_draft[state._tt_selected_slot];
   const [sd, sp] = state._tt_selected_slot.split("_");
   const btn = document.getElementById(`tt_cell_${sd}_${sp}`);
   if (btn) {
     btn.textContent = clean ? clean.slice(0, 4) : "수업";
+  }
+}
+
+function triggerTimetableImageUpload() {
+  if (state._tt_ai_loading) return;
+  const inp = document.getElementById("tt-image-upload-input");
+  if (inp) {
+    inp.value = "";
+    inp.click();
+  }
+}
+
+function compressTimetableImageToBase64(file, maxDim = 1080, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("파일을 읽을 수 없어요."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("이미지 형식을 확인할 수 없어요."));
+      img.onload = () => {
+        try {
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, w);
+          canvas.height = Math.max(1, h);
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(dataUrl);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleTimetableImageUpload(inputEl) {
+  const file = inputEl && inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (!String(file.type || "").startsWith("image/")) {
+    return showToast("이미지 파일(JPG, PNG 등)만 업로드할 수 있어요.");
+  }
+  state._tt_ai_loading = true;
+  render();
+  showToast("AI가 시간표 사진을 분석하고 있어요... (약 3~5초)");
+  try {
+    const dataUrl = await compressTimetableImageToBase64(file, 1080, 0.82);
+    const authPayload = typeof getApiAuthPayload === "function" ? getApiAuthPayload() : {};
+    const res = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({}, authPayload, {
+        action: "parse_timetable_image",
+        image_base64: dataUrl,
+        mime_type: "image/jpeg"
+      }))
+    });
+    const data = await res.json();
+    state._tt_ai_loading = false;
+    if (!data || !data.ok) {
+      render();
+      return showToast((data && data.message) || "시간표 인식에 실패했어요. 다시 시도해 주세요.");
+    }
+    const cnt = Number(data.count || 0);
+    if (cnt === 0) {
+      render();
+      return showToast("사진에서 수업을 찾지 못했어요. 요일과 시간이 잘 보이는 캡처로 올려주세요.");
+    }
+    state._tt_draft = data.timetable || {};
+    state._tt_names_draft = data.timetable_names || {};
+    state._tt_selected_slot = null;
+    render();
+    showToast(`AI가 수업 ${cnt}칸을 자동으로 채웠어요! 확인 후 [시간표 저장]을 눌러주세요.`);
+  } catch (e) {
+    state._tt_ai_loading = false;
+    render();
+    showToast("시간표 분석 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.");
   }
 }
 
@@ -342,9 +434,22 @@ function renderTimetableModal() {
         <span style="font-size:15px; font-weight:800; color:#191F28;">내 수업 시간표</span>
         <button type="button" onclick="resetTimetableDraft()" style="border:none; background:none; color:#98A2B3; font-size:12px; font-weight:600; cursor:pointer;">초기화</button>
       </div>
-      <div id="tt-draft-summary" style="font-size:12px; color:#287D62; font-weight:700; margin-bottom:12px;">
+      <div id="tt-draft-summary" style="font-size:12px; color:#287D62; font-weight:700; margin-bottom:10px;">
         ${escHtml(buildTimetableDraftSummary(draft))}
       </div>
+
+      <!-- AI 시간표 사진 자동 입력 -->
+      <input id="tt-image-upload-input" type="file" accept="image/*" style="display:none;" onchange="handleTimetableImageUpload(this)" />
+      <button type="button" onclick="triggerTimetableImageUpload()" ${state._tt_ai_loading ? 'disabled' : ''} style="width:100%; padding:11px 14px; margin-bottom:12px; border-radius:14px; border:1.5px dashed #287D62; background:#EEF8F3; color:#1F6A52; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:${state._tt_ai_loading ? 'wait' : 'pointer'}; text-align:left; opacity:${state._tt_ai_loading ? '0.75' : '1'};">
+        <span style="display:flex; align-items:center; gap:9px; min-width:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span style="min-width:0;">
+            <span style="display:block; font-size:13px; font-weight:800; color:#1F6A52;">${state._tt_ai_loading ? 'AI가 시간표를 분석하고 있어요...' : '시간표 사진으로 자동 채우기'}</span>
+            <span style="display:block; font-size:11px; font-weight:500; color:#4E5968; margin-top:1px;">에브리타임 · 포털 캡처 업로드 (원본 미저장)</span>
+          </span>
+        </span>
+        <span style="font-size:12px; font-weight:800; color:#287D62; flex-shrink:0;">${state._tt_ai_loading ? '분석중' : '업로드 ›'}</span>
+      </button>
 
       <div style="background:#F7F9F8; border-radius:16px; padding:12px 10px; margin-bottom:12px;">
         <div style="display:grid; grid-template-columns: 36px repeat(5, 1fr); gap:5px; user-select:none;">
@@ -370,7 +475,7 @@ function renderTimetableModal() {
       <!-- 선택 칸 수업명 한 줄 입력 (선택) -->
       <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; border-radius:14px; padding:6px 10px 6px 14px; margin-bottom:14px;">
         <span id="tt-course-slot-label" style="font-size:11.5px; font-weight:700; color:#6B7684; white-space:nowrap;">${escHtml(selSlotLabel)}</span>
-        <input id="tt-course-name-input" type="text" maxlength="12" value="${escHtml(selSlotVal)}" ${selSlot ? '' : 'disabled'} placeholder="수업명 입력 (선택)" oninput="updateSelectedSlotCourseName(this.value)" style="flex:1; min-width:0; height:32px; border:none; background:transparent; font-size:13px; color:#191F28; outline:none;" />
+        <input id="tt-course-name-input" type="text" maxlength="16" value="${escHtml(selSlotVal)}" ${selSlot ? '' : 'disabled'} placeholder="수업명 입력 (선택)" oninput="updateSelectedSlotCourseName(this.value)" style="flex:1; min-width:0; height:32px; border:none; background:transparent; font-size:13px; color:#191F28; outline:none;" />
       </div>
 
       <button type="button" onclick="saveUserTimetable()" style="width:100%; height:46px; border-radius:23px; border:none; background:#287D62; color:#FFFFFF; font-size:14.5px; font-weight:800; cursor:pointer;">시간표 저장</button>

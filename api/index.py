@@ -455,6 +455,41 @@ def call_gemini_api(prompt: str) -> str:
         return ""
 
 
+def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
+    if not GEMINI_API_KEY or not image_b64:
+        return None
+    try:
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+        payload = json.dumps({
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+                ]
+            }],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "temperature": 0.1,
+            },
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "x-goog-api-key": GEMINI_API_KEY,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=22) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", str(raw_text).strip())
+            return json.loads(cleaned)
+    except Exception:
+        return None
+
+
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
     plain_body = (
         f"[울대모] 이메일 본인 확인 안내\n\n"
@@ -2519,6 +2554,72 @@ class handler(BaseHTTPRequestHandler):
             reply = call_gemini_api(prompt)
             blocked = "경고" in reply
             self._send_json(200, {"ok": True, "blocked": blocked, "reply": reply})
+            return
+
+        if action == "parse_timetable_image":
+            db_obj, actor_id, is_adm = _require_auth()
+            if not db_obj:
+                return
+            if not GEMINI_API_KEY:
+                self._send_json(503, {"ok": False, "message": "AI 시간표 인식 기능이 아직 준비되지 않았어요."})
+                return
+            raw_img = str(data.get("image_base64") or "").strip()
+            mime = str(data.get("mime_type") or "image/jpeg").strip().lower()
+            if mime not in ("image/jpeg", "image/jpg", "image/png", "image/webp"):
+                mime = "image/jpeg"
+            if mime == "image/jpg":
+                mime = "image/jpeg"
+            if "," in raw_img and raw_img.startswith("data:"):
+                raw_img = raw_img.split(",", 1)[1].strip()
+            if not raw_img or len(raw_img) > 4_000_000:
+                self._send_json(400, {"ok": False, "message": "이미지 크기를 확인해주세요. (최대 3MB 이하)"})
+                return
+
+            tt_prompt = (
+                "너는 한국 대학교(울산대학교, 에브리타임 앱 등) 시간표 스크린샷을 분석하는 OCR 도우미야.\n"
+                "첨부된 시간표 이미지에서 월, 화, 수, 목, 금요일의 수업 시간과 과목명을 정확하게 읽어 JSON으로 반환해줘.\n"
+                "교시 기준:\n"
+                "- 1교시: 09:00~10:00, 2교시: 10:00~11:00, 3교시: 11:00~12:00\n"
+                "- 4교시: 12:00~13:00, 5교시: 13:00~14:00, 6교시: 14:00~15:00\n"
+                "- 7교시: 15:00~16:00, 8교시: 16:00~17:00, 9교시: 17:00~18:00\n"
+                "규칙:\n"
+                "1) 수업이 해당 시간대에 20분 이상 걸쳐 있으면 그 교시를 포함해줘.\n"
+                "2) 과목명은 강의실 번호/교수명 없이 깔끔한 과목명만 최대 12자로 적어줘.\n"
+                "3) 반드시 아래 JSON 스키마만 출력해:\n"
+                "{\n"
+                "  \"timetable\": {\"월\": [1,2], \"화\": [], \"수\": [], \"목\": [], \"금\": []},\n"
+                "  \"timetable_names\": {\"월_1\": \"자료구조\", \"월_2\": \"자료구조\"}\n"
+                "}\n"
+                "4) 시간표가 전혀 보이지 않으면 모든 요일을 빈 배열 []로 반환해."
+            )
+            parsed = call_gemini_vision_json(tt_prompt, raw_img, mime)
+            if not isinstance(parsed, dict):
+                self._send_json(502, {"ok": False, "message": "시간표 사진을 읽지 못했어요. 글자가 잘 보이는 캡처로 다시 시도해 주세요."})
+                return
+
+            valid_days = ("월", "화", "수", "목", "금")
+            raw_tt = parsed.get("timetable") if isinstance(parsed.get("timetable"), dict) else {}
+            raw_names = parsed.get("timetable_names") if isinstance(parsed.get("timetable_names"), dict) else {}
+            clean_tt = {}
+            clean_names = {}
+            total_slots = 0
+            for d in valid_days:
+                arr = raw_tt.get(d) if isinstance(raw_tt.get(d), list) else []
+                periods = sorted({int(p) for p in arr if str(p).isdigit() and 1 <= int(p) <= 9})
+                clean_tt[d] = periods
+                total_slots += len(periods)
+                for p in periods:
+                    k = f"{d}_{p}"
+                    nm = str(raw_names.get(k) or "").strip()[:16]
+                    if nm:
+                        clean_names[k] = nm
+
+            self._send_json(200, {
+                "ok": True,
+                "timetable": clean_tt,
+                "timetable_names": clean_names,
+                "count": total_slots,
+            })
             return
 
         if action == "ai_icebreaker":
