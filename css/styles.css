@@ -3929,13 +3929,19 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   }
 }
 
-/* Mobile: Toss-style Bottom Sheet (S2 Spec) */
+/* Mobile: Toss-style Bottom Sheet (S2 Spec — rendered in top-level root) */
 @media (max-width: 1023px) {
+  .sort-v3-wrap .sort-v3-backdrop,
+  .sort-v3-wrap .sort-v3-panel {
+    display: none !important;
+  }
   .sort-v3-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 2100;
-    background: rgba(25, 31, 40, 0.45);
+    z-index: 99990;
+    background: rgba(25, 31, 40, 0.48);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     animation: sortV3FadeIn 0.16s ease-out;
   }
   .sort-v3-panel {
@@ -3943,11 +3949,11 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 2110;
+    z-index: 99995;
     background: #FFFFFF;
     border-radius: 28px 28px 0 0;
     padding: 12px 14px calc(24px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -8px 32px rgba(25, 31, 40, 0.14);
+    box-shadow: 0 -8px 32px rgba(25, 31, 40, 0.16);
     animation: sortV3SheetUp 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .sort-v3-sheet-head {
