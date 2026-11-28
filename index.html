@@ -4776,10 +4776,25 @@
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") {
         if (state.sort_menu_open) toggleHomeSortMenu(false);
+        else if (state.open_talk_more_id != null) { state.open_talk_more_id = null; render(); }
+        else if (state.open_chat_more_id != null) { state.open_chat_more_id = null; render(); }
         else if (state.show_poll_form) { state.show_poll_form = false; render(); }
         else if (state.profile_sec) { state.profile_sec = null; render(); }
         else if (shouldShowDailyCheckinSheet()) dismissDailyCheckinSheet();
       }
+    });
+
+    document.addEventListener("click", (ev) => {
+      let changed = false;
+      if (state.open_talk_more_id != null && !(ev.target && ev.target.closest && ev.target.closest(".talk-more-wrap"))) {
+        state.open_talk_more_id = null;
+        changed = true;
+      }
+      if (state.open_chat_more_id != null && !(ev.target && ev.target.closest && ev.target.closest(".chat-more-wrap"))) {
+        state.open_chat_more_id = null;
+        changed = true;
+      }
+      if (changed) render();
     });
 
     function getFilteredHomePosts() {
@@ -7956,12 +7971,12 @@
                         <button type="button" style="border:none; background:none; color:var(--text-secondary); font-size:var(--fs-sm); font-weight:600; cursor:pointer; padding:2px 0;" onclick="toggleReplies('t', ${t.id})">답글 ${replyCnt}</button>
                       </div>
                       ${(t.author_id && String(t.author_id) !== String(state.user_id)) ? `
-                        <div style="position:relative;">
-                          <button type="button" aria-label="게시글 더보기" onclick="state['talk_more_${t.id}']=!state['talk_more_${t.id}']; render();" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:var(--radius-btn);">⋯</button>
-                          ${state['talk_more_' + t.id] ? `
+                        <div class="talk-more-wrap" style="position:relative;">
+                          <button type="button" aria-label="게시글 더보기" onclick="event.stopPropagation(); state.open_talk_more_id=(String(state.open_talk_more_id)===String(${t.id}) ? null : ${t.id}); render();" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:var(--radius-btn);">⋯</button>
+                          ${String(state.open_talk_more_id) === String(t.id) ? `
                             <div style="position:absolute; right:0; top:44px; z-index:40; min-width:132px; background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-btn); box-shadow:0 8px 24px rgba(25,31,40,0.14); overflow:hidden;">
-                              <button type="button" onclick="state['talk_more_${t.id}']=false; reportContentOrUser('${escHtml(t.author_id)}', '광장 작성 학우');" style="width:100%; min-height:44px; padding:0 14px; border:none; border-bottom:1px solid #F2F4F3; background:#FFFFFF; color:#D93025; font-size:var(--fs-sm); font-weight:700; text-align:left; cursor:pointer;">신고하기</button>
-                              <button type="button" onclick="state['talk_more_${t.id}']=false; blockUser('${escHtml(t.author_id)}', '광장 작성 학우');" style="width:100%; min-height:44px; padding:0 14px; border:none; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-sm); font-weight:700; text-align:left; cursor:pointer;">작성자 차단</button>
+                              <button type="button" onclick="state.open_talk_more_id=null; reportContentOrUser('${escHtml(t.author_id)}', '광장 작성 학우');" style="width:100%; min-height:44px; padding:0 14px; border:none; border-bottom:1px solid #F2F4F3; background:#FFFFFF; color:#D93025; font-size:var(--fs-sm); font-weight:700; text-align:left; cursor:pointer;">신고하기</button>
+                              <button type="button" onclick="state.open_talk_more_id=null; blockUser('${escHtml(t.author_id)}', '광장 작성 학우');" style="width:100%; min-height:44px; padding:0 14px; border:none; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-sm); font-weight:700; text-align:left; cursor:pointer;">작성자 차단</button>
                             </div>
                           ` : ""}
                         </div>
@@ -8720,23 +8735,23 @@
                   신고
                 </button>
               ` : ""}
-              <button type="button" class="tk-room-top-btn" style="min-width:44px; min-height:44px; font-size:var(--fs-lg); font-weight:700; padding:0 8px; display:inline-flex; align-items:center; justify-content:center;" onclick="state['chat_more_open_${post.id}']=!state['chat_more_open_${post.id}']; render();" title="더보기" aria-label="대화방 메뉴 더보기">⋯</button>
+              <button type="button" class="tk-room-top-btn chat-more-wrap" style="min-width:44px; min-height:44px; font-size:var(--fs-lg); font-weight:700; padding:0 8px; display:inline-flex; align-items:center; justify-content:center;" onclick="event.stopPropagation(); state.open_chat_more_id=(String(state.open_chat_more_id)===String(${post.id}) ? null : ${post.id}); render();" title="더보기" aria-label="대화방 메뉴 더보기">⋯</button>
             </div>
           </div>
-          ${state['chat_more_open_' + post.id] ? `
-            <div style="background:#FFFFFF; border-bottom:1px solid #EEF0EF; padding:8px 16px; display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px;">
-              <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:var(--text-primary); background:#F7F9F8; border:1px solid #E5E8EB; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; openDetailModal(${post.id});">
+          ${String(state.open_chat_more_id) === String(post.id) ? `
+            <div class="chat-more-wrap" style="background:#FFFFFF; border-bottom:1px solid #EEF0EF; padding:8px 16px; display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px;">
+              <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:var(--text-primary); background:#F7F9F8; border:1px solid #E5E8EB; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state.open_chat_more_id=null; openDetailModal(${post.id});">
                 번개 상세 보기
               </button>
-              <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:#287D62; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; openReviewModal(${post.id});">
+              <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:#287D62; background:#EEF8F3; border:1px solid #C5E6D6; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state.open_chat_more_id=null; openReviewModal(${post.id});">
                 후기 쓰기
               </button>
               ${partnerId && String(partnerId) !== myId ? `
-                <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary); background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; reportContentOrUser('${escHtml(partnerId)}', '${escHtml(getRoomBlindAlias(post.id, partnerId))}');">
+                <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:var(--text-secondary); background:#FFFFFF; border:1px solid #E5E8EB; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state.open_chat_more_id=null; reportContentOrUser('${escHtml(partnerId)}', '${escHtml(getRoomBlindAlias(post.id, partnerId))}');">
                   신고하기
                 </button>
               ` : ""}
-              <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:#D93025; background:#FFF5F5; border:1px solid #FECACA; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state['chat_more_open_${post.id}']=false; leaveChatRoom(${post.id});">
+              <button type="button" class="btn" style="width:auto; min-height:44px; font-size:var(--fs-sm); font-weight:700; color:#D93025; background:#FFF5F5; border:1px solid #FECACA; border-radius:var(--radius-btn); padding:0 14px; cursor:pointer;" onclick="state.open_chat_more_id=null; leaveChatRoom(${post.id});">
                 대화방 나가기
               </button>
             </div>
