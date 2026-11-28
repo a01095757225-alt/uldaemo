@@ -4450,28 +4450,184 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   pointer-events: none;
 }
 
-/* ===== 에브리타임 스타일 시간표 그리드 (9시~오후7시 · 과목별 컬러 · 전체 과목명) ===== */
+/* ===== 시간표 · 공강 메이트 v3 (Figma T1~T5 토스풍 개선안) ===== */
+.tt-v3-page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding-bottom: 108px;
+}
+.tt-v3-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.tt-v3-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tt-v3-title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 800;
+  color: #191F28;
+  letter-spacing: -0.4px;
+}
+.tt-v3-reset-btn {
+  border: none;
+  background: none;
+  color: #8B95A1;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.tt-v3-reset-btn:hover {
+  color: #4E5968;
+  background: #F2F4F6;
+}
+
+/* 세그먼트 탭 (모바일 T1/T3/T4) */
+.tt-v3-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: #F2F4F6;
+  padding: 4px;
+  border-radius: 14px;
+  height: 44px;
+  margin-bottom: 14px;
+}
+.tt-v3-seg-btn {
+  border: none;
+  background: transparent;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #8B95A1;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+.tt-v3-seg-btn.active {
+  background: #FFFFFF;
+  color: #191F28;
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(25, 31, 40, 0.08);
+}
+
+/* 카드 컨테이너 */
+.tt-v3-card {
+  background: #FFFFFF;
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid #F0F2F4;
+}
+.tt-v3-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* AI 사진 자동입력 배너 (T1 / T5) */
+.tt-v3-ai-banner {
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  border: none;
+  background: #EEF8F3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s ease, transform 0.1s ease;
+}
+.tt-v3-ai-banner:hover {
+  background: #E2F3EA;
+}
+.tt-v3-ai-banner:active {
+  transform: scale(0.99);
+}
+.tt-v3-ai-banner:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+.tt-v3-ai-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.tt-v3-ai-copy {
+  flex: 1;
+  min-width: 0;
+}
+.tt-v3-ai-title {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #191F28;
+  line-height: 1.3;
+}
+.tt-v3-ai-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4E5968;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.tt-v3-ai-cta {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tt-v3-hint-line {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #8B95A1;
+  margin-bottom: 12px;
+}
+
+/* 토스풍 미니멀 시간표 그리드 (가로선만 · 오늘 요일 강조 · 에타 9~19시) */
 .tt-et-wrap {
   background: #FFFFFF;
-  border: 1px solid #E5E8EB;
-  border-radius: 16px;
-  overflow: hidden;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   user-select: none;
+  position: relative;
 }
 .tt-et-grid {
   display: grid;
   grid-template-columns: 28px repeat(5, minmax(0, 1fr));
-  grid-template-rows: 28px repeat(11, minmax(46px, auto));
+  grid-template-rows: 30px repeat(11, minmax(44px, auto));
+  column-gap: 4px;
   width: 100%;
   background: #FFFFFF;
 }
 .tt-et-corner {
   grid-column: 1;
   grid-row: 1;
-  background: #F7F9F8;
-  border-right: 1px solid #ECEFF1;
-  border-bottom: 1px solid #ECEFF1;
 }
 .tt-et-day {
   grid-row: 1;
@@ -4480,52 +4636,78 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  color: #4E5968;
-  background: #F7F9F8;
-  border-bottom: 1px solid #ECEFF1;
-  border-right: 1px solid #ECEFF1;
+  color: #6B7684;
+  padding-bottom: 4px;
 }
-.tt-et-day:last-of-type {
-  border-right: none;
+.tt-et-day-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.tt-et-today-col {
+  grid-row: 2 / 13;
+  background: rgba(40, 125, 98, 0.045);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 0;
 }
 .tt-et-hour {
   grid-column: 1;
   display: flex;
   align-items: flex-start;
-  justify-content: center;
-  padding-top: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #8B95A1;
-  background: #FAFBFB;
-  border-right: 1px solid #ECEFF1;
-  border-bottom: 1px solid #F0F2F4;
+  justify-content: flex-end;
+  padding: 3px 6px 0 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #B0B8C1;
 }
 .tt-et-empty {
+  position: relative;
+  z-index: 1;
   border: none;
-  border-right: 1px solid #F0F2F4;
-  border-bottom: 1px solid #F0F2F4;
-  background: #FFFFFF;
+  border-top: 1px solid #F2F4F6;
+  background: transparent;
   cursor: pointer;
   padding: 0;
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .tt-et-empty:hover {
-  background: #F2FAF6;
+  background: rgba(40, 125, 98, 0.05);
+  border-radius: 10px;
+}
+.tt-et-empty.adding {
+  background: #FFFFFF;
+  border: 2px solid #287D62;
+  border-radius: 10px;
+  color: #287D62;
+  font-size: 17px;
+  font-weight: 800;
+  z-index: 3;
 }
 .tt-et-block {
   position: relative;
   z-index: 2;
-  margin: 2px;
-  padding: 5px 5px 6px;
-  border-radius: 9px;
+  margin: 2px 0;
+  padding: 6px 6px 7px;
+  border-radius: 11px;
   border: 1.5px solid transparent;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
+  gap: 2px;
   text-align: left;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.12s ease;
@@ -4537,51 +4719,495 @@ button:focus-visible, a:focus-visible, [onclick]:focus-visible {
   transform: scale(0.98);
 }
 .tt-et-block.selected {
-  box-shadow: 0 0 0 2px #191F28;
+  box-shadow: 0 0 0 2px #287D62;
   z-index: 3;
 }
 .tt-et-block-name {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 800;
-  line-height: 1.28;
+  line-height: 1.3;
   white-space: normal;
   word-break: keep-all;
   overflow-wrap: anywhere;
   width: 100%;
 }
-.tt-et-editor-bar {
+.tt-et-block-time {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.72;
+  line-height: 1.2;
+}
+
+/* 모바일 하단 고정 저장 버튼 (T1) */
+.tt-v3-sticky-save {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  padding: 18px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 28%, #FFFFFF 100%);
+  pointer-events: none;
+}
+.tt-v3-sticky-save .tt-v3-save-btn {
+  pointer-events: auto;
+  max-width: 480px;
+  margin: 0 auto;
+  display: block;
+}
+.tt-v3-save-btn {
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 15.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.14s ease, transform 0.1s ease;
+}
+.tt-v3-save-btn:hover {
+  background: #216952;
+}
+.tt-v3-save-btn:active {
+  transform: scale(0.99);
+}
+
+/* T2 수업 추가/수정 바텀시트 (모바일) + 모달 (PC) */
+.tt-v3-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(25, 31, 40, 0.42);
+  backdrop-filter: blur(2px);
+  z-index: 99980;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.tt-v3-sheet {
+  width: 100%;
+  max-width: 460px;
+  background: #FFFFFF;
+  border-radius: 28px 28px 0 0;
+  padding: 10px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 32px rgba(25, 31, 40, 0.14);
+  animation: ttSheetUp 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes ttSheetUp {
+  from { transform: translateY(28px); opacity: 0.6; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.tt-v3-sheet-handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: #D1D6DB;
+  margin: 0 auto 18px;
+}
+.tt-v3-sheet-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #191F28;
+  margin: 0 0 4px;
+}
+.tt-v3-sheet-sub {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #8B95A1;
+  margin: 0 0 16px;
+}
+.tt-v3-input-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #F7F9F8;
-  border: 1px solid #E5E8EB;
+  height: 54px;
+  padding: 0 14px;
   border-radius: 14px;
-  padding: 6px 8px 6px 12px;
-  margin-bottom: 14px;
+  background: #F2F4F6;
+  border: 1.5px solid #287D62;
+  margin-bottom: 8px;
 }
-.tt-et-del-btn {
-  flex-shrink: 0;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 10px;
+.tt-v3-input-box input {
+  flex: 1;
+  min-width: 0;
   border: none;
-  background: #FDECEC;
-  color: #D93838;
+  background: transparent;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #191F28;
+  outline: none;
+}
+.tt-v3-sheet-note {
   font-size: 12px;
+  color: #8B95A1;
+  margin: 0 0 14px;
+}
+.tt-v3-cont-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: #F7F8FA;
+  margin-bottom: 18px;
+  cursor: pointer;
+}
+.tt-v3-cont-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #191F28;
+}
+.tt-v3-switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: #D1D6DB;
+  position: relative;
+  transition: background 0.18s ease;
+  flex-shrink: 0;
+}
+.tt-v3-switch.on {
+  background: #287D62;
+}
+.tt-v3-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.18s ease;
+}
+.tt-v3-switch.on::after {
+  transform: translateX(20px);
+}
+.tt-v3-sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+.tt-v3-btn-cancel {
+  flex: 0 0 100px;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: #F2F4F6;
+  color: #4E5968;
+  font-size: 15.5px;
   font-weight: 700;
   cursor: pointer;
 }
-@media (max-width: 420px) {
+.tt-v3-btn-del {
+  flex: 0 0 84px;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: #FDECEC;
+  color: #D93838;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tt-v3-btn-submit {
+  flex: 1;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 15.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* T3 오늘 내 공강 타임라인 & 메이트 카드 */
+.tt-v3-today-box {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid #F0F2F4;
+  margin-bottom: 18px;
+}
+.tt-v3-today-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8B95A1;
+  margin-bottom: 3px;
+}
+.tt-v3-today-count {
+  font-size: 18px;
+  font-weight: 800;
+  color: #191F28;
+  margin-bottom: 12px;
+}
+.tt-v3-timeline-bars {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.tt-v3-tbar {
+  height: 26px;
+  border-radius: 7px;
+  background: #E5E8EB;
+}
+.tt-v3-tbar.free {
+  background: #CDEBDD;
+}
+.tt-v3-timeline-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  color: #B0B8C1;
+}
+.tt-v3-mates-head {
+  font-size: 16px;
+  font-weight: 800;
+  color: #191F28;
+  margin: 0 0 4px;
+}
+.tt-v3-privacy-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #8B95A1;
+  margin-bottom: 14px;
+}
+.tt-v3-mate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tt-v3-mate-card {
+  background: #FFFFFF;
+  border: 1px solid #F0F2F4;
+  border-radius: 20px;
+  padding: 16px;
+}
+.tt-v3-mate-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.tt-v3-mate-av {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #F2F4F6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  flex-shrink: 0;
+}
+.tt-v3-mate-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #191F28;
+  line-height: 1.3;
+}
+.tt-v3-mate-dept {
+  font-size: 12.5px;
+  color: #8B95A1;
+  margin-top: 2px;
+}
+.tt-v3-mate-hl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: #EEF8F3;
+  color: #1E6B52;
+  font-size: 12.5px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+.tt-v3-mate-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tt-v3-mate-prog-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.tt-v3-mate-hours {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4E5968;
+  margin-bottom: 6px;
+}
+.tt-v3-mate-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tt-v3-mate-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #EEF0F2;
+  overflow: hidden;
+}
+.tt-v3-mate-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #287D62;
+}
+.tt-v3-mate-pct {
+  font-size: 12px;
+  font-weight: 800;
+  color: #287D62;
+  flex-shrink: 0;
+}
+.tt-v3-mate-cta {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: none;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* T4 빈 상태 */
+.tt-v3-empty-state {
+  background: #FFFFFF;
+  border-radius: 22px;
+  padding: 42px 20px 24px;
+  text-align: center;
+  border: 1px solid #F0F2F4;
+}
+.tt-v3-empty-ic {
+  width: 88px;
+  height: 88px;
+  border-radius: 28px;
+  background: #EEF8F3;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tt-v3-empty-title {
+  font-size: 21px;
+  font-weight: 800;
+  color: #191F28;
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+.tt-v3-empty-sub {
+  font-size: 13.5px;
+  color: #6B7684;
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+.tt-v3-empty-privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #8B95A1;
+  margin-bottom: 14px;
+}
+.tt-v3-empty-btn-primary {
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: #287D62;
+  color: #FFFFFF;
+  font-size: 15.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.tt-v3-empty-btn-secondary {
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  background: #F2F4F6;
+  color: #4E5968;
+  font-size: 15.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (min-width: 1024px) {
+  .tt-v3-page {
+    padding-bottom: 32px;
+  }
+  .tt-v3-card {
+    border-radius: 24px;
+    padding: 24px;
+  }
   .tt-et-grid {
-    grid-template-columns: 24px repeat(5, minmax(0, 1fr));
-    grid-template-rows: 26px repeat(11, minmax(44px, auto));
+    grid-template-columns: 34px repeat(5, minmax(0, 1fr));
+    grid-template-rows: 32px repeat(11, minmax(46px, auto));
+    column-gap: 6px;
   }
   .tt-et-block {
-    padding: 4px 4px 5px;
-    border-radius: 7px;
+    padding: 7px 9px;
+    border-radius: 12px;
   }
   .tt-et-block-name {
-    font-size: 10px;
-    line-height: 1.25;
+    font-size: 12px;
+  }
+  .tt-v3-sheet-backdrop {
+    align-items: center;
+    padding: 20px;
+  }
+  .tt-v3-sheet {
+    border-radius: 24px;
+    padding: 24px;
+  }
+  .tt-v3-sheet-handle {
+    display: none;
+  }
+  .tt-v3-pc-mates-card .tt-v3-mate-card {
+    background: #F7F8FA;
+    border: none;
+    border-radius: 18px;
+  }
+  .tt-v3-pc-mates-card .tt-v3-mate-av {
+    background: #FFFFFF;
+  }
+  .tt-v3-pc-mates-card .tt-v3-mate-hl {
+    background: #E2F3EA;
+  }
+}
+@media (max-width: 420px) {
+  .tt-et-grid {
+    grid-template-columns: 22px repeat(5, minmax(0, 1fr));
+    grid-template-rows: 28px repeat(11, minmax(42px, auto));
+    column-gap: 3px;
+  }
+  .tt-et-block {
+    padding: 4px 5px 5px;
+    border-radius: 9px;
+  }
+  .tt-et-block-name {
+    font-size: 10.5px;
+    line-height: 1.26;
+  }
+  .tt-et-block-time {
+    display: none;
   }
 }
