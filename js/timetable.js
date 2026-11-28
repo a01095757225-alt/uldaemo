@@ -472,7 +472,7 @@ async function handleTimetableImageUpload(inputEl) {
   render();
   showToast("AI가 시간표 사진을 분석하고 있어요... (약 3~5초)");
   try {
-    const dataUrl = await compressTimetableImageToBase64(file, 1080, 0.85);
+    const dataUrl = await compressTimetableImageToBase64(file, 960, 0.82);
     const authPayload = typeof getApiAuthPayload === "function" ? getApiAuthPayload() : {};
     const res = await fetch("/api/index", {
       method: "POST",
