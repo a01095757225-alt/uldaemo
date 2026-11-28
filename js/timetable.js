@@ -592,8 +592,12 @@ function refineTimetableBlocksWithPixelHeights(canvas, blocks) {
       let inBlk = false;
       let sY = 0;
       for (let y = yMin; y <= yMax; y++) {
-        // 글자 픽셀로 끊기지 않도록 3개 x지점 중 하나라도 컬러면 블록 내부로 판정
-        const colHit = isColoredAt(cx, y) || isColoredAt(cx - colW * 0.22, y) || isColoredAt(cx + colW * 0.22, y);
+        // 글자 픽셀로 상단이 잘리지 않도록 블록 좌우 가장자리 포함 5개 지점 검사
+        const colHit = isColoredAt(cx, y)
+          || isColoredAt(cx - colW * 0.38, y)
+          || isColoredAt(cx + colW * 0.38, y)
+          || isColoredAt(cx - colW * 0.18, y)
+          || isColoredAt(cx + colW * 0.18, y);
         if (colHit && !inBlk) {
           inBlk = true;
           sY = y;
@@ -644,7 +648,7 @@ function refineTimetableBlocksWithPixelHeights(canvas, blocks) {
     const refined = blocks.map(b => Object.assign({}, b));
     pairs.forEach(({ idx, b, seg }) => {
       const rawHours = seg.h / pxPerHour;
-      const snappedMins = Math.max(30, Math.min(360, Math.round((rawHours + 0.12) * 2) * 30));
+      const snappedMins = Math.max(30, Math.min(360, Math.round((rawHours + 0.14) * 2) * 30));
       refined[idx].end_min = Math.min(1200, Number(b.start_min) + snappedMins);
     });
     return refined;
