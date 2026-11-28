@@ -438,12 +438,10 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
 def _gemini_endpoint_candidates(models):
     key = (GEMINI_API_KEY or "").strip()
     q_key = urllib.parse.quote(key, safe="")
-    endpoints = []
-    for m in models:
-        endpoints.append((m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={q_key}"))
-    if key.startswith("AQ."):
-        endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1/publishers/google/models/{models[0]}:generateContent?key={q_key}"))
-    return endpoints
+    return [
+        (m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={q_key}")
+        for m in models
+    ]
 
 
 def _scrub_secret(text: str) -> str:
@@ -456,7 +454,7 @@ def _scrub_secret(text: str) -> str:
 def _call_gemini_text_with_diag(prompt: str):
     if not GEMINI_API_KEY:
         return "", "missing_key"
-    last_err = "unknown"
+    errs = []
     for model_name, url in _gemini_endpoint_candidates(["gemini-3.8-flash", "gemini-flash-latest"]):
         try:
             payload = json.dumps({
@@ -469,25 +467,24 @@ def _call_gemini_text_with_diag(prompt: str):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=7) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                 chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
                 if chunks:
                     return "\n".join(chunks).strip(), ""
+                errs.append(f"{model_name}:empty_parts")
         except urllib.error.HTTPError as he:
             err_body = ""
             try:
-                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:220]
+                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:180]
             except Exception:
                 pass
-            host_tag = "vertex" if "aiplatform" in url else "aistudio"
-            last_err = _scrub_secret(f"{host_tag}/{model_name} HTTP {he.code}: {err_body}")
+            errs.append(_scrub_secret(f"{model_name} HTTP {he.code}: {err_body}"))
             continue
         except Exception as ex:
-            host_tag = "vertex" if "aiplatform" in url else "aistudio"
-            last_err = _scrub_secret(f"{host_tag}/{model_name} {str(ex)[:140]}")
-    return "", last_err
+            errs.append(_scrub_secret(f"{model_name} {str(ex)[:120]}"))
+    return "", " | ".join(errs)
 
 
 def call_gemini_api(prompt: str) -> str:
@@ -498,7 +495,7 @@ def call_gemini_api(prompt: str) -> str:
 def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
     if not GEMINI_API_KEY or not image_b64:
         return None, "missing_key"
-    last_err = "unknown"
+    errs = []
     for model_name, url in _gemini_endpoint_candidates(["gemini-3.8-flash", "gemini-flash-latest"]):
         try:
             payload = json.dumps({
@@ -532,20 +529,18 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
                     m_obj = re.search(r"\{[\s\S]*\}", cleaned)
                     if m_obj:
                         return json.loads(m_obj.group(0)), ""
-                    last_err = f"json_parse:{cleaned[:120]}"
+                    errs.append(f"{model_name}:json_parse:{cleaned[:100]}")
         except urllib.error.HTTPError as he:
             err_body = ""
             try:
-                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:220]
+                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:180]
             except Exception:
                 pass
-            host_tag = "vertex" if "aiplatform" in url else "aistudio"
-            last_err = _scrub_secret(f"{host_tag}/{model_name} HTTP {he.code}: {err_body}")
+            errs.append(_scrub_secret(f"{model_name} HTTP {he.code}: {err_body}"))
             continue
         except Exception as ex:
-            host_tag = "vertex" if "aiplatform" in url else "aistudio"
-            last_err = _scrub_secret(f"{host_tag}/{model_name} {str(ex)[:140]}")
-    return None, last_err
+            errs.append(_scrub_secret(f"{model_name} {str(ex)[:120]}"))
+    return None, " | ".join(errs)
 
 
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
@@ -2613,7 +2608,7 @@ class handler(BaseHTTPRequestHandler):
             blocked = "경고" in reply
             res_body = {"ok": True, "blocked": blocked, "reply": reply}
             if not reply and diag:
-                res_body["diag"] = diag[:220]
+                res_body["diag"] = diag[:380]
             self._send_json(200, res_body)
             return
 
