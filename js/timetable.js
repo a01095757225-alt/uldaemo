@@ -1,6 +1,88 @@
 // 울대모(Uldaemo) 내 시간표 · 공강 메이트 매칭 모듈
 const TT_DAYS = ["월", "화", "수", "목", "금"];
-const TT_PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9]; // 1교시(09:00) ~ 9교시(17:00)
+// 에브리타임 시간대 기준: 1(9시) ~ 11(오후 7시, 19:00~20:00)
+const TT_PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+// 과목별 구분을 위한 에브리타임 감성 파스텔·에디토리얼 팔레트 (10색)
+const TT_COURSE_PALETTE = [
+  { bg: "#E7F5EE", border: "#9AD4BA", text: "#14533E", accent: "#287D62" }, // Forest Mint
+  { bg: "#FFF4DF", border: "#F0CC86", text: "#7A4F0B", accent: "#D99B26" }, // Warm Amber
+  { bg: "#E8F1FE", border: "#9EC2FA", text: "#1B4A8A", accent: "#4285F4" }, // Sky Blue
+  { bg: "#F2EBFE", border: "#C4B0F8", text: "#4C2A85", accent: "#7C52D9" }, // Soft Lavender
+  { bg: "#FDECEC", border: "#F5AEAE", text: "#8C2323", accent: "#E05A5A" }, // Coral Rose
+  { bg: "#E5F6F5", border: "#8CD3CE", text: "#135955", accent: "#2A9D8F" }, // Ocean Teal
+  { bg: "#FFF0E6", border: "#F5BA93", text: "#8A3F14", accent: "#E07A3F" }, // Warm Peach
+  { bg: "#EEF7E4", border: "#B2D98A", text: "#365C14", accent: "#6BA336" }, // Fresh Olive
+  { bg: "#FCEBF4", border: "#F0A8CE", text: "#852056", accent: "#D65094" }, // Berry Pink
+  { bg: "#EAEFFB", border: "#A6B9F2", text: "#243B82", accent: "#5271D9" }, // Periwinkle Indigo
+];
+
+function periodToEverytimeHour(p) {
+  const h = 8 + Number(p); // 9..19
+  return h > 12 ? String(h - 12) : String(h);
+}
+
+function formatEverytimeSlotRange(day, periods) {
+  const sorted = [...(periods || [])].map(Number).sort((a, b) => a - b);
+  if (!sorted.length) return "수업 칸 선택";
+  const first = periodToEverytimeHour(sorted[0]);
+  const lastEndH = 9 + sorted[sorted.length - 1];
+  const lastEndStr = lastEndH > 12 ? String(lastEndH - 12) : String(lastEndH);
+  return `${day} ${first}~${lastEndStr}시`;
+}
+
+function buildCourseColorMap(draft, namesMap) {
+  const map = {};
+  let idx = 0;
+  TT_DAYS.forEach(d => {
+    const busy = Array.isArray(draft && draft[d]) ? draft[d].map(Number).sort((a, b) => a - b) : [];
+    busy.forEach(p => {
+      const nm = String((namesMap && namesMap[`${d}_${p}`]) || "").trim();
+      if (nm && !map[nm]) {
+        map[nm] = TT_COURSE_PALETTE[idx % TT_COURSE_PALETTE.length];
+        idx += 1;
+      }
+    });
+  });
+  return map;
+}
+
+function buildMergedDayItems(day, draft, namesMap) {
+  const busySet = new Set(Array.isArray(draft && draft[day]) ? draft[day].map(Number) : []);
+  const items = [];
+  let p = 1;
+  while (p <= TT_PERIODS.length) {
+    if (!busySet.has(p)) {
+      items.push({ type: "empty", day, period: p });
+      p += 1;
+      continue;
+    }
+    const name = String((namesMap && namesMap[`${day}_${p}`]) || "").trim();
+    const periods = [p];
+    if (name) {
+      let next = p + 1;
+      while (next <= TT_PERIODS.length && busySet.has(next)) {
+        const nextName = String((namesMap && namesMap[`${day}_${next}`]) || "").trim();
+        if (nextName === name) {
+          periods.push(next);
+          next += 1;
+        } else {
+          break;
+        }
+      }
+    }
+    items.push({
+      type: "block",
+      day,
+      start: periods[0],
+      end: periods[periods.length - 1],
+      periods,
+      name
+    });
+    p = periods[periods.length - 1] + 1;
+  }
+  return items;
+}
 
 function getDayLabelFromDateStr(dateStr) {
   if (!dateStr) return "";
@@ -16,8 +98,8 @@ function getDayLabelFromDateStr(dateStr) {
 function getPeriodFromTimeStr(timeStr) {
   if (!timeStr || !String(timeStr).includes(":")) return null;
   const h = parseInt(String(timeStr).split(":")[0], 10);
-  if (isNaN(h) || h < 9 || h > 17) return null;
-  return h - 8; // 09:xx -> 1교시, 13:xx -> 5교시, 17:xx -> 9교시
+  if (isNaN(h) || h < 9 || h > 19) return null;
+  return h - 8; // 09:xx -> 1(9시), 13:xx -> 5(오후 1시), 19:xx -> 11(오후 7시)
 }
 
 function periodToTimeLabel(p) {
@@ -199,7 +281,9 @@ function openTimetableModal(tab) {
   const u = DB.users[state.user_id];
   if (u && !state._tt_draft) {
     state._tt_draft = JSON.parse(JSON.stringify(u.timetable || {}));
+    state._tt_names_draft = JSON.parse(JSON.stringify(u.timetable_names || {}));
   }
+  state._tt_selected_slots = null;
   state.timetable_tab = tab || (hasUserTimetable(state.user_id) ? "mates" : "edit");
   state.active_modal = "timetable";
   render();
@@ -208,66 +292,82 @@ function openTimetableModal(tab) {
 
 function closeTimetableModal() {
   state._tt_draft = null;
+  state._tt_names_draft = null;
+  state._tt_selected_slots = null;
   state.active_modal = null;
   render();
 }
 
-function toggleTimetableSlot(day, period) {
-  state._tt_draft = state._tt_draft || {};
-  state._tt_names_draft = state._tt_names_draft || JSON.parse(JSON.stringify((DB.users[state.user_id] && DB.users[state.user_id].timetable_names) || {}));
-  const arr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
-  const idx = arr.indexOf(Number(period));
-  const slotKey = `${day}_${period}`;
-  if (idx >= 0) {
-    arr.splice(idx, 1);
-    delete state._tt_names_draft[slotKey];
-    if (state._tt_selected_slot === slotKey) state._tt_selected_slot = null;
-  } else {
-    arr.push(Number(period));
-    state._tt_selected_slot = slotKey;
-  }
-  arr.sort((a, b) => a - b);
-  state._tt_draft[day] = arr;
+function ensureTimetableDrafts() {
+  const u = (DB && DB.users && DB.users[state.user_id]) || {};
+  if (!state._tt_draft) state._tt_draft = JSON.parse(JSON.stringify(u.timetable || {}));
+  if (!state._tt_names_draft) state._tt_names_draft = JSON.parse(JSON.stringify(u.timetable_names || {}));
+}
 
-  const btn = document.getElementById(`tt_cell_${day}_${period}`);
-  if (btn) {
-    const isBusy = arr.includes(Number(period));
-    const sName = (state._tt_names_draft && state._tt_names_draft[slotKey]) ? String(state._tt_names_draft[slotKey]).slice(0, 4) : "수업";
-    btn.style.background = isBusy ? "#287D62" : "#FFFFFF";
-    btn.style.color = isBusy ? "#FFFFFF" : "#98A2B3";
-    btn.style.borderColor = isBusy ? "#287D62" : "transparent";
-    btn.textContent = isBusy ? sName : "";
+function addTimetableEmptySlot(day, period) {
+  ensureTimetableDrafts();
+  const p = Number(period);
+  const arr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
+  if (!arr.includes(p)) {
+    arr.push(p);
+    arr.sort((a, b) => a - b);
+    state._tt_draft[day] = arr;
   }
-  const summaryEl = document.getElementById("tt-draft-summary");
-  if (summaryEl) {
-    summaryEl.textContent = buildTimetableDraftSummary(state._tt_draft);
+  state._tt_selected_slots = [`${day}_${p}`];
+  render();
+  const inp = document.getElementById("tt-course-name-input");
+  if (inp) inp.focus();
+}
+
+function selectTimetableBlock(day, periodsCsv) {
+  ensureTimetableDrafts();
+  const periods = String(periodsCsv || "").split(",").map(Number).filter(n => !isNaN(n));
+  const keys = periods.map(p => `${day}_${p}`);
+  const cur = Array.isArray(state._tt_selected_slots) ? state._tt_selected_slots : [];
+  const sameSelection = cur.length === keys.length && cur.every((k, i) => k === keys[i]);
+  if (sameSelection && keys.length === 1 && !(state._tt_names_draft && state._tt_names_draft[keys[0]])) {
+    // 이름 없는 단일 칸을 한 번 더 누르면 바로 해제
+    deleteSelectedTimetableSlots();
+    return;
   }
-  const courseInput = document.getElementById("tt-course-name-input");
-  const courseLabel = document.getElementById("tt-course-slot-label");
-  if (courseInput && courseLabel) {
-    if (state._tt_selected_slot) {
-      const [sd, sp] = state._tt_selected_slot.split("_");
-      courseLabel.textContent = `${sd} ${sp}교시 수업명`;
-      courseInput.value = (state._tt_names_draft && state._tt_names_draft[state._tt_selected_slot]) || "";
-      courseInput.disabled = false;
-    } else {
-      courseLabel.textContent = "수업 칸 선택";
-      courseInput.value = "";
-      courseInput.disabled = true;
-    }
-  }
+  state._tt_selected_slots = keys;
+  render();
+}
+
+function deleteSelectedTimetableSlots() {
+  ensureTimetableDrafts();
+  const sel = Array.isArray(state._tt_selected_slots) ? state._tt_selected_slots : [];
+  if (!sel.length) return;
+  sel.forEach(slotKey => {
+    const [d, pStr] = slotKey.split("_");
+    const p = Number(pStr);
+    const arr = Array.isArray(state._tt_draft[d]) ? state._tt_draft[d].map(Number) : [];
+    state._tt_draft[d] = arr.filter(x => x !== p);
+    if (state._tt_names_draft) delete state._tt_names_draft[slotKey];
+  });
+  state._tt_selected_slots = null;
+  render();
 }
 
 function updateSelectedSlotCourseName(val) {
-  if (!state._tt_selected_slot) return;
-  state._tt_names_draft = state._tt_names_draft || {};
-  const clean = String(val || "").trim().slice(0, 16);
-  if (clean) state._tt_names_draft[state._tt_selected_slot] = clean;
-  else delete state._tt_names_draft[state._tt_selected_slot];
-  const [sd, sp] = state._tt_selected_slot.split("_");
-  const btn = document.getElementById(`tt_cell_${sd}_${sp}`);
-  if (btn) {
-    btn.textContent = clean ? clean.slice(0, 4) : "수업";
+  ensureTimetableDrafts();
+  const sel = Array.isArray(state._tt_selected_slots) ? state._tt_selected_slots : [];
+  if (!sel.length) return;
+  const clean = String(val || "").trim().slice(0, 60);
+  sel.forEach(slotKey => {
+    if (clean) state._tt_names_draft[slotKey] = clean;
+    else delete state._tt_names_draft[slotKey];
+  });
+  const blockEl = document.getElementById(`tt_block_${sel[0]}`);
+  if (blockEl) {
+    const nameSpan = blockEl.querySelector(".tt-et-block-name");
+    if (nameSpan) nameSpan.textContent = clean || "수업";
+    const colorMap = buildCourseColorMap(state._tt_draft, state._tt_names_draft);
+    const pal = (clean && colorMap[clean]) ? colorMap[clean] : TT_COURSE_PALETTE[0];
+    blockEl.style.background = pal.bg;
+    blockEl.style.borderColor = pal.border;
+    blockEl.style.color = pal.text;
+    blockEl.style.borderLeftColor = pal.accent;
   }
 }
 
@@ -354,7 +454,7 @@ async function handleTimetableImageUpload(inputEl) {
     }
     state._tt_draft = data.timetable || {};
     state._tt_names_draft = data.timetable_names || {};
-    state._tt_selected_slot = null;
+    state._tt_selected_slots = null;
     render();
     showToast(`AI가 수업 ${cnt}칸을 자동으로 채웠어요! 확인 후 [시간표 저장]을 눌러주세요.`);
   } catch (e) {
@@ -377,7 +477,7 @@ function buildTimetableDraftSummary(ttObj) {
 function resetTimetableDraft() {
   state._tt_draft = { "월": [], "화": [], "수": [], "목": [], "금": [] };
   state._tt_names_draft = {};
-  state._tt_selected_slot = null;
+  state._tt_selected_slots = null;
   render();
   showToast("시간표를 초기화했어요.");
 }
@@ -388,7 +488,7 @@ function saveUserTimetable() {
   const draft = state._tt_draft || {};
   const clean = {};
   TT_DAYS.forEach(d => {
-    clean[d] = Array.isArray(draft[d]) ? [...new Set(draft[d].map(Number))].sort((a, b) => a - b) : [];
+    clean[d] = Array.isArray(draft[d]) ? [...new Set(draft[d].map(Number))].filter(n => n >= 1 && n <= TT_PERIODS.length).sort((a, b) => a - b) : [];
   });
   u.timetable = clean;
   u.timetable_names = state._tt_names_draft || u.timetable_names || {};
@@ -397,7 +497,7 @@ function saveUserTimetable() {
   saveDB(true);
   state._tt_draft = null;
   state._tt_names_draft = null;
-  state._tt_selected_slot = null;
+  state._tt_selected_slots = null;
   state.timetable_tab = "mates";
   showToast("시간표가 저장되었어요! 공강이 겹치는 학우를 확인해 보세요.");
   render();
@@ -425,9 +525,44 @@ function renderTimetableModal() {
   const namesMap = state._tt_names_draft || u.timetable_names || {};
   const hasSaved = hasUserTimetable(state.user_id);
   const mates = hasSaved ? getGonggangMates() : [];
-  const selSlot = state._tt_selected_slot || null;
-  const selSlotLabel = selSlot ? `${selSlot.split("_")[0]} ${selSlot.split("_")[1]}교시 수업명` : "수업 칸 선택";
-  const selSlotVal = selSlot ? (namesMap[selSlot] || "") : "";
+  const selSlots = Array.isArray(state._tt_selected_slots) && state._tt_selected_slots.length ? state._tt_selected_slots : null;
+  const selDay = selSlots ? selSlots[0].split("_")[0] : "";
+  const selPeriods = selSlots ? selSlots.map(k => Number(k.split("_")[1])).filter(n => !isNaN(n)) : [];
+  const selSlotLabel = selSlots ? formatEverytimeSlotRange(selDay, selPeriods) : "수업 선택";
+  const selSlotVal = selSlots ? (namesMap[selSlots[0]] || "") : "";
+  const colorMap = buildCourseColorMap(draft, namesMap);
+
+  const dayHeadersHtml = TT_DAYS.map((d, di) =>
+    `<div class="tt-et-day" style="grid-column:${di + 2}; grid-row:1;">${d}</div>`
+  ).join("");
+
+  const hourAxisHtml = TT_PERIODS.map((p, idx) =>
+    `<div class="tt-et-hour" style="grid-row:${idx + 2};">${periodToEverytimeHour(p)}</div>`
+  ).join("");
+
+  const cellsHtml = TT_DAYS.map((d, di) => {
+    const col = di + 2;
+    const items = buildMergedDayItems(d, draft, namesMap);
+    return items.map(item => {
+      if (item.type === "empty") {
+        const row = item.period + 1;
+        return `<button type="button" class="tt-et-empty" style="grid-column:${col}; grid-row:${row};" onclick="addTimetableEmptySlot('${d}', ${item.period})" aria-label="${d} ${periodToEverytimeHour(item.period)}시 추가"></button>`;
+      }
+      const rowStart = item.start + 1;
+      const rowEnd = item.end + 2;
+      const firstKey = `${d}_${item.start}`;
+      const pal = (item.name && colorMap[item.name]) ? colorMap[item.name] : TT_COURSE_PALETTE[0];
+      const isSelected = Boolean(selSlots && selSlots.includes(firstKey));
+      const periodsCsv = item.periods.join(",");
+      return `
+        <button type="button" id="tt_block_${firstKey}" class="tt-et-block ${isSelected ? 'selected' : ''}"
+          style="grid-column:${col}; grid-row:${rowStart} / ${rowEnd}; background:${pal.bg}; border-color:${pal.border}; border-left:3px solid ${pal.accent}; color:${pal.text};"
+          onclick="selectTimetableBlock('${d}', '${periodsCsv}')">
+          <span class="tt-et-block-name">${escHtml(item.name || "수업")}</span>
+        </button>
+      `;
+    }).join("");
+  }).join("");
 
   const editorHtml = `
     <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:18px;">
@@ -452,31 +587,21 @@ function renderTimetableModal() {
         <span style="font-size:12px; font-weight:800; color:#287D62; flex-shrink:0;">${state._tt_ai_loading ? '분석중' : '업로드 ›'}</span>
       </button>
 
-      <div style="background:#F7F9F8; border-radius:16px; padding:12px 10px; margin-bottom:12px;">
-        <div style="display:grid; grid-template-columns: 36px repeat(5, 1fr); gap:5px; user-select:none;">
-          <div></div>
-          ${TT_DAYS.map(d => `<div style="text-align:center; font-size:12px; font-weight:700; color:#6B7684; padding:2px 0 4px;">${d}</div>`).join("")}
-          ${TT_PERIODS.map(p => `
-            <div style="display:flex; align-items:center; justify-content:center; font-size:11px; color:#98A2B3; font-weight:700;">
-              ${p}
-            </div>
-            ${TT_DAYS.map(d => {
-              const isBusy = Array.isArray(draft[d]) && draft[d].map(Number).includes(p);
-              const sName = namesMap[`${d}_${p}`] ? String(namesMap[`${d}_${p}`]).slice(0, 4) : "수업";
-              return `
-                <button type="button" id="tt_cell_${d}_${p}" onclick="toggleTimetableSlot('${d}', ${p})" style="height:32px; border-radius:8px; border:1px solid ${isBusy ? '#287D62' : 'transparent'}; background:${isBusy ? '#287D62' : '#FFFFFF'}; color:${isBusy ? '#FFFFFF' : '#98A2B3'}; font-size:10.5px; font-weight:700; cursor:pointer; transition:all 0.12s; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                  ${isBusy ? escHtml(sName) : ''}
-                </button>
-              `;
-            }).join("")}
-          `).join("")}
+      <!-- 에브리타임 기준 시간표 (9시 ~ 오후 7시) -->
+      <div class="tt-et-wrap">
+        <div class="tt-et-grid">
+          <div class="tt-et-corner"></div>
+          ${dayHeadersHtml}
+          ${hourAxisHtml}
+          ${cellsHtml}
         </div>
       </div>
 
-      <!-- 선택 칸 수업명 한 줄 입력 (선택) -->
-      <div style="display:flex; align-items:center; gap:8px; background:#F7F9F8; border-radius:14px; padding:6px 10px 6px 14px; margin-bottom:14px;">
-        <span id="tt-course-slot-label" style="font-size:11.5px; font-weight:700; color:#6B7684; white-space:nowrap;">${escHtml(selSlotLabel)}</span>
-        <input id="tt-course-name-input" type="text" maxlength="16" value="${escHtml(selSlotVal)}" ${selSlot ? '' : 'disabled'} placeholder="수업명 입력 (선택)" oninput="updateSelectedSlotCourseName(this.value)" style="flex:1; min-width:0; height:32px; border:none; background:transparent; font-size:13px; color:#191F28; outline:none;" />
+      <!-- 선택 수업명 수정 · 삭제 바 -->
+      <div class="tt-et-editor-bar">
+        <span id="tt-course-slot-label" style="font-size:11.5px; font-weight:800; color:#287D62; white-space:nowrap;">${escHtml(selSlotLabel)}</span>
+        <input id="tt-course-name-input" type="text" maxlength="60" value="${escHtml(selSlotVal)}" ${selSlots ? '' : 'disabled'} placeholder="${selSlots ? '수업명 전체 입력' : '수업 칸을 눌러 수정·삭제'}" oninput="updateSelectedSlotCourseName(this.value)" onchange="render()" style="flex:1; min-width:0; height:32px; border:none; background:transparent; font-size:13px; color:#191F28; outline:none;" />
+        ${selSlots ? `<button type="button" class="tt-et-del-btn" onclick="deleteSelectedTimetableSlots()">삭제</button>` : ''}
       </div>
 
       <button type="button" onclick="saveUserTimetable()" style="width:100%; height:46px; border-radius:23px; border:none; background:#287D62; color:#FFFFFF; font-size:14.5px; font-weight:800; cursor:pointer;">시간표 저장</button>
