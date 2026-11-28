@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3q" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3r" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -5746,27 +5746,27 @@
       updateCreateTriggerLabels();
     }
 
-    let _dtSheetDraft = { date: "", ampm: "PM", hour: 12, min: "30" };
+    let _dtSheetDraft = { mode: "time", date: "", ampm: "PM", hour: 12, min: "30" };
     const _dtWheelRaf = {};
 
     function updateDtSheetPreviewText() {
       const el = document.getElementById("dt_sheet_preview");
       if (!el) return;
+      if (_dtSheetDraft.mode === "date") {
+        el.textContent = formatCreateDateLabel(_dtSheetDraft.date);
+        return;
+      }
       let h = Number(_dtSheetDraft.hour) || 12;
       if (_dtSheetDraft.ampm === "PM" && h < 12) h += 12;
       if (_dtSheetDraft.ampm === "AM" && h === 12) h = 0;
       const hhmm = `${String(h).padStart(2, "0")}:${String(_dtSheetDraft.min || "00").padStart(2, "0")}`;
-      el.textContent = `${formatCreateDateLabel(_dtSheetDraft.date)} · ${formatCreateTimeLabel(hhmm)}`;
+      el.textContent = formatCreateTimeLabel(hhmm);
     }
 
     function selectDtSheetDate(iso) {
       _dtSheetDraft.date = iso;
-      document.querySelectorAll("#create-datetime-sheet-root .date-pill-v3").forEach(btn => {
-        const on = btn.getAttribute("data-date") === iso;
-        btn.classList.toggle("active", on);
-        if (on) {
-          try { btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } catch (e) {}
-        }
+      document.querySelectorAll("#create-datetime-sheet-root [data-date]").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-date") === iso);
       });
       updateDtSheetPreviewText();
     }
@@ -5798,7 +5798,54 @@
       });
     }
 
-    function openCreateDateTimeSheet() {
+    function buildDateSheetCalendarHtml(selectedIso) {
+      const todayIso = getTodayStr();
+      const base = new Date();
+      base.setHours(0, 0, 0, 0);
+      const startDow = base.getDay();
+      const gridStart = new Date(base);
+      gridStart.setDate(base.getDate() - startDow);
+
+      const cells = [];
+      for (let i = 0; i < 28; i++) {
+        const d = new Date(gridStart);
+        d.setDate(gridStart.getDate() + i);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const day = d.getDate();
+        const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const isPast = iso < todayIso;
+        const isToday = iso === todayIso;
+        const isSelected = iso === selectedIso;
+        const label = (day === 1 && !isToday) ? `${m}/1` : String(day);
+        cells.push(`
+          <button type="button" class="cal-cell-v3 ${isToday ? 'today' : ''} ${isSelected ? 'active' : ''}" data-date="${iso}" ${isPast ? 'disabled' : `onclick="selectDtSheetDate('${iso}')"`}>
+            <span>${label}</span>
+          </button>
+        `);
+      }
+
+      const tm = new Date(base);
+      tm.setDate(base.getDate() + 1);
+      const tomorrowIso = `${tm.getFullYear()}-${String(tm.getMonth() + 1).padStart(2, "0")}-${String(tm.getDate()).padStart(2, "0")}`;
+
+      return `
+        <div style="display:flex; gap:6px; margin-bottom:12px;">
+          <button type="button" class="date-pill-v3 ${selectedIso === todayIso ? 'active' : ''}" data-date="${todayIso}" onclick="selectDtSheetDate('${todayIso}')" style="flex:1; flex-direction:row; gap:6px; height:38px; padding:0 12px;">
+            <span style="font-size:13px; font-weight:800;">오늘</span>
+          </button>
+          <button type="button" class="date-pill-v3 ${selectedIso === tomorrowIso ? 'active' : ''}" data-date="${tomorrowIso}" onclick="selectDtSheetDate('${tomorrowIso}')" style="flex:1; flex-direction:row; gap:6px; height:38px; padding:0 12px;">
+            <span style="font-size:13px; font-weight:800;">내일</span>
+          </button>
+        </div>
+        <div class="cal-grid-v3" style="margin-bottom:16px;">
+          ${["일", "월", "화", "수", "목", "금", "토"].map(w => `<div class="cal-dow-v3">${w}</div>`).join("")}
+          ${cells.join("")}
+        </div>
+      `;
+    }
+
+    function openCreateDateTimeSheet(mode = "time") {
       const root = document.getElementById("create-datetime-sheet-root");
       if (!root) return;
       const curDate = (document.getElementById("c_date")?.value) || getTodayStr();
@@ -5806,84 +5853,88 @@
       const curHour = parseInt(document.getElementById("c_time_hour")?.value || "12", 10) || 12;
       const curMinRaw = parseInt(document.getElementById("c_time_min")?.value || "30", 10);
       const curMin = String((Math.round((isNaN(curMinRaw) ? 30 : curMinRaw) / 5) * 5) % 60).padStart(2, "0");
-      _dtSheetDraft = { date: curDate, ampm: curAmPm, hour: curHour, min: curMin };
+      _dtSheetDraft = { mode, date: curDate, ampm: curAmPm, hour: curHour, min: curMin };
 
-      const upcomingDates = getUpcomingCreateDates(14);
+      const isDateMode = (mode === "date");
+      const titleText = isDateMode ? "만날 날짜 선택" : "만날 시간 선택";
+      const confirmText = isDateMode ? "이 날짜로 선택" : "이 시간으로 선택";
+
+      const bodyHtml = isDateMode
+        ? buildDateSheetCalendarHtml(curDate)
+        : `
+          <div class="time-wheel-v3" style="margin-bottom:16px;">
+            <div class="time-wheel-highlight"></div>
+            <div class="time-wheel-fade-top"></div>
+            <div class="time-wheel-fade-bottom"></div>
+
+            <div id="dt_wheel_ampm" class="time-wheel-col" onscroll="handleDtWheelScroll('ampm')">
+              <div class="time-wheel-spacer"></div>
+              ${TIME_WHEEL_AMPMS.map((v, idx) => `
+                <button type="button" class="time-wheel-item ${v === curAmPm ? 'active' : ''}" onclick="snapDtWheel('ampm', ${idx}, true)">${v === 'AM' ? '오전' : '오후'}</button>
+              `).join("")}
+              <div class="time-wheel-spacer"></div>
+            </div>
+
+            <div id="dt_wheel_hour" class="time-wheel-col" onscroll="handleDtWheelScroll('hour')">
+              <div class="time-wheel-spacer"></div>
+              ${TIME_WHEEL_HOURS.map((h, idx) => `
+                <button type="button" class="time-wheel-item ${h === curHour ? 'active' : ''}" onclick="snapDtWheel('hour', ${idx}, true)">${h}시</button>
+              `).join("")}
+              <div class="time-wheel-spacer"></div>
+            </div>
+
+            <div class="time-wheel-colon">:</div>
+
+            <div id="dt_wheel_min" class="time-wheel-col" onscroll="handleDtWheelScroll('min')">
+              <div class="time-wheel-spacer"></div>
+              ${TIME_WHEEL_MINS.map((m, idx) => `
+                <button type="button" class="time-wheel-item ${m === curMin ? 'active' : ''}" onclick="snapDtWheel('min', ${idx}, true)">${m}분</button>
+              `).join("")}
+              <div class="time-wheel-spacer"></div>
+            </div>
+          </div>
+        `;
+
       root.innerHTML = `
-        <div class="profile-sheet-backdrop" role="dialog" aria-modal="true" aria-label="만날 날짜와 시간 선택" onclick="if(event.target===this){ closeCreateDateTimeSheet(); }">
-          <div class="profile-sheet-panel" onclick="event.stopPropagation()" style="max-width:440px;">
+        <div class="profile-sheet-backdrop" role="dialog" aria-modal="true" aria-label="${titleText}" onclick="if(event.target===this){ closeCreateDateTimeSheet(); }">
+          <div class="profile-sheet-panel" onclick="event.stopPropagation()" style="max-width:420px;">
             <div class="profile-sheet-grabber"></div>
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px;">
               <div>
-                <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">만날 날짜 · 시간</div>
+                <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">${titleText}</div>
                 <div id="dt_sheet_preview" style="font-size:var(--fs-sm); font-weight:700; color:#287D62; margin-top:2px;"></div>
               </div>
               <button type="button" aria-label="닫기" onclick="closeCreateDateTimeSheet()" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer;">✕</button>
             </div>
-
-            <div class="date-strip-v3" style="margin-bottom:14px;">
-              ${upcomingDates.map(d => `
-                <button type="button" class="date-pill-v3 ${d.iso === curDate ? 'active' : ''}" data-date="${d.iso}" onclick="selectDtSheetDate('${d.iso}')">
-                  <span class="date-pill-dow">${escHtml(d.topLbl)}</span>
-                  <span class="date-pill-num">${escHtml(d.numLbl)}</span>
-                </button>
-              `).join("")}
-            </div>
-
-            <div class="time-wheel-v3" style="margin-bottom:16px;">
-              <div class="time-wheel-highlight"></div>
-              <div class="time-wheel-fade-top"></div>
-              <div class="time-wheel-fade-bottom"></div>
-
-              <div id="dt_wheel_ampm" class="time-wheel-col" onscroll="handleDtWheelScroll('ampm')">
-                <div class="time-wheel-spacer"></div>
-                ${TIME_WHEEL_AMPMS.map((v, idx) => `
-                  <button type="button" class="time-wheel-item ${v === curAmPm ? 'active' : ''}" onclick="snapDtWheel('ampm', ${idx}, true)">${v === 'AM' ? '오전' : '오후'}</button>
-                `).join("")}
-                <div class="time-wheel-spacer"></div>
-              </div>
-
-              <div id="dt_wheel_hour" class="time-wheel-col" onscroll="handleDtWheelScroll('hour')">
-                <div class="time-wheel-spacer"></div>
-                ${TIME_WHEEL_HOURS.map((h, idx) => `
-                  <button type="button" class="time-wheel-item ${h === curHour ? 'active' : ''}" onclick="snapDtWheel('hour', ${idx}, true)">${h}시</button>
-                `).join("")}
-                <div class="time-wheel-spacer"></div>
-              </div>
-
-              <div class="time-wheel-colon">:</div>
-
-              <div id="dt_wheel_min" class="time-wheel-col" onscroll="handleDtWheelScroll('min')">
-                <div class="time-wheel-spacer"></div>
-                ${TIME_WHEEL_MINS.map((m, idx) => `
-                  <button type="button" class="time-wheel-item ${m === curMin ? 'active' : ''}" onclick="snapDtWheel('min', ${idx}, true)">${m}분</button>
-                `).join("")}
-                <div class="time-wheel-spacer"></div>
-              </div>
-            </div>
-
-            <button type="button" class="btn btn-primary" style="min-height:50px; border-radius:16px; font-size:var(--fs-md); font-weight:800;" onclick="applyCreateDateTimeSheet()">이 시간으로 선택</button>
+            ${bodyHtml}
+            <button type="button" class="btn btn-primary" style="min-height:50px; border-radius:16px; font-size:var(--fs-md); font-weight:800;" onclick="applyCreateDateTimeSheet()">${confirmText}</button>
           </div>
         </div>
       `;
       updateDtSheetPreviewText();
-      requestAnimationFrame(() => {
-        snapDtWheel("ampm", curAmPm === "PM" ? 1 : 0, false);
-        snapDtWheel("hour", Math.max(0, TIME_WHEEL_HOURS.indexOf(curHour)), false);
-        snapDtWheel("min", Math.max(0, TIME_WHEEL_MINS.indexOf(curMin)), false);
-      });
+      if (!isDateMode) {
+        requestAnimationFrame(() => {
+          snapDtWheel("ampm", curAmPm === "PM" ? 1 : 0, false);
+          snapDtWheel("hour", Math.max(0, TIME_WHEEL_HOURS.indexOf(curHour)), false);
+          snapDtWheel("min", Math.max(0, TIME_WHEEL_MINS.indexOf(curMin)), false);
+        });
+      }
     }
 
     function applyCreateDateTimeSheet() {
-      const dateEl = document.getElementById("c_date");
-      const ampmEl = document.getElementById("c_time_ampm");
-      const hrEl = document.getElementById("c_time_hour");
-      const minEl = document.getElementById("c_time_min");
-      if (dateEl) dateEl.value = _dtSheetDraft.date;
-      if (ampmEl) ampmEl.value = _dtSheetDraft.ampm;
-      if (hrEl) hrEl.value = String(_dtSheetDraft.hour);
-      if (minEl) minEl.value = String(_dtSheetDraft.min).padStart(2, "0");
-      syncCreateTimeFromParts();
+      if (_dtSheetDraft.mode === "date") {
+        const dateEl = document.getElementById("c_date");
+        if (dateEl) dateEl.value = _dtSheetDraft.date;
+        updateCreateTriggerLabels();
+      } else {
+        const ampmEl = document.getElementById("c_time_ampm");
+        const hrEl = document.getElementById("c_time_hour");
+        const minEl = document.getElementById("c_time_min");
+        if (ampmEl) ampmEl.value = _dtSheetDraft.ampm;
+        if (hrEl) hrEl.value = String(_dtSheetDraft.hour);
+        if (minEl) minEl.value = String(_dtSheetDraft.min).padStart(2, "0");
+        syncCreateTimeFromParts();
+      }
       closeCreateDateTimeSheet();
     }
 
@@ -6222,14 +6273,14 @@
                   const initVal = `${String(initH24).padStart(2, "0")}:${initM}`;
                   return `
                     <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-                      <button type="button" class="dt-trigger-btn" onclick="openCreateDateTimeSheet()">
+                      <button type="button" class="dt-trigger-btn" onclick="openCreateDateTimeSheet('date')">
                         <span style="display:inline-flex; align-items:center; gap:8px; min-width:0;">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                           <span id="c_date_label" style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(formatCreateDateLabel(initDate))}</span>
                         </span>
                         <span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; flex-shrink:0;">변경 ›</span>
                       </button>
-                      <button type="button" class="dt-trigger-btn" onclick="openCreateDateTimeSheet()">
+                      <button type="button" class="dt-trigger-btn" onclick="openCreateDateTimeSheet('time')">
                         <span style="display:inline-flex; align-items:center; gap:8px; min-width:0;">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
                           <span id="c_time_label" style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(formatCreateTimeLabel(initVal))}</span>
