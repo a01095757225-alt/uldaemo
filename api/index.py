@@ -438,25 +438,35 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
 def _gemini_endpoint_candidates(models):
     key = (GEMINI_API_KEY or "").strip()
     is_vertex_express = key.startswith("AQ.")
+    q_key = urllib.parse.quote(key, safe="")
     endpoints = []
     if is_vertex_express:
         for m in models:
-            endpoints.append((m, f"https://aiplatform.googleapis.com/v1/publishers/google/models/{m}:generateContent"))
-        endpoints.append((models[0], f"https://generativelanguage.googleapis.com/v1beta/models/{models[0]}:generateContent"))
+            endpoints.append((m, f"https://aiplatform.googleapis.com/v1/publishers/google/models/{m}:generateContent?key={q_key}"))
+        endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1beta1/publishers/google/models/{models[0]}:generateContent?key={q_key}"))
+        endpoints.append((models[0], f"https://generativelanguage.googleapis.com/v1beta/models/{models[0]}:generateContent?key={q_key}"))
     else:
         for m in models:
-            endpoints.append((m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"))
-        endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1/publishers/google/models/{models[0]}:generateContent"))
+            endpoints.append((m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={q_key}"))
+        endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1/publishers/google/models/{models[0]}:generateContent?key={q_key}"))
     return endpoints
 
 
-def call_gemini_api(prompt: str) -> str:
+def _scrub_secret(text: str) -> str:
+    s = str(text or "")
+    if GEMINI_API_KEY:
+        s = s.replace(GEMINI_API_KEY, "***")
+    return s
+
+
+def _call_gemini_text_with_diag(prompt: str):
     if not GEMINI_API_KEY:
-        return ""
-    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash"]):
+        return "", "missing_key"
+    last_err = "unknown"
+    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash"]):
         try:
             gen_cfg = {"temperature": 0.2}
-            if "2.5" in model_name:
+            if "2.5" in model_name and "aiplatform" not in url:
                 gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
             payload = json.dumps({
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -465,10 +475,7 @@ def call_gemini_api(prompt: str) -> str:
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={
-                    "x-goog-api-key": GEMINI_API_KEY,
-                    "Content-Type": "application/json",
-                },
+                headers={"Content-Type": "application/json"},
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=6) as resp:
@@ -476,23 +483,38 @@ def call_gemini_api(prompt: str) -> str:
                 parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                 chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
                 if chunks:
-                    return "\n".join(chunks).strip()
-        except Exception:
+                    return "\n".join(chunks).strip(), ""
+        except urllib.error.HTTPError as he:
+            err_body = ""
+            try:
+                err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:220]
+            except Exception:
+                pass
+            host_tag = "vertex" if "aiplatform" in url else "aistudio"
+            last_err = _scrub_secret(f"{host_tag}/{model_name} HTTP {he.code}: {err_body}")
             continue
-    return ""
+        except Exception as ex:
+            host_tag = "vertex" if "aiplatform" in url else "aistudio"
+            last_err = _scrub_secret(f"{host_tag}/{model_name} {str(ex)[:140]}")
+    return "", last_err
+
+
+def call_gemini_api(prompt: str) -> str:
+    txt, _ = _call_gemini_text_with_diag(prompt)
+    return txt
 
 
 def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
     if not GEMINI_API_KEY or not image_b64:
         return None, "missing_key"
     last_err = "unknown"
-    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash"]):
+    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash"]):
         try:
             gen_cfg = {
                 "responseMimeType": "application/json",
                 "temperature": 0.1,
             }
-            if "2.5" in model_name:
+            if "2.5" in model_name and "aiplatform" not in url:
                 gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
             payload = json.dumps({
                 "contents": [{
@@ -507,10 +529,7 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={
-                    "x-goog-api-key": GEMINI_API_KEY,
-                    "Content-Type": "application/json",
-                },
+                headers={"Content-Type": "application/json"},
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
@@ -532,10 +551,12 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
                 err_body = he.read().decode("utf-8", "ignore").replace("\n", " ")[:220]
             except Exception:
                 pass
-            last_err = f"HTTP {he.code}: {err_body}"
+            host_tag = "vertex" if "aiplatform" in url else "aistudio"
+            last_err = _scrub_secret(f"{host_tag}/{model_name} HTTP {he.code}: {err_body}")
             continue
         except Exception as ex:
-            last_err = str(ex)[:160]
+            host_tag = "vertex" if "aiplatform" in url else "aistudio"
+            last_err = _scrub_secret(f"{host_tag}/{model_name} {str(ex)[:140]}")
     return None, last_err
 
 
@@ -2600,9 +2621,12 @@ class handler(BaseHTTPRequestHandler):
                 "다음 메시지에 심한 욕설, 성적 발언, 또는 '카톡', '전번', '번호', '라인', '인스타' 등 "
                 f"사적인 연락처를 요구하는 내용이 있다면 '경고', 평범한 대화라면 '통과'라고만 대답해. 메시지: {text}"
             )
-            reply = call_gemini_api(prompt)
+            reply, diag = _call_gemini_text_with_diag(prompt)
             blocked = "경고" in reply
-            self._send_json(200, {"ok": True, "blocked": blocked, "reply": reply})
+            res_body = {"ok": True, "blocked": blocked, "reply": reply}
+            if not reply and diag:
+                res_body["diag"] = diag[:220]
+            self._send_json(200, res_body)
             return
 
         if action == "parse_timetable_image":
