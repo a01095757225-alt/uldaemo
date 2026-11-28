@@ -466,7 +466,7 @@ def _gemini_one_call(model_name, url, body_obj, timeout_sec):
             # gemini-3.8-flash 기본 thinking이 7초+ 걸려 Vercel 10초 제한에 걸리므로 가벼운 예산으로 제한
             req_body = json.loads(json.dumps(body_obj))
             gc = req_body.setdefault("generationConfig", {})
-            gc["thinkingConfig"] = {"thinkingBudget": 256}
+            gc["thinkingConfig"] = {"thinkingBudget": 512}
         req = urllib.request.Request(
             url,
             data=json.dumps(req_body).encode("utf-8"),
@@ -492,7 +492,7 @@ def _gemini_one_call(model_name, url, body_obj, timeout_sec):
         return "", _scrub_secret(f"{model_name} {str(ex)[:80]}")
 
 
-def _gemini_race(body_obj, validator=None, timeout_sec=6.5, models=None, prefer_non_lite=False):
+def _gemini_race(body_obj, validator=None, timeout_sec=7.5, models=None, prefer_non_lite=False):
     """여러 모델에 동시에 요청하고 유효한 응답을 사용 (Vercel 10초 제한 내 확실히 응답)."""
     from concurrent.futures import as_completed
     cands = _gemini_endpoint_candidates(models or GEMINI_MODEL_CANDIDATES)
@@ -2699,28 +2699,27 @@ class handler(BaseHTTPRequestHandler):
             tt_prompt = (
                 "너는 한국 대학교 에브리타임(Everytime) 시간표 스크린샷을 30분 단위로 정밀 판독하는 시각 OCR 전문가야.\n"
                 "첨부된 시간표 이미지에서 월, 화, 수, 목, 금 5개 요일 열을 왼쪽부터 오른쪽까지 하나도 빠짐없이 스캔해서 모든 수업 블록을 JSON으로 반환해줘.\n\n"
-                "[에브리타임 시각 격자 정밀 판독 규칙]\n"
+                "[에브리타임 시각 격자 정밀 판독 규칙 — 매우 중요!]\n"
                 "1) 왼쪽 시간축 숫자 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7은 각각 1시간 높이의 가로 행(칸)이며 24시간제로 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00이야.\n"
                 "   - 오후 숫자 1=13:00, 2=14:00, 3=15:00, 4=16:00, 5=17:00, 6=18:00, 7=19:00이며, 7행의 바닥선은 20:00이야.\n"
-                "2) 색깔 블록의 [맨 윗변]과 [맨 아랫변]이 가로 격자선 대비 어느 위치에 있는지 30분 단위(HH:00 또는 HH:30)로 읽어줘:\n"
-                "   - 한 칸 높이의 80~100%를 채우면 1시간 수업 (예: 9행 상단~10행 선 바로 위 -> start: \"09:00\", end: \"10:00\")\n"
-                "   - 한 칸을 지나 다음 칸의 절반(약 50%)에서 끝나면 1시간 30분 수업 (예: 4행 상단~5행 절반 -> start: \"16:00\", end: \"17:30\")\n"
-                "   - 두 칸 높이의 85~100%를 채우면 2시간 수업 (예: 9행 상단~10행 바닥 근처 -> start: \"09:00\", end: \"11:00\" / 4행~5행 바닥(6행 선) -> start: \"16:00\", end: \"18:00\" / 6행~7행 바닥 -> start: \"18:00\", end: \"20:00\")\n"
-                "   - 세 칸 높이의 85~100%를 채우면 3시간 수업 (예: 2행 상단~4행 바닥 근처 -> start: \"14:00\", end: \"17:00\")\n"
-                "3) 절대 과목 글자가 있는 첫 칸만 보지 말고, 반드시 색깔 박스의 맨 아래쪽 끝선이 닿는 시간 행을 기준으로 end를 계산해!\n"
-                "4) 같은 과목이 여러 요일에 있으면 요일별로 각각 빠짐없이 모두 출력해! (예: 월요일과 화요일에 둘 다 있으면 2개, 목요일과 금요일에 둘 다 있으면 2개)\n"
-                "5) 과목명은 강의실 번호(5-106, 7-613, 19호관 등)만 빼고 줄이지 말고 전체 이름을 그대로 적어줘.\n"
-                "6) 반드시 아래 JSON 스키마만 출력해:\n"
+                "2) 각 색깔 블록마다 반드시 [맨 윗변]과 [맨 아랫변] 사이의 세로 칸 수(span_hours: 0.5, 1.0, 1.5, 2.0, 2.5, 3.0 등)를 가로 격자선과 직접 대조해서 먼저 세어줘!\n"
+                "   - 1칸 높이(약 80~100%): span_hours: 1.0 (예: 9행 안에서 끝나고 10행으로 안 넘어감 -> start: \"09:00\", end: \"10:00\")\n"
+                "   - 1칸 반 높이(다음 칸 절반 50%): span_hours: 1.5 (예: 4행~5행 절반 -> start: \"16:00\", end: \"17:30\")\n"
+                "   - 2칸 높이(가로선 1개를 뚫고 다음 칸의 80~100%까지 내려옴): span_hours: 2.0 (예: 9행~10행 바닥 -> start: \"09:00\", end: \"11:00\" / 12행~1행 바닥 -> start: \"12:00\", end: \"14:00\" / 6행~7행 바닥 -> start: \"18:00\", end: \"20:00\")\n"
+                "   - 3칸 높이(가로선 2개를 뚫고 3번째 칸 80~100%까지 내려옴): span_hours: 3.0 (예: 2행~4행 바닥 -> start: \"14:00\", end: \"17:00\")\n"
+                "3) [치명적 실수 방지] 같은 과목명이 다른 요일에도 있을 때, 요일마다 수업 길이가 다를 수 있어! (예: 목요일은 2칸(2시간)인데 금요일은 1칸(1시간)이거나, 화요일은 2칸(2시간)인데 수요일은 1칸(1시간)인 경우가 매우 흔함!)\n"
+                "   -> 절대 다른 요일의 길이를 복사하지 말고, 매 블록의 색깔 박스 아랫변이 실제로 몇 번째 가로선 아래까지 내려오는지 독립적으로 확인해서 span_hours와 end를 계산해!\n"
+                "4) 과목명은 강의실 번호(5-106, 7-613, 19호관 등)만 빼고 줄이지 말고 전체 이름을 그대로 적어줘.\n"
+                "5) 반드시 아래 JSON 스키마만 출력해:\n"
                 "{\n"
                 "  \"courses\": [\n"
-                "    {\"day\": \"월\", \"name\": \"ICT융합개론\", \"start\": \"16:00\", \"end\": \"17:00\"},\n"
-                "    {\"day\": \"화\", \"name\": \"인본적사고와공동체의가치\", \"start\": \"09:00\", \"end\": \"11:00\"},\n"
-                "    {\"day\": \"목\", \"name\": \"기초프로그래밍II\", \"start\": \"14:00\", \"end\": \"17:00\"},\n"
-                "    {\"day\": \"금\", \"name\": \"미적분학II\", \"start\": \"09:00\", \"end\": \"10:00\"},\n"
-                "    {\"day\": \"금\", \"name\": \"멘토멘티\", \"start\": \"16:00\", \"end\": \"18:00\"}\n"
+                "    {\"day\": \"화\", \"name\": \"기초확률\", \"start\": \"12:00\", \"span_hours\": 2.0, \"end\": \"14:00\"},\n"
+                "    {\"day\": \"수\", \"name\": \"기초확률\", \"start\": \"11:00\", \"span_hours\": 1.0, \"end\": \"12:00\"},\n"
+                "    {\"day\": \"목\", \"name\": \"미적분학II\", \"start\": \"09:00\", \"span_hours\": 2.0, \"end\": \"11:00\"},\n"
+                "    {\"day\": \"금\", \"name\": \"미적분학II\", \"start\": \"09:00\", \"span_hours\": 1.0, \"end\": \"10:00\"}\n"
                 "  ]\n"
                 "}\n"
-                "7) 시간표가 전혀 보이지 않으면 {\"courses\": []}를 반환해."
+                "6) 시간표가 전혀 보이지 않으면 {\"courses\": []}를 반환해."
             )
             parsed, err_detail = call_gemini_vision_json(tt_prompt, raw_img, mime)
             if not isinstance(parsed, dict):
@@ -2770,6 +2769,14 @@ class handler(BaseHTTPRequestHandler):
                         em = (em_h + 60) if em_h is not None else None
                     if sm is None:
                         continue
+                    span_h = item.get("span_hours")
+                    if span_h is not None:
+                        try:
+                            sp_min = int(round(float(span_h) * 2.0)) * 30
+                            if 30 <= sp_min <= 360:
+                                em = min(1200, sm + sp_min)
+                        except Exception:
+                            pass
                     if em is None or em <= sm:
                         em = min(1200, sm + 60)
                     nm = str(item.get("name") or "").strip()[:60]
