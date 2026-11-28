@@ -644,12 +644,20 @@ function refineTimetableBlocksWithPixelHeights(canvas, blocks) {
     ratios.sort((a, b) => a - b);
     const pxPerHour = ratios[Math.floor(ratios.length / 2)];
 
-    // 5) 각 블록의 실제 픽셀 높이로 30분 단위 정밀 수업 길이 보정
+    // 4-2) 09:00 기준 y좌표(baseY)를 전체 블록의 중앙값으로 산출하여 시작 시간(start_min) 오차도 함께 보정
+    const baseYs = pairs.map(({ b, seg }) => seg.y1 - ((Number(b.start_min) - 540) / 60) * pxPerHour);
+    baseYs.sort((a, b) => a - b);
+    const baseY = baseYs[Math.floor(baseYs.length / 2)];
+
+    // 5) 각 블록의 실제 픽셀 위치(y1)와 높이(h)로 30분 단위 정밀 시작·종료 시간 보정
     const refined = blocks.map(b => Object.assign({}, b));
-    pairs.forEach(({ idx, b, seg }) => {
+    pairs.forEach(({ idx, seg }) => {
+      const startHours = (seg.y1 - baseY) / pxPerHour;
+      const snappedStart = Math.max(540, Math.min(1170, 540 + Math.round(startHours * 2) * 30));
       const rawHours = seg.h / pxPerHour;
       const snappedMins = Math.max(30, Math.min(360, Math.round((rawHours + 0.14) * 2) * 30));
-      refined[idx].end_min = Math.min(1200, Number(b.start_min) + snappedMins);
+      refined[idx].start_min = snappedStart;
+      refined[idx].end_min = Math.min(1200, snappedStart + snappedMins);
     });
     return refined;
   } catch (e) {
