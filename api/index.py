@@ -486,30 +486,36 @@ def _gemini_one_call(model_name, url, body_obj, timeout_sec):
         return "", _scrub_secret(f"{model_name} {str(ex)[:80]}")
 
 
-def _gemini_race(body_obj, validator=None, timeout_sec=8.5):
-    """여러 모델에 동시에 요청하고 먼저 유효하게 성공한 응답을 사용 (Vercel 10초 제한 대응)."""
+def _gemini_race(body_obj, validator=None, timeout_sec=8.5, models=None, prefer_non_lite=False):
+    """여러 모델에 동시에 요청하고 유효한 응답을 사용 (비전 OCR은 비-lite 모델 우선)."""
     from concurrent.futures import as_completed
-    cands = _gemini_endpoint_candidates(GEMINI_MODEL_CANDIDATES)
+    cands = _gemini_endpoint_candidates(models or GEMINI_MODEL_CANDIDATES)
     errs = []
+    lite_fallback = None
     ex = ThreadPoolExecutor(max_workers=len(cands))
     try:
-        futs = [ex.submit(_gemini_one_call, m, u, body_obj, timeout_sec) for m, u in cands]
+        fut_to_model = {ex.submit(_gemini_one_call, m, u, body_obj, timeout_sec): m for m, u in cands}
         try:
-            for fut in as_completed(futs, timeout=timeout_sec + 0.8):
+            for fut in as_completed(list(fut_to_model.keys()), timeout=timeout_sec + 0.6):
+                m_name = fut_to_model[fut]
                 txt, err = fut.result()
                 if txt:
-                    if validator is None:
-                        return txt, ""
-                    val = validator(txt)
+                    val = txt if validator is None else validator(txt)
                     if val is not None:
+                        if prefer_non_lite and "lite" in m_name:
+                            if lite_fallback is None:
+                                lite_fallback = val
+                            continue
                         return val, ""
-                    errs.append("invalid_output")
+                    errs.append(f"{m_name}:invalid_output")
                 else:
                     errs.append(err)
         except Exception:
             errs.append("race_timeout")
     finally:
         ex.shutdown(wait=False)
+    if lite_fallback is not None:
+        return lite_fallback, ""
     return None, " | ".join(errs)[:360]
 
 
@@ -555,9 +561,15 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
                 {"inlineData": {"mimeType": mime_type, "data": image_b64}},
             ],
         }],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.1},
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.05},
     }
-    return _gemini_race(body, validator=_parse_json_loose, timeout_sec=8.5)
+    return _gemini_race(
+        body,
+        validator=_parse_json_loose,
+        timeout_sec=8.5,
+        models=["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite"],
+        prefer_non_lite=True,
+    )
 
 
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
@@ -2655,22 +2667,28 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             tt_prompt = (
-                "너는 한국 대학교(울산대학교, 에브리타임 앱 등) 시간표 스크린샷을 분석하는 OCR 도우미야.\n"
-                "첨부된 시간표 이미지에서 월, 화, 수, 목, 금요일의 수업 시간과 과목명을 정확하게 읽어 JSON으로 반환해줘.\n"
-                "에브리타임 시간대(1~11) 매핑 기준:\n"
-                "- 1: 오전 9시 (09:00~10:00), 2: 오전 10시 (10:00~11:00), 3: 오전 11시 (11:00~12:00)\n"
-                "- 4: 오후 12시 (12:00~13:00), 5: 오후 1시 (13:00~14:00), 6: 오후 2시 (14:00~15:00)\n"
-                "- 7: 오후 3시 (15:00~16:00), 8: 오후 4시 (16:00~17:00), 9: 오후 5시 (17:00~18:00)\n"
-                "- 10: 오후 6시 (18:00~19:00), 11: 오후 7시 (19:00~20:00)\n"
-                "규칙:\n"
-                "1) 수업이 해당 시간대에 20분 이상 걸쳐 있으면 그 시간 번호(1~11)를 포함해줘.\n"
-                "2) 과목명은 강의실 번호/교수명만 빼고 줄이지 말고 전체 과목명을 그대로 적어줘.\n"
-                "3) 반드시 아래 JSON 스키마만 출력해:\n"
+                "너는 한국 대학교 에브리타임(Everytime) 및 포털 시간표 스크린샷을 정밀 분석하는 시각 OCR 전문가야.\n"
+                "첨부된 시간표 이미지의 월·화·수·목·금요일에 있는 모든 수업 블록을 찾아 JSON으로 반환해줘.\n\n"
+                "[가장 중요한 규칙: 에브리타임 시간표의 세로 칸 높이(수업 시간 길이) 읽기]\n"
+                "1) 왼쪽 세로축의 시간 숫자 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7은 각각 1시간짜리 가로 행(칸)을 의미하며 24시간제로 [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]시야.\n"
+                "   - 특히 오후 숫자 1=13시, 2=14시, 3=15시, 4=16시, 5=17시, 6=18시, 7=19시임을 절대 헷갈리지 마!\n"
+                "2) 에브리타임에서 과목 글자는 항상 색깔 블록의 맨 위쪽에만 적혀 있고, 2시간·3시간 연강 수업은 글자 아래로 색깔 박스가 가로선(격자선)을 뚫고 다음 시간 행까지 길게 이어져 있어.\n"
+                "3) 따라서 절대 글자 위치만 보지 말고, 각 색깔 박스의 [맨 윗변]이 시작하는 시간(start_hour)과 [맨 아랫변]이 끝나는 시간 행(end_hour, 포함)을 반드시 가로 격자선과 대조해서 세어줘!\n"
+                "   - 1시간 수업(1칸 높이): 색깔 박스가 1개 시간 행 안에서 끝남 (예: 9행에서 시작해 10행 가로선 위에서 끝남 -> start_hour: 9, end_hour: 9)\n"
+                "   - 2시간 수업(2칸 높이, 1시간 30분~2시간): 색깔 박스가 가로선 1개를 넘어 다음 시간 행의 절반 이상 또는 끝까지 내려옴 (예: 9행에서 시작해 10행 아래쪽까지 내려옴 -> start_hour: 9, end_hour: 10 / 12행~1행 -> start_hour: 12, end_hour: 13 / 6행~7행 -> start_hour: 18, end_hour: 19)\n"
+                "   - 3시간 수업(3칸 높이): 색깔 박스가 가로선 2개를 넘어 3개 시간 행에 걸쳐 있음 (예: 2행(14시)에서 시작해 3행(15시)을 지나 4행(16시) 아래쪽까지 내려옴 -> start_hour: 14, end_hour: 16)\n"
+                "   - 주의: 색깔 박스 아랫변이 다음 행 가로선에 딱 맞춰 끝나고 다음 행 안으로 들어가지 않았으면 그 다음 행은 포함하지 마! (예: 4행(16시)에서 시작해 5행(17시) 바닥(6행 시작선)에서 끝나면 start_hour: 16, end_hour: 17)\n"
+                "4) 과목명은 강의실 번호(예: 5-106, 7-613, 19호관)와 교수명만 제외하고, 줄이지 말고 전체 과목명을 그대로 적어줘.\n"
+                "5) 반드시 아래 JSON 스키마만 출력해:\n"
                 "{\n"
-                "  \"timetable\": {\"월\": [1,2], \"화\": [], \"수\": [], \"목\": [], \"금\": []},\n"
-                "  \"timetable_names\": {\"월_1\": \"인본적사고와공동체의가치\", \"월_2\": \"인본적사고와공동체의가치\"}\n"
+                "  \"courses\": [\n"
+                "    {\"day\": \"화\", \"name\": \"인본적사고와공동체의가치\", \"start_hour\": 9, \"end_hour\": 10},\n"
+                "    {\"day\": \"금\", \"name\": \"미적분학II\", \"start_hour\": 9, \"end_hour\": 9},\n"
+                "    {\"day\": \"목\", \"name\": \"기초프로그래밍II\", \"start_hour\": 14, \"end_hour\": 16},\n"
+                "    {\"day\": \"수\", \"name\": \"스터디\", \"start_hour\": 18, \"end_hour\": 19}\n"
+                "  ]\n"
                 "}\n"
-                "4) 시간표가 전혀 보이지 않으면 모든 요일을 빈 배열 []로 반환해."
+                "6) 시간표가 전혀 보이지 않으면 {\"courses\": []}를 반환해."
             )
             parsed, err_detail = call_gemini_vision_json(tt_prompt, raw_img, mime)
             if not isinstance(parsed, dict):
@@ -2683,21 +2701,53 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             valid_days = ("월", "화", "수", "목", "금")
-            raw_tt = parsed.get("timetable") if isinstance(parsed.get("timetable"), dict) else {}
-            raw_names = parsed.get("timetable_names") if isinstance(parsed.get("timetable_names"), dict) else {}
-            clean_tt = {}
+            clean_tt = {d: [] for d in valid_days}
             clean_names = {}
-            total_slots = 0
-            for d in valid_days:
-                arr = raw_tt.get(d) if isinstance(raw_tt.get(d), list) else []
-                periods = sorted({int(p) for p in arr if str(p).isdigit() and 1 <= int(p) <= 11})
-                clean_tt[d] = periods
-                total_slots += len(periods)
-                for p in periods:
-                    k = f"{d}_{p}"
-                    nm = str(raw_names.get(k) or "").strip()[:60]
-                    if nm:
-                        clean_names[k] = nm
+            courses_list = parsed.get("courses") if isinstance(parsed.get("courses"), list) else None
+            if courses_list is not None:
+                day_sets = {d: set() for d in valid_days}
+                for item in courses_list:
+                    if not isinstance(item, dict):
+                        continue
+                    d = str(item.get("day") or "").strip()[:1]
+                    if d not in day_sets:
+                        continue
+                    try:
+                        sh = int(item.get("start_hour"))
+                        eh = int(item.get("end_hour"))
+                    except Exception:
+                        continue
+                    if 1 <= sh <= 7:
+                        sh += 12
+                    if 1 <= eh <= 7:
+                        eh += 12
+                    if eh < sh:
+                        eh = sh
+                    nm = str(item.get("name") or "").strip()[:60]
+                    for h in range(max(9, sh), min(19, eh) + 1):
+                        p_idx = h - 8
+                        if 1 <= p_idx <= 11:
+                            day_sets[d].add(p_idx)
+                            if nm:
+                                clean_names[f"{d}_{p_idx}"] = nm
+                total_slots = 0
+                for d in valid_days:
+                    clean_tt[d] = sorted(day_sets[d])
+                    total_slots += len(clean_tt[d])
+            else:
+                raw_tt = parsed.get("timetable") if isinstance(parsed.get("timetable"), dict) else {}
+                raw_names = parsed.get("timetable_names") if isinstance(parsed.get("timetable_names"), dict) else {}
+                total_slots = 0
+                for d in valid_days:
+                    arr = raw_tt.get(d) if isinstance(raw_tt.get(d), list) else []
+                    periods = sorted({int(p) for p in arr if str(p).isdigit() and 1 <= int(p) <= 11})
+                    clean_tt[d] = periods
+                    total_slots += len(periods)
+                    for p in periods:
+                        k = f"{d}_{p}"
+                        nm = str(raw_names.get(k) or "").strip()[:60]
+                        if nm:
+                            clean_names[k] = nm
 
             self._send_json(200, {
                 "ok": True,
