@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3o" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3q" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -3357,6 +3357,7 @@
           ${state.nav_tab === "마이" && !state.active_modal && state.profile_sec ? renderProfileSectionModalHtml(currentUser) : ""}
           ${state.nav_tab === "광장" && !state.active_modal && state.show_poll_form ? renderCreatePollModalHtml() : ""}
           <div id="home-sort-mobile-sheet-root">${renderHomeSortMobileSheetHtml()}</div>
+          <div id="create-datetime-sheet-root"></div>
         `;
 
         if (state.active_modal === "detail") {
@@ -4775,7 +4776,9 @@
 
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") {
-        if (state.sort_menu_open) toggleHomeSortMenu(false);
+        const dtRoot = document.getElementById("create-datetime-sheet-root");
+        if (dtRoot && dtRoot.innerHTML) closeCreateDateTimeSheet();
+        else if (state.sort_menu_open) toggleHomeSortMenu(false);
         else if (state.open_talk_more_id != null) { state.open_talk_more_id = null; render(); }
         else if (state.open_chat_more_id != null) { state.open_chat_more_id = null; render(); }
         else if (state.show_poll_form) { state.show_poll_form = false; render(); }
@@ -5653,6 +5656,60 @@
       "초면이어도 어색하지 않게 이끌어드려요"
     ];
 
+    const TIME_WHEEL_AMPMS = ["AM", "PM"];
+    const TIME_WHEEL_HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const TIME_WHEEL_MINS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+    const TIME_WHEEL_ITEM_H = 44;
+
+    function getUpcomingCreateDates(count = 14) {
+      const dows = ["일", "월", "화", "수", "목", "금", "토"];
+      const list = [];
+      const base = new Date();
+      base.setHours(0, 0, 0, 0);
+      for (let i = 0; i < count; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const day = d.getDate();
+        const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const topLbl = i === 0 ? "오늘" : (i === 1 ? "내일" : dows[d.getDay()]);
+        const numLbl = (i >= 2 && day === 1) ? `${m}/${day}` : String(day);
+        const fullLbl = `${i === 0 ? "오늘 · " : (i === 1 ? "내일 · " : "")}${m}월 ${day}일 (${dows[d.getDay()]})`;
+        list.push({ iso, topLbl, numLbl, fullLbl });
+      }
+      return list;
+    }
+
+    function formatCreateDateLabel(iso) {
+      const found = getUpcomingCreateDates(14).find(d => d.iso === iso);
+      if (found) return found.fullLbl;
+      const parts = String(iso || "").split("-");
+      if (parts.length === 3) return `${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일`;
+      return iso || "오늘";
+    }
+
+    function formatCreateTimeLabel(hhmm) {
+      const parts = String(hhmm || "12:30").split(":");
+      let h24 = parseInt(parts[0], 10);
+      let m = parseInt(parts[1], 10);
+      if (isNaN(h24)) h24 = 12;
+      if (isNaN(m)) m = 30;
+      const ap = h24 >= 12 ? "오후" : "오전";
+      const h12 = (h24 % 12) || 12;
+      const mm = String(m).padStart(2, "0");
+      return `${ap} ${h12}시 ${mm}분`;
+    }
+
+    function updateCreateTriggerLabels() {
+      const dateEl = document.getElementById("c_date");
+      const timeEl = document.getElementById("c_time");
+      const dateLblEl = document.getElementById("c_date_label");
+      const timeLblEl = document.getElementById("c_time_label");
+      if (dateEl && dateLblEl) dateLblEl.textContent = formatCreateDateLabel(dateEl.value);
+      if (timeEl && timeLblEl) timeLblEl.textContent = formatCreateTimeLabel(timeEl.value);
+    }
+
     function syncCreateTimeFromParts() {
       const ampmEl = document.getElementById("c_time_ampm");
       const hrEl = document.getElementById("c_time_hour");
@@ -5665,6 +5722,7 @@
       if (!isPm && h === 12) h = 0;
       const mm = String(minEl.value || "00").padStart(2, "0");
       hiddenEl.value = `${String(h).padStart(2, "0")}:${mm}`;
+      updateCreateTriggerLabels();
     }
 
     function setCreateTimeInputs(hhmm) {
@@ -5673,8 +5731,8 @@
       let m = parseInt(parts[1], 10);
       if (isNaN(h24)) h24 = 12;
       if (isNaN(m)) m = 30;
-      const roundedMin = (Math.round(m / 10) * 10) % 60;
-      if (m >= 55) h24 = (h24 + 1) % 24;
+      const roundedMin = (Math.round(m / 5) * 5) % 60;
+      if (m >= 58) h24 = (h24 + 1) % 24;
       const isPm = h24 >= 12;
       const h12 = (h24 % 12) || 12;
       const ampmEl = document.getElementById("c_time_ampm");
@@ -5685,6 +5743,153 @@
       if (hrEl) hrEl.value = String(h12);
       if (minEl) minEl.value = String(roundedMin).padStart(2, "0");
       if (hiddenEl) hiddenEl.value = `${String(h24).padStart(2, "0")}:${String(roundedMin).padStart(2, "0")}`;
+      updateCreateTriggerLabels();
+    }
+
+    let _dtSheetDraft = { date: "", ampm: "PM", hour: 12, min: "30" };
+    const _dtWheelRaf = {};
+
+    function updateDtSheetPreviewText() {
+      const el = document.getElementById("dt_sheet_preview");
+      if (!el) return;
+      let h = Number(_dtSheetDraft.hour) || 12;
+      if (_dtSheetDraft.ampm === "PM" && h < 12) h += 12;
+      if (_dtSheetDraft.ampm === "AM" && h === 12) h = 0;
+      const hhmm = `${String(h).padStart(2, "0")}:${String(_dtSheetDraft.min || "00").padStart(2, "0")}`;
+      el.textContent = `${formatCreateDateLabel(_dtSheetDraft.date)} · ${formatCreateTimeLabel(hhmm)}`;
+    }
+
+    function selectDtSheetDate(iso) {
+      _dtSheetDraft.date = iso;
+      document.querySelectorAll("#create-datetime-sheet-root .date-pill-v3").forEach(btn => {
+        const on = btn.getAttribute("data-date") === iso;
+        btn.classList.toggle("active", on);
+        if (on) {
+          try { btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } catch (e) {}
+        }
+      });
+      updateDtSheetPreviewText();
+    }
+
+    function snapDtWheel(kind, idx, smooth = true) {
+      const col = document.getElementById(`dt_wheel_${kind}`);
+      const list = kind === "ampm" ? TIME_WHEEL_AMPMS : (kind === "hour" ? TIME_WHEEL_HOURS : TIME_WHEEL_MINS);
+      const clamped = Math.max(0, Math.min(list.length - 1, idx));
+      if (col) {
+        col.scrollTo({ top: clamped * TIME_WHEEL_ITEM_H, behavior: smooth ? "smooth" : "auto" });
+        col.querySelectorAll(".time-wheel-item").forEach((it, i) => it.classList.toggle("active", i === clamped));
+      }
+      _dtSheetDraft[kind] = list[clamped];
+      updateDtSheetPreviewText();
+    }
+
+    function handleDtWheelScroll(kind) {
+      if (_dtWheelRaf[kind]) cancelAnimationFrame(_dtWheelRaf[kind]);
+      _dtWheelRaf[kind] = requestAnimationFrame(() => {
+        const col = document.getElementById(`dt_wheel_${kind}`);
+        if (!col) return;
+        const list = kind === "ampm" ? TIME_WHEEL_AMPMS : (kind === "hour" ? TIME_WHEEL_HOURS : TIME_WHEEL_MINS);
+        const idx = Math.max(0, Math.min(list.length - 1, Math.round(col.scrollTop / TIME_WHEEL_ITEM_H)));
+        col.querySelectorAll(".time-wheel-item").forEach((it, i) => it.classList.toggle("active", i === idx));
+        if (_dtSheetDraft[kind] !== list[idx]) {
+          _dtSheetDraft[kind] = list[idx];
+          updateDtSheetPreviewText();
+        }
+      });
+    }
+
+    function openCreateDateTimeSheet() {
+      const root = document.getElementById("create-datetime-sheet-root");
+      if (!root) return;
+      const curDate = (document.getElementById("c_date")?.value) || getTodayStr();
+      const curAmPm = (document.getElementById("c_time_ampm")?.value) || "PM";
+      const curHour = parseInt(document.getElementById("c_time_hour")?.value || "12", 10) || 12;
+      const curMinRaw = parseInt(document.getElementById("c_time_min")?.value || "30", 10);
+      const curMin = String((Math.round((isNaN(curMinRaw) ? 30 : curMinRaw) / 5) * 5) % 60).padStart(2, "0");
+      _dtSheetDraft = { date: curDate, ampm: curAmPm, hour: curHour, min: curMin };
+
+      const upcomingDates = getUpcomingCreateDates(14);
+      root.innerHTML = `
+        <div class="profile-sheet-backdrop" role="dialog" aria-modal="true" aria-label="만날 날짜와 시간 선택" onclick="if(event.target===this){ closeCreateDateTimeSheet(); }">
+          <div class="profile-sheet-panel" onclick="event.stopPropagation()" style="max-width:440px;">
+            <div class="profile-sheet-grabber"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px;">
+              <div>
+                <div style="font-size:var(--fs-lg); font-weight:800; color:var(--text-primary);">만날 날짜 · 시간</div>
+                <div id="dt_sheet_preview" style="font-size:var(--fs-sm); font-weight:700; color:#287D62; margin-top:2px;"></div>
+              </div>
+              <button type="button" aria-label="닫기" onclick="closeCreateDateTimeSheet()" style="min-width:44px; min-height:44px; border:none; background:transparent; color:var(--text-secondary); font-size:var(--fs-lg); font-weight:700; cursor:pointer;">✕</button>
+            </div>
+
+            <div class="date-strip-v3" style="margin-bottom:14px;">
+              ${upcomingDates.map(d => `
+                <button type="button" class="date-pill-v3 ${d.iso === curDate ? 'active' : ''}" data-date="${d.iso}" onclick="selectDtSheetDate('${d.iso}')">
+                  <span class="date-pill-dow">${escHtml(d.topLbl)}</span>
+                  <span class="date-pill-num">${escHtml(d.numLbl)}</span>
+                </button>
+              `).join("")}
+            </div>
+
+            <div class="time-wheel-v3" style="margin-bottom:16px;">
+              <div class="time-wheel-highlight"></div>
+              <div class="time-wheel-fade-top"></div>
+              <div class="time-wheel-fade-bottom"></div>
+
+              <div id="dt_wheel_ampm" class="time-wheel-col" onscroll="handleDtWheelScroll('ampm')">
+                <div class="time-wheel-spacer"></div>
+                ${TIME_WHEEL_AMPMS.map((v, idx) => `
+                  <button type="button" class="time-wheel-item ${v === curAmPm ? 'active' : ''}" onclick="snapDtWheel('ampm', ${idx}, true)">${v === 'AM' ? '오전' : '오후'}</button>
+                `).join("")}
+                <div class="time-wheel-spacer"></div>
+              </div>
+
+              <div id="dt_wheel_hour" class="time-wheel-col" onscroll="handleDtWheelScroll('hour')">
+                <div class="time-wheel-spacer"></div>
+                ${TIME_WHEEL_HOURS.map((h, idx) => `
+                  <button type="button" class="time-wheel-item ${h === curHour ? 'active' : ''}" onclick="snapDtWheel('hour', ${idx}, true)">${h}시</button>
+                `).join("")}
+                <div class="time-wheel-spacer"></div>
+              </div>
+
+              <div class="time-wheel-colon">:</div>
+
+              <div id="dt_wheel_min" class="time-wheel-col" onscroll="handleDtWheelScroll('min')">
+                <div class="time-wheel-spacer"></div>
+                ${TIME_WHEEL_MINS.map((m, idx) => `
+                  <button type="button" class="time-wheel-item ${m === curMin ? 'active' : ''}" onclick="snapDtWheel('min', ${idx}, true)">${m}분</button>
+                `).join("")}
+                <div class="time-wheel-spacer"></div>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" style="min-height:50px; border-radius:16px; font-size:var(--fs-md); font-weight:800;" onclick="applyCreateDateTimeSheet()">이 시간으로 선택</button>
+          </div>
+        </div>
+      `;
+      updateDtSheetPreviewText();
+      requestAnimationFrame(() => {
+        snapDtWheel("ampm", curAmPm === "PM" ? 1 : 0, false);
+        snapDtWheel("hour", Math.max(0, TIME_WHEEL_HOURS.indexOf(curHour)), false);
+        snapDtWheel("min", Math.max(0, TIME_WHEEL_MINS.indexOf(curMin)), false);
+      });
+    }
+
+    function applyCreateDateTimeSheet() {
+      const dateEl = document.getElementById("c_date");
+      const ampmEl = document.getElementById("c_time_ampm");
+      const hrEl = document.getElementById("c_time_hour");
+      const minEl = document.getElementById("c_time_min");
+      if (dateEl) dateEl.value = _dtSheetDraft.date;
+      if (ampmEl) ampmEl.value = _dtSheetDraft.ampm;
+      if (hrEl) hrEl.value = String(_dtSheetDraft.hour);
+      if (minEl) minEl.value = String(_dtSheetDraft.min).padStart(2, "0");
+      syncCreateTimeFromParts();
+      closeCreateDateTimeSheet();
+    }
+
+    function closeCreateDateTimeSheet() {
+      const root = document.getElementById("create-datetime-sheet-root");
+      if (root) root.innerHTML = "";
     }
 
     function renderCreateComboOptions(kind, filterText = "") {
@@ -6008,27 +6213,33 @@
                   <button type="button" id="time_chip_tomorrow_lunch" class="quick-chip time-quick-chip" style="border:none; background:#F7F9F8; color:var(--text-secondary);" onclick="setCreateQuickTime('tomorrow_lunch')">내일 점심</button>
                 </div>
                 ${(() => {
+                  const initDate = state.prefill_date || getTodayStr();
                   const initT = String(state.prefill_time || "12:30").split(":");
                   const initH24 = parseInt(initT[0], 10) || 12;
-                  const initM = String((Math.round((parseInt(initT[1], 10) || 30) / 10) * 10) % 60).padStart(2, "0");
+                  const initM = String((Math.round((parseInt(initT[1], 10) || 30) / 5) * 5) % 60).padStart(2, "0");
                   const initAmPm = initH24 >= 12 ? "PM" : "AM";
                   const initH12 = (initH24 % 12) || 12;
                   const initVal = `${String(initH24).padStart(2, "0")}:${initM}`;
                   return `
                     <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-                      <input id="c_date" type="date" class="input" value="${escHtml(state.prefill_date || getTodayStr())}" min="${getTodayStr()}" style="width:100%; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 12px; margin-bottom:0;" />
-                      <div style="display:flex; gap:8px; width:100%;">
-                        <select id="c_time_ampm" class="select" onchange="syncCreateTimeFromParts()" style="flex:1; min-width:0; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 10px; margin-bottom:0;">
-                          <option value="AM" ${initAmPm === "AM" ? "selected" : ""}>오전</option>
-                          <option value="PM" ${initAmPm === "PM" ? "selected" : ""}>오후</option>
-                        </select>
-                        <select id="c_time_hour" class="select" onchange="syncCreateTimeFromParts()" style="flex:1; min-width:0; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 10px; margin-bottom:0;">
-                          ${[12,1,2,3,4,5,6,7,8,9,10,11].map(h => `<option value="${h}" ${initH12 === h ? "selected" : ""}>${h}시</option>`).join("")}
-                        </select>
-                        <select id="c_time_min" class="select" onchange="syncCreateTimeFromParts()" style="flex:1; min-width:0; height:46px; background:#F7F9F8; border:none; border-radius:var(--radius-input); font-size:var(--fs-md); font-weight:700; padding:0 10px; margin-bottom:0;">
-                          ${["00","10","20","30","40","50"].map(m => `<option value="${m}" ${initM === m ? "selected" : ""}>${m}분</option>`).join("")}
-                        </select>
-                      </div>
+                      <button type="button" class="dt-trigger-btn" onclick="openCreateDateTimeSheet()">
+                        <span style="display:inline-flex; align-items:center; gap:8px; min-width:0;">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          <span id="c_date_label" style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(formatCreateDateLabel(initDate))}</span>
+                        </span>
+                        <span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; flex-shrink:0;">변경 ›</span>
+                      </button>
+                      <button type="button" class="dt-trigger-btn" onclick="openCreateDateTimeSheet()">
+                        <span style="display:inline-flex; align-items:center; gap:8px; min-width:0;">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                          <span id="c_time_label" style="font-size:var(--fs-md); font-weight:700; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(formatCreateTimeLabel(initVal))}</span>
+                        </span>
+                        <span style="font-size:var(--fs-xs); font-weight:700; color:#287D62; flex-shrink:0;">변경 ›</span>
+                      </button>
+                      <input id="c_date" type="hidden" value="${escHtml(initDate)}" />
+                      <input id="c_time_ampm" type="hidden" value="${initAmPm}" />
+                      <input id="c_time_hour" type="hidden" value="${initH12}" />
+                      <input id="c_time_min" type="hidden" value="${initM}" />
                       <input id="c_time" type="hidden" value="${escHtml(initVal)}" />
                     </div>
                   `;
