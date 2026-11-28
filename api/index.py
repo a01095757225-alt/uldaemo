@@ -437,17 +437,11 @@ def _sanitize_db_for_viewer(db_obj: dict, viewer_id: str = "", is_admin: bool = 
 
 def _gemini_endpoint_candidates(models):
     key = (GEMINI_API_KEY or "").strip()
-    is_vertex_express = key.startswith("AQ.")
     q_key = urllib.parse.quote(key, safe="")
     endpoints = []
-    if is_vertex_express:
-        for m in models:
-            endpoints.append((m, f"https://aiplatform.googleapis.com/v1/publishers/google/models/{m}:generateContent?key={q_key}"))
-        endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1beta1/publishers/google/models/{models[0]}:generateContent?key={q_key}"))
-        endpoints.append((models[0], f"https://generativelanguage.googleapis.com/v1beta/models/{models[0]}:generateContent?key={q_key}"))
-    else:
-        for m in models:
-            endpoints.append((m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={q_key}"))
+    for m in models:
+        endpoints.append((m, f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={q_key}"))
+    if key.startswith("AQ."):
         endpoints.append((models[0], f"https://aiplatform.googleapis.com/v1/publishers/google/models/{models[0]}:generateContent?key={q_key}"))
     return endpoints
 
@@ -463,14 +457,11 @@ def _call_gemini_text_with_diag(prompt: str):
     if not GEMINI_API_KEY:
         return "", "missing_key"
     last_err = "unknown"
-    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash"]):
+    for model_name, url in _gemini_endpoint_candidates(["gemini-3.8-flash", "gemini-flash-latest"]):
         try:
-            gen_cfg = {"temperature": 0.2}
-            if "2.5" in model_name and "aiplatform" not in url:
-                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
             payload = json.dumps({
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": gen_cfg,
+                "generationConfig": {"temperature": 0.2},
             }).encode("utf-8")
             req = urllib.request.Request(
                 url,
@@ -478,7 +469,7 @@ def _call_gemini_text_with_diag(prompt: str):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=6) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                 chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
@@ -508,14 +499,8 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
     if not GEMINI_API_KEY or not image_b64:
         return None, "missing_key"
     last_err = "unknown"
-    for model_name, url in _gemini_endpoint_candidates(["gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.0-flash"]):
+    for model_name, url in _gemini_endpoint_candidates(["gemini-3.8-flash", "gemini-flash-latest"]):
         try:
-            gen_cfg = {
-                "responseMimeType": "application/json",
-                "temperature": 0.1,
-            }
-            if "2.5" in model_name and "aiplatform" not in url:
-                gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
             payload = json.dumps({
                 "contents": [{
                     "role": "user",
@@ -524,7 +509,10 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
                         {"inlineData": {"mimeType": mime_type, "data": image_b64}},
                     ],
                 }],
-                "generationConfig": gen_cfg,
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.1,
+                },
             }).encode("utf-8")
             req = urllib.request.Request(
                 url,
@@ -532,7 +520,7 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=9) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                 chunks = [str(p.get("text", "")) for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
