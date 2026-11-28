@@ -1479,6 +1479,10 @@
 
     function persistLogin(uid) {
       state.user_id = String(uid).trim();
+      state.nav_tab = "홈";
+      state.active_modal = null;
+      state.profile_sec = null;
+      state.active_chat_post_id = null;
       localStorage.setItem("uldaemo_uid", state.user_id);
       document.cookie = `user_id=${state.user_id}; path=/; max-age=2592000`;
       if (!window.location.hash || !window.location.hash.startsWith("#/")) {
@@ -1754,6 +1758,11 @@
 
     function executeLogoutNow() {
       state.user_id = "";
+      state.nav_tab = "홈";
+      state.active_modal = null;
+      state.profile_sec = null;
+      state.active_chat_post_id = null;
+      state.blind_onboarding_open = false;
       state.verified_email = null;
       state.auth_code_sent = false;
       _initialCloudSynced = false;
