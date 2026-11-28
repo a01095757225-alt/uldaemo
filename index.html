@@ -1089,7 +1089,8 @@
     function shouldShowDailyCheckinSheet() {
       if (!state.user_id || !DB.users[state.user_id]) return false;
       if (state.checkin_sheet_preview) return true;
-      if (state.active_modal || state.blind_onboarding_open || state.confirm_dialog || state.withdraw_modal_open) return false;
+      if (state.nav_tab !== "홈") return false;
+      if (state.active_modal || state.active_chat_post_id || state.profile_sec || state.blind_onboarding_open || state.confirm_dialog || state.withdraw_modal_open) return false;
       const st = getUserStatsAndBadges(state.user_id);
       if (st.checkedInToday) return false;
       try {
