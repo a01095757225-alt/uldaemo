@@ -3,18 +3,18 @@ const TT_DAYS = ["월", "화", "수", "목", "금"];
 // 에브리타임 시간대 기준: 1(9시) ~ 11(오후 7시, 19:00~20:00)
 const TT_PERIODS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
-// 과목별 구분을 위한 에브리타임 감성 파스텔·에디토리얼 팔레트 (10색)
+// 과목별 구분을 위한 Figma T1/T5 토스풍 파스텔 팔레트 (10색)
 const TT_COURSE_PALETTE = [
-  { bg: "#E7F5EE", border: "#9AD4BA", text: "#14533E", accent: "#287D62" }, // Forest Mint
-  { bg: "#FFF4DF", border: "#F0CC86", text: "#7A4F0B", accent: "#D99B26" }, // Warm Amber
-  { bg: "#E8F1FE", border: "#9EC2FA", text: "#1B4A8A", accent: "#4285F4" }, // Sky Blue
-  { bg: "#F2EBFE", border: "#C4B0F8", text: "#4C2A85", accent: "#7C52D9" }, // Soft Lavender
-  { bg: "#FDECEC", border: "#F5AEAE", text: "#8C2323", accent: "#E05A5A" }, // Coral Rose
-  { bg: "#E5F6F5", border: "#8CD3CE", text: "#135955", accent: "#2A9D8F" }, // Ocean Teal
-  { bg: "#FFF0E6", border: "#F5BA93", text: "#8A3F14", accent: "#E07A3F" }, // Warm Peach
-  { bg: "#EEF7E4", border: "#B2D98A", text: "#365C14", accent: "#6BA336" }, // Fresh Olive
-  { bg: "#FCEBF4", border: "#F0A8CE", text: "#852056", accent: "#D65094" }, // Berry Pink
-  { bg: "#EAEFFB", border: "#A6B9F2", text: "#243B82", accent: "#5271D9" }, // Periwinkle Indigo
+  { bg: "#E8F1FE", text: "#2B6CD8" }, // Sky Blue (대학영어)
+  { bg: "#E6F4EE", text: "#1F6A53" }, // Forest Mint (코딩기초)
+  { bg: "#F1EBFD", text: "#6741D9" }, // Soft Lavender (미적분학)
+  { bg: "#FFF1E6", text: "#D9480F" }, // Warm Peach (ICT개론)
+  { bg: "#FDECF1", text: "#C2255C" }, // Coral Rose (물리학)
+  { bg: "#E3F6F8", text: "#0C8599" }, // Ocean Cyan (코딩실습)
+  { bg: "#FFF6DB", text: "#A66A00" }, // Warm Amber
+  { bg: "#EEF7E4", text: "#3B6B16" }, // Fresh Olive
+  { bg: "#FCEBF6", text: "#9C2474" }, // Berry Pink
+  { bg: "#EAEFFB", text: "#2D47A0" }, // Periwinkle Indigo
 ];
 
 function periodToEverytimeHour(p) {
@@ -22,13 +22,26 @@ function periodToEverytimeHour(p) {
   return h > 12 ? String(h - 12) : String(h);
 }
 
+function periodToKoreanHourText(p) {
+  const h = 8 + Number(p);
+  if (h < 12) return `오전 ${h}시`;
+  if (h === 12) return `오후 12시`;
+  return `오후 ${h - 12}시`;
+}
+
+function formatBlockTimeRange(startP, endP) {
+  const sh = 8 + Number(startP);
+  const eh = 8 + Number(endP);
+  return `${sh}:00–${eh}:50`;
+}
+
 function formatEverytimeSlotRange(day, periods) {
   const sorted = [...(periods || [])].map(Number).sort((a, b) => a - b);
-  if (!sorted.length) return "수업 칸 선택";
+  if (!sorted.length) return "수업 선택";
   const first = periodToEverytimeHour(sorted[0]);
   const lastEndH = 9 + sorted[sorted.length - 1];
   const lastEndStr = lastEndH > 12 ? String(lastEndH - 12) : String(lastEndH);
-  return `${day} ${first}~${lastEndStr}시`;
+  return `${day}요일 ${first}~${lastEndStr}시`;
 }
 
 function buildCourseColorMap(draft, namesMap) {
@@ -283,8 +296,8 @@ function openTimetableModal(tab) {
     state._tt_draft = JSON.parse(JSON.stringify(u.timetable || {}));
     state._tt_names_draft = JSON.parse(JSON.stringify(u.timetable_names || {}));
   }
-  state._tt_selected_slots = null;
-  state.timetable_tab = tab || (hasUserTimetable(state.user_id) ? "mates" : "edit");
+  state._tt_sheet = null;
+  state.timetable_tab = tab || (hasUserTimetable(state.user_id) ? "mates" : "mates");
   state.active_modal = "timetable";
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -293,7 +306,7 @@ function openTimetableModal(tab) {
 function closeTimetableModal() {
   state._tt_draft = null;
   state._tt_names_draft = null;
-  state._tt_selected_slots = null;
+  state._tt_sheet = null;
   state.active_modal = null;
   render();
 }
@@ -304,71 +317,101 @@ function ensureTimetableDrafts() {
   if (!state._tt_names_draft) state._tt_names_draft = JSON.parse(JSON.stringify(u.timetable_names || {}));
 }
 
-function addTimetableEmptySlot(day, period) {
+function openTimetableAddSheet(day, period) {
   ensureTimetableDrafts();
   const p = Number(period);
+  const busyArr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
+  const canExtend = p < TT_PERIODS.length && !busyArr.includes(p + 1);
+  state._tt_sheet = {
+    mode: "add",
+    day,
+    periods: [p],
+    name: "",
+    extendNext: false,
+    canExtend
+  };
+  render();
+  setTimeout(() => {
+    const inp = document.getElementById("tt-sheet-name-input");
+    if (inp) inp.focus();
+  }, 30);
+}
+
+function openTimetableEditSheet(day, periodsCsv) {
+  ensureTimetableDrafts();
+  const periods = String(periodsCsv || "").split(",").map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+  if (!periods.length) return;
+  const firstKey = `${day}_${periods[0]}`;
+  const curName = (state._tt_names_draft && state._tt_names_draft[firstKey]) || "";
+  const lastP = periods[periods.length - 1];
+  const busyArr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
+  const canExtend = lastP < TT_PERIODS.length && !busyArr.includes(lastP + 1);
+  state._tt_sheet = {
+    mode: "edit",
+    day,
+    periods,
+    name: curName,
+    extendNext: false,
+    canExtend
+  };
+  render();
+  setTimeout(() => {
+    const inp = document.getElementById("tt-sheet-name-input");
+    if (inp) inp.focus();
+  }, 30);
+}
+
+function closeTimetableSheet() {
+  state._tt_sheet = null;
+  render();
+}
+
+function toggleTimetableSheetExtend() {
+  if (!state._tt_sheet || !state._tt_sheet.canExtend) return;
+  const inp = document.getElementById("tt-sheet-name-input");
+  if (inp) state._tt_sheet.name = inp.value;
+  state._tt_sheet.extendNext = !state._tt_sheet.extendNext;
+  render();
+}
+
+function submitTimetableSheet() {
+  if (!state._tt_sheet) return;
+  ensureTimetableDrafts();
+  const sheet = state._tt_sheet;
+  const inp = document.getElementById("tt-sheet-name-input");
+  const cleanName = String(inp ? inp.value : sheet.name || "").trim().slice(0, 60);
+  const targetPeriods = [...sheet.periods];
+  if (sheet.extendNext && sheet.canExtend) {
+    const nextP = targetPeriods[targetPeriods.length - 1] + 1;
+    if (nextP <= TT_PERIODS.length && !targetPeriods.includes(nextP)) {
+      targetPeriods.push(nextP);
+    }
+  }
+  const arr = Array.isArray(state._tt_draft[sheet.day]) ? state._tt_draft[sheet.day].map(Number) : [];
+  targetPeriods.forEach(p => {
+    if (!arr.includes(p)) arr.push(p);
+    const k = `${sheet.day}_${p}`;
+    if (cleanName) state._tt_names_draft[k] = cleanName;
+    else delete state._tt_names_draft[k];
+  });
+  arr.sort((a, b) => a - b);
+  state._tt_draft[sheet.day] = arr;
+  state._tt_sheet = null;
+  render();
+}
+
+function deleteTimetableSheetSlots() {
+  if (!state._tt_sheet) return;
+  ensureTimetableDrafts();
+  const { day, periods } = state._tt_sheet;
+  const removeSet = new Set(periods.map(Number));
   const arr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
-  if (!arr.includes(p)) {
-    arr.push(p);
-    arr.sort((a, b) => a - b);
-    state._tt_draft[day] = arr;
-  }
-  state._tt_selected_slots = [`${day}_${p}`];
-  render();
-  const inp = document.getElementById("tt-course-name-input");
-  if (inp) inp.focus();
-}
-
-function selectTimetableBlock(day, periodsCsv) {
-  ensureTimetableDrafts();
-  const periods = String(periodsCsv || "").split(",").map(Number).filter(n => !isNaN(n));
-  const keys = periods.map(p => `${day}_${p}`);
-  const cur = Array.isArray(state._tt_selected_slots) ? state._tt_selected_slots : [];
-  const sameSelection = cur.length === keys.length && cur.every((k, i) => k === keys[i]);
-  if (sameSelection && keys.length === 1 && !(state._tt_names_draft && state._tt_names_draft[keys[0]])) {
-    // 이름 없는 단일 칸을 한 번 더 누르면 바로 해제
-    deleteSelectedTimetableSlots();
-    return;
-  }
-  state._tt_selected_slots = keys;
-  render();
-}
-
-function deleteSelectedTimetableSlots() {
-  ensureTimetableDrafts();
-  const sel = Array.isArray(state._tt_selected_slots) ? state._tt_selected_slots : [];
-  if (!sel.length) return;
-  sel.forEach(slotKey => {
-    const [d, pStr] = slotKey.split("_");
-    const p = Number(pStr);
-    const arr = Array.isArray(state._tt_draft[d]) ? state._tt_draft[d].map(Number) : [];
-    state._tt_draft[d] = arr.filter(x => x !== p);
-    if (state._tt_names_draft) delete state._tt_names_draft[slotKey];
+  state._tt_draft[day] = arr.filter(x => !removeSet.has(x));
+  periods.forEach(p => {
+    if (state._tt_names_draft) delete state._tt_names_draft[`${day}_${p}`];
   });
-  state._tt_selected_slots = null;
+  state._tt_sheet = null;
   render();
-}
-
-function updateSelectedSlotCourseName(val) {
-  ensureTimetableDrafts();
-  const sel = Array.isArray(state._tt_selected_slots) ? state._tt_selected_slots : [];
-  if (!sel.length) return;
-  const clean = String(val || "").trim().slice(0, 60);
-  sel.forEach(slotKey => {
-    if (clean) state._tt_names_draft[slotKey] = clean;
-    else delete state._tt_names_draft[slotKey];
-  });
-  const blockEl = document.getElementById(`tt_block_${sel[0]}`);
-  if (blockEl) {
-    const nameSpan = blockEl.querySelector(".tt-et-block-name");
-    if (nameSpan) nameSpan.textContent = clean || "수업";
-    const colorMap = buildCourseColorMap(state._tt_draft, state._tt_names_draft);
-    const pal = (clean && colorMap[clean]) ? colorMap[clean] : TT_COURSE_PALETTE[0];
-    blockEl.style.background = pal.bg;
-    blockEl.style.borderColor = pal.border;
-    blockEl.style.color = pal.text;
-    blockEl.style.borderLeftColor = pal.accent;
-  }
 }
 
 function triggerTimetableImageUpload() {
@@ -454,7 +497,8 @@ async function handleTimetableImageUpload(inputEl) {
     }
     state._tt_draft = data.timetable || {};
     state._tt_names_draft = data.timetable_names || {};
-    state._tt_selected_slots = null;
+    state._tt_sheet = null;
+    state.timetable_tab = "edit";
     render();
     showToast(`AI가 수업 ${cnt}칸을 자동으로 채웠어요! 확인 후 [시간표 저장]을 눌러주세요.`);
   } catch (e) {
@@ -477,7 +521,7 @@ function buildTimetableDraftSummary(ttObj) {
 function resetTimetableDraft() {
   state._tt_draft = { "월": [], "화": [], "수": [], "목": [], "금": [] };
   state._tt_names_draft = {};
-  state._tt_selected_slots = null;
+  state._tt_sheet = null;
   render();
   showToast("시간표를 초기화했어요.");
 }
@@ -497,7 +541,7 @@ function saveUserTimetable() {
   saveDB(true);
   state._tt_draft = null;
   state._tt_names_draft = null;
-  state._tt_selected_slots = null;
+  state._tt_sheet = null;
   state.timetable_tab = "mates";
   showToast("시간표가 저장되었어요! 공강이 겹치는 학우를 확인해 보세요.");
   render();
@@ -517,27 +561,50 @@ function inviteGonggangMate(mateUid, meetDate, meetTime) {
   }
 }
 
+function getMateAvatarEmoji(temp) {
+  const t = Number(temp || 36.5);
+  if (t >= 38.0) return "🦦";
+  if (t >= 37.0) return "🐳";
+  return "🐣";
+}
+
 function renderTimetableModal() {
   const u = DB.users[state.user_id];
   if (!u) return "";
+  const pcMode = isPC();
   const curTab = state.timetable_tab || "mates";
   const draft = state._tt_draft || u.timetable || {};
   const namesMap = state._tt_names_draft || u.timetable_names || {};
   const hasSaved = hasUserTimetable(state.user_id);
   const mates = hasSaved ? getGonggangMates() : [];
-  const selSlots = Array.isArray(state._tt_selected_slots) && state._tt_selected_slots.length ? state._tt_selected_slots : null;
-  const selDay = selSlots ? selSlots[0].split("_")[0] : "";
-  const selPeriods = selSlots ? selSlots.map(k => Number(k.split("_")[1])).filter(n => !isNaN(n)) : [];
-  const selSlotLabel = selSlots ? formatEverytimeSlotRange(selDay, selPeriods) : "수업 선택";
-  const selSlotVal = selSlots ? (namesMap[selSlots[0]] || "") : "";
   const colorMap = buildCourseColorMap(draft, namesMap);
+  const sheet = state._tt_sheet || null;
 
-  const dayHeadersHtml = TT_DAYS.map((d, di) =>
-    `<div class="tt-et-day" style="grid-column:${di + 2}; grid-row:1;">${d}</div>`
-  ).join("");
+  const todayDayRaw = getDayLabelFromDateStr(getTodayStr());
+  const todayIdx = TT_DAYS.indexOf(todayDayRaw);
+  const timelineDay = todayIdx >= 0 ? todayDayRaw : "월";
+  const savedOrDraft = hasSaved ? (u.timetable || draft) : draft;
+  const todayBusySet = new Set(Array.isArray(savedOrDraft[timelineDay]) ? savedOrDraft[timelineDay].map(Number) : []);
+  const todayFreeCount = TT_PERIODS.filter(p => !todayBusySet.has(p)).length;
+  const totalWeeklyHours = TT_DAYS.reduce((acc, d) => acc + (Array.isArray(draft[d]) ? draft[d].length : 0), 0);
+
+  const lockSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8B95A1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+  const cameraSvg = (strokeColor) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${strokeColor}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+  const chevronRightSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>`;
+  const calendarSvg = `<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#287D62" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+
+  const dayHeadersHtml = TT_DAYS.map((d, di) => {
+    const isToday = di === todayIdx;
+    const label = isToday ? (pcMode ? `${d} · 오늘` : d) : d;
+    return `<div class="tt-et-day" style="grid-column:${di + 2}; grid-row:1;">${isToday ? `<span class="tt-et-day-pill">${label}</span>` : label}</div>`;
+  }).join("");
+
+  const todayColBgHtml = todayIdx >= 0
+    ? `<div class="tt-et-today-col" style="grid-column:${todayIdx + 2};"></div>`
+    : "";
 
   const hourAxisHtml = TT_PERIODS.map((p, idx) =>
-    `<div class="tt-et-hour" style="grid-row:${idx + 2};">${periodToEverytimeHour(p)}</div>`
+    `<div class="tt-et-hour" style="grid-row:${idx + 2};">${periodToEverytimeHour(p)}${pcMode ? '시' : ''}</div>`
   ).join("");
 
   const cellsHtml = TT_DAYS.map((d, di) => {
@@ -546,127 +613,217 @@ function renderTimetableModal() {
     return items.map(item => {
       if (item.type === "empty") {
         const row = item.period + 1;
-        return `<button type="button" class="tt-et-empty" style="grid-column:${col}; grid-row:${row};" onclick="addTimetableEmptySlot('${d}', ${item.period})" aria-label="${d} ${periodToEverytimeHour(item.period)}시 추가"></button>`;
+        const isAdding = Boolean(sheet && sheet.mode === "add" && sheet.day === d && sheet.periods.includes(item.period));
+        return `<button type="button" class="tt-et-empty ${isAdding ? 'adding' : ''}" style="grid-column:${col}; grid-row:${row};" onclick="openTimetableAddSheet('${d}', ${item.period})" aria-label="${d} ${periodToEverytimeHour(item.period)}시 추가">${isAdding ? '+' : ''}</button>`;
       }
       const rowStart = item.start + 1;
       const rowEnd = item.end + 2;
       const firstKey = `${d}_${item.start}`;
-      const pal = (item.name && colorMap[item.name]) ? colorMap[item.name] : TT_COURSE_PALETTE[0];
-      const isSelected = Boolean(selSlots && selSlots.includes(firstKey));
+      const pal = (item.name && colorMap[item.name]) ? colorMap[item.name] : TT_COURSE_PALETTE[1];
+      const isSelected = Boolean(sheet && sheet.mode === "edit" && sheet.day === d && sheet.periods.includes(item.start));
       const periodsCsv = item.periods.join(",");
       return `
         <button type="button" id="tt_block_${firstKey}" class="tt-et-block ${isSelected ? 'selected' : ''}"
-          style="grid-column:${col}; grid-row:${rowStart} / ${rowEnd}; background:${pal.bg}; border-color:${pal.border}; border-left:3px solid ${pal.accent}; color:${pal.text};"
-          onclick="selectTimetableBlock('${d}', '${periodsCsv}')">
+          style="grid-column:${col}; grid-row:${rowStart} / ${rowEnd}; background:${pal.bg}; color:${pal.text};"
+          onclick="openTimetableEditSheet('${d}', '${periodsCsv}')">
           <span class="tt-et-block-name">${escHtml(item.name || "수업")}</span>
+          ${pcMode ? `<span class="tt-et-block-time">${formatBlockTimeRange(item.start, item.end)}</span>` : ''}
         </button>
       `;
     }).join("");
   }).join("");
 
   const editorHtml = `
-    <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:18px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span style="font-size:15px; font-weight:800; color:#191F28;">내 수업 시간표</span>
-        <button type="button" onclick="resetTimetableDraft()" style="border:none; background:none; color:#98A2B3; font-size:12px; font-weight:600; cursor:pointer;">초기화</button>
-      </div>
-      <div id="tt-draft-summary" style="font-size:12px; color:#287D62; font-weight:700; margin-bottom:10px;">
-        ${escHtml(buildTimetableDraftSummary(draft))}
-      </div>
+    <div class="tt-v3-card">
+      ${pcMode ? `
+        <div class="tt-v3-card-head">
+          <div>
+            <div style="font-size:17px; font-weight:800; color:#191F28;">내 시간표</div>
+            <div class="tt-v3-hint-line" style="margin:4px 0 0;">주 ${totalWeeklyHours}시간 수업 · 수업 있는 칸을 눌러 추가</div>
+          </div>
+          <button type="button" class="tt-v3-reset-btn" onclick="resetTimetableDraft()">초기화</button>
+        </div>
+      ` : ''}
 
-      <!-- AI 시간표 사진 자동 입력 -->
-      <input id="tt-image-upload-input" type="file" accept="image/*" style="display:none;" onchange="handleTimetableImageUpload(this)" />
-      <button type="button" onclick="triggerTimetableImageUpload()" ${state._tt_ai_loading ? 'disabled' : ''} style="width:100%; padding:11px 14px; margin-bottom:12px; border-radius:14px; border:1.5px dashed #287D62; background:#EEF8F3; color:#1F6A52; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:${state._tt_ai_loading ? 'wait' : 'pointer'}; text-align:left; opacity:${state._tt_ai_loading ? '0.75' : '1'};">
-        <span style="display:flex; align-items:center; gap:9px; min-width:0;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6A52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          <span style="min-width:0;">
-            <span style="display:block; font-size:13px; font-weight:800; color:#1F6A52;">${state._tt_ai_loading ? 'AI가 시간표를 분석하고 있어요...' : '시간표 사진으로 자동 채우기'}</span>
-            <span style="display:block; font-size:11px; font-weight:500; color:#4E5968; margin-top:1px;">에브리타임 · 포털 캡처 업로드 (원본 미저장)</span>
-          </span>
+      <button type="button" class="tt-v3-ai-banner" onclick="triggerTimetableImageUpload()" ${state._tt_ai_loading ? 'disabled' : ''}>
+        <span class="tt-v3-ai-ic">${cameraSvg("#287D62")}</span>
+        <span class="tt-v3-ai-copy">
+          <span class="tt-v3-ai-title">${state._tt_ai_loading ? 'AI가 시간표를 분석하고 있어요...' : '사진 한 장으로 자동 채우기'}</span>
+          <span class="tt-v3-ai-sub">${pcMode ? '에브리타임·포털 캡처를 올리면 칸이 채워져요 · 사진은 저장 안 해요' : '에브리타임·포털 캡처 · 사진은 저장 안 해요'}</span>
         </span>
-        <span style="font-size:12px; font-weight:800; color:#287D62; flex-shrink:0;">${state._tt_ai_loading ? '분석중' : '업로드 ›'}</span>
+        ${pcMode
+          ? `<span class="tt-v3-ai-cta">${state._tt_ai_loading ? '분석중' : '업로드'}</span>`
+          : chevronRightSvg}
       </button>
 
-      <!-- 에브리타임 기준 시간표 (9시 ~ 오후 7시) -->
+      ${!pcMode ? `<div class="tt-v3-hint-line">수업 있는 칸을 누르면 추가돼요 · 주 ${totalWeeklyHours}시간 수업</div>` : ''}
+
       <div class="tt-et-wrap">
         <div class="tt-et-grid">
           <div class="tt-et-corner"></div>
           ${dayHeadersHtml}
+          ${todayColBgHtml}
           ${hourAxisHtml}
           ${cellsHtml}
         </div>
       </div>
 
-      <!-- 선택 수업명 수정 · 삭제 바 -->
-      <div class="tt-et-editor-bar">
-        <span id="tt-course-slot-label" style="font-size:11.5px; font-weight:800; color:#287D62; white-space:nowrap;">${escHtml(selSlotLabel)}</span>
-        <input id="tt-course-name-input" type="text" maxlength="60" value="${escHtml(selSlotVal)}" ${selSlots ? '' : 'disabled'} placeholder="${selSlots ? '수업명 전체 입력' : '수업 칸을 눌러 수정·삭제'}" oninput="updateSelectedSlotCourseName(this.value)" onchange="render()" style="flex:1; min-width:0; height:32px; border:none; background:transparent; font-size:13px; color:#191F28; outline:none;" />
-        ${selSlots ? `<button type="button" class="tt-et-del-btn" onclick="deleteSelectedTimetableSlots()">삭제</button>` : ''}
+      ${pcMode ? `<button type="button" class="tt-v3-save-btn" onclick="saveUserTimetable()">시간표 저장</button>` : ''}
+    </div>
+  `;
+
+  const todayTimelineHtml = `
+    <div class="${pcMode ? '' : 'tt-v3-today-box'}">
+      <div class="tt-v3-today-label">${todayIdx >= 0 ? `오늘(${timelineDay}) 내 공강` : `${timelineDay}요일 내 공강`}</div>
+      <div class="tt-v3-today-count">${todayFreeCount}시간 비어 있어요</div>
+      <div class="tt-v3-timeline-bars">
+        ${TT_PERIODS.map(p => `<div class="tt-v3-tbar ${todayBusySet.has(p) ? '' : 'free'}" title="${periodToEverytimeHour(p)}시 ${todayBusySet.has(p) ? '수업' : '공강'}"></div>`).join("")}
       </div>
-
-      <button type="button" onclick="saveUserTimetable()" style="width:100%; height:46px; border-radius:23px; border:none; background:#287D62; color:#FFFFFF; font-size:14.5px; font-weight:800; cursor:pointer;">시간표 저장</button>
+      <div class="tt-v3-timeline-ticks">
+        <span>9</span>
+        <span>12</span>
+        <span>3</span>
+        <span>6</span>
+        <span>7</span>
+      </div>
     </div>
   `;
 
-  const matesHtml = `
-    <div style="background:#FFFFFF; border:1.5px solid #E5E8EB; border-radius:20px; padding:18px;">
-      <div style="font-size:15px; font-weight:800; color:#191F28; margin-bottom:4px;">공강이 겹치는 학우 ${mates.length}명</div>
-      <div style="font-size:12px; color:#6B7684; margin-bottom:14px;">단과대와 매너온도만 블라인드로 표시돼요</div>
-
-      ${!hasSaved ? `
-        <div style="text-align:center; padding:32px 16px; background:#F7F9F8; border-radius:16px;">
-          <div style="font-size:14.5px; font-weight:800; color:#191F28; margin-bottom:6px;">내 시간표를 먼저 등록해 주세요</div>
-          <div style="font-size:12.5px; color:#6B7684; margin-bottom:14px; line-height:1.5;">수업 있는 칸만 누르면 공강이 겹치는 학우를 찾아드려요.</div>
-          ${!isPC() ? `<button type="button" onclick="state._tt_draft={}; state.timetable_tab='edit'; render();" style="height:38px; padding:0 18px; border-radius:19px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer;">시간표 입력하기 ›</button>` : ''}
-        </div>
-      ` : (mates.length === 0 ? `
-        <div style="text-align:center; padding:32px 16px; background:#F7F9F8; border-radius:16px;">
-          <div style="font-size:14.5px; font-weight:800; color:#191F28; margin-bottom:6px;">아직 공강이 겹치는 학우가 없어요</div>
-          <div style="font-size:12px; color:#6B7684; margin-bottom:14px;">먼저 내 공강 시간에 맞춰 번개를 열어보는 건 어떨까요?</div>
-          <button type="button" onclick="state.active_modal='create'; render();" style="height:38px; padding:0 18px; border-radius:19px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer;">내 공강에 번개 열기</button>
-        </div>
-      ` : `
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          ${mates.map(m => {
-            const tier = getTierByTemp(m.user.manner_temp || 36.5);
-            const broadDept = typeof getBroadCollege === "function" ? getBroadCollege(m.user.department) : (m.user.department || "울산대");
-            return `
-              <div style="padding:14px 16px; border-radius:16px; background:#F7F9F8; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                <div style="min-width:0; flex:1;">
-                  <div style="font-size:14.5px; font-weight:800; color:#191F28;">${escHtml(tier.name)} · ${tier.displayTemp}°C · ${escHtml(broadDept)}</div>
-                  <div style="font-size:12.5px; font-weight:700; color:#287D62; margin-top:4px;">${escHtml(m.overlap.highlightText)}</div>
-                  <div style="font-size:11.5px; color:#6B7684; margin-top:2px;">주 ${m.overlap.overlapHours}시간 공강 일치 (${m.overlap.pct}%)</div>
-                </div>
-                <button type="button" onclick="inviteGonggangMate('${m.uid}', '${m.overlap.bestMeetDate}', '${m.overlap.bestMeetTime}')" style="flex-shrink:0; height:34px; padding:0 14px; border-radius:17px; border:none; background:#FFFFFF; color:#287D62; font-size:12px; font-weight:700; cursor:pointer;">번개 열기</button>
+  const mateCardsHtml = mates.length === 0 ? `
+    <div style="text-align:center; padding:28px 16px; background:#F7F8FA; border-radius:18px;">
+      <div style="font-size:14.5px; font-weight:800; color:#191F28; margin-bottom:6px;">아직 공강이 겹치는 학우가 없어요</div>
+      <div style="font-size:12.5px; color:#6B7684; margin-bottom:14px;">먼저 내 공강 시간에 맞춰 번개를 열어보는 건 어떨까요?</div>
+      <button type="button" onclick="state.active_modal='create'; render();" style="height:38px; padding:0 18px; border-radius:12px; border:none; background:#287D62; color:#FFFFFF; font-size:13px; font-weight:800; cursor:pointer;">내 공강에 번개 열기</button>
+    </div>
+  ` : `
+    <div class="tt-v3-mate-list">
+      ${mates.map(m => {
+        const tier = getTierByTemp(m.user.manner_temp || 36.5);
+        const broadDept = typeof getBroadCollege === "function" ? getBroadCollege(m.user.department) : (m.user.department || "울산대");
+        const avEmoji = getMateAvatarEmoji(m.user.manner_temp);
+        const pct = Math.max(5, Math.min(100, Number(m.overlap.pct || 0)));
+        return `
+          <div class="tt-v3-mate-card">
+            <div class="tt-v3-mate-top">
+              <div class="tt-v3-mate-av">${avEmoji}</div>
+              <div style="min-width:0; flex:1;">
+                <div class="tt-v3-mate-name">${escHtml(tier.name)} · ${tier.displayTemp}°C</div>
+                <div class="tt-v3-mate-dept">${escHtml(broadDept)}</div>
               </div>
-            `;
-          }).join("")}
-        </div>
-      `)}
+            </div>
+            <div class="tt-v3-mate-hl">${escHtml(m.overlap.highlightText)}</div>
+            <div class="tt-v3-mate-foot">
+              <div class="tt-v3-mate-prog-wrap">
+                <div class="tt-v3-mate-hours">주 ${m.overlap.overlapHours}시간 겹쳐요</div>
+                <div class="tt-v3-mate-bar-row">
+                  <div class="tt-v3-mate-bar-track"><div class="tt-v3-mate-bar-fill" style="width:${pct}%;"></div></div>
+                  <span class="tt-v3-mate-pct">${pct}%</span>
+                </div>
+              </div>
+              <button type="button" class="tt-v3-mate-cta" onclick="inviteGonggangMate('${m.uid}', '${m.overlap.bestMeetDate}', '${m.overlap.bestMeetTime}')">번개 열기</button>
+            </div>
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
+
+  const emptyStateHtml = `
+    <div class="tt-v3-empty-state">
+      <div class="tt-v3-empty-ic">${calendarSvg}</div>
+      <h2 class="tt-v3-empty-title">시간표를 넣으면<br>공강 메이트를 찾아드려요</h2>
+      <p class="tt-v3-empty-sub">공강이 겹치는 학우와 바로 밥약·카공 번개를 열 수 있어요</p>
+      <div class="tt-v3-empty-privacy">${lockSvg}<span>사진은 분석 후 바로 지워져요</span></div>
+      <button type="button" class="tt-v3-empty-btn-primary" onclick="triggerTimetableImageUpload()" ${state._tt_ai_loading ? 'disabled' : ''}>
+        ${cameraSvg("#FFFFFF")}
+        <span>${state._tt_ai_loading ? 'AI가 시간표를 분석하고 있어요...' : '사진으로 자동 채우기'}</span>
+      </button>
+      ${!pcMode ? `<button type="button" class="tt-v3-empty-btn-secondary" onclick="ensureTimetableDrafts(); state.timetable_tab='edit'; render();">직접 입력할게요</button>` : ''}
+    </div>
+  `;
+
+  const matesSectionHtml = !hasSaved ? emptyStateHtml : (pcMode ? `
+    <div class="tt-v3-card tt-v3-pc-mates-card">
+      ${todayTimelineHtml}
+      <div style="height:1px; background:#F2F4F6; margin:16px 0;"></div>
+      <div class="tt-v3-mates-head">공강이 겹치는 학우 ${mates.length}명</div>
+      <div class="tt-v3-privacy-row">${lockSvg}<span>단과대·매너온도만 보여요</span></div>
+      ${mateCardsHtml}
+    </div>
+  ` : `
+    <div>
+      ${todayTimelineHtml}
+      <div class="tt-v3-mates-head">공강이 겹치는 학우 ${mates.length}명</div>
+      <div class="tt-v3-privacy-row">${lockSvg}<span>단과대와 매너온도만 보여요 · 이름·학번은 수락 전까지 비밀</span></div>
+      ${mateCardsHtml}
+    </div>
+  `);
+
+  let sheetHtml = "";
+  if (sheet) {
+    const startP = sheet.periods[0];
+    const endP = sheet.periods[sheet.periods.length - 1];
+    const nextP = endP + 1;
+    const titleStr = sheet.periods.length === 1
+      ? `${sheet.day}요일 ${periodToKoreanHourText(startP)}`
+      : formatEverytimeSlotRange(sheet.day, sheet.periods);
+    const subStr = formatBlockTimeRange(startP, sheet.extendNext && sheet.canExtend ? nextP : endP);
+    sheetHtml = `
+      <div class="tt-v3-sheet-backdrop" onclick="if(event.target===this) closeTimetableSheet();">
+        <div class="tt-v3-sheet" onclick="event.stopPropagation();">
+          <div class="tt-v3-sheet-handle"></div>
+          <h3 class="tt-v3-sheet-title">${escHtml(titleStr)}</h3>
+          <p class="tt-v3-sheet-sub">${escHtml(subStr)}</p>
+          <div class="tt-v3-input-box">
+            <input id="tt-sheet-name-input" type="text" maxlength="60" value="${escHtml(sheet.name || '')}" placeholder="수업명 입력 (예: 인본적사고와공동체의가치)" onkeydown="if(event.key==='Enter'){event.preventDefault(); submitTimetableSheet();}" />
+          </div>
+          <p class="tt-v3-sheet-note">수업명은 나만 보여요 · 비워두면 '수업'으로 표시돼요</p>
+          ${sheet.canExtend ? `
+            <div class="tt-v3-cont-row" onclick="toggleTimetableSheetExtend()">
+              <span class="tt-v3-cont-label">${periodToKoreanHourText(nextP)}까지 이어서 추가</span>
+              <span class="tt-v3-switch ${sheet.extendNext ? 'on' : ''}"></span>
+            </div>
+          ` : ''}
+          <div class="tt-v3-sheet-actions">
+            ${sheet.mode === "edit"
+              ? `<button type="button" class="tt-v3-btn-del" onclick="deleteTimetableSheetSlots()">삭제</button>`
+              : `<button type="button" class="tt-v3-btn-cancel" onclick="closeTimetableSheet()">취소</button>`}
+            <button type="button" class="tt-v3-btn-submit" onclick="submitTimetableSheet()">${sheet.mode === "edit" ? '수정하기' : '추가하기'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   return `
-    <div style="max-width:920px;">
-      <div class="v3-modal-head">
-        <div class="v3-modal-head-left">
+    <div class="tt-v3-page">
+      <input id="tt-image-upload-input" type="file" accept="image/*" style="display:none;" onchange="handleTimetableImageUpload(this)" />
+      <div class="tt-v3-topbar">
+        <div class="tt-v3-topbar-left">
           <button type="button" class="v3-back-btn" onclick="closeTimetableModal()" aria-label="뒤로 가기"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-          <h1 style="margin:0; font-size:22px; font-weight:800; color:#191F28; line-height:1.25;">시간표 · 공강 메이트</h1>
+          <h1 class="tt-v3-title">시간표</h1>
         </div>
+        ${!pcMode && curTab === "edit" ? `<button type="button" class="tt-v3-reset-btn" onclick="resetTimetableDraft()">초기화</button>` : ''}
       </div>
 
-      ${isPC() ? `
+      ${pcMode ? `
         <div class="pc-tt-2col">
           ${editorHtml}
-          ${matesHtml}
+          ${matesSectionHtml}
         </div>
       ` : `
-        <div style="display:flex; gap:8px; margin-bottom:14px;">
-          <button type="button" onclick="state.timetable_tab='mates'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'mates' ? '#287D62' : '#F7F9F8'}; color:${curTab === 'mates' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">공강 메이트 ${mates.length}</button>
-          <button type="button" onclick="state._tt_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable||{})); state._tt_names_draft=JSON.parse(JSON.stringify((DB.users[state.user_id]||{}).timetable_names||{})); state.timetable_tab='edit'; render();" style="height:36px; padding:0 16px; border-radius:18px; border:none; background:${curTab === 'edit' ? '#287D62' : '#F7F9F8'}; color:${curTab === 'edit' ? '#FFFFFF' : '#6B7684'}; font-size:13px; font-weight:700; cursor:pointer;">내 시간표 입력</button>
+        <div class="tt-v3-seg" role="tablist">
+          <button type="button" class="tt-v3-seg-btn ${curTab === 'mates' ? 'active' : ''}" onclick="state.timetable_tab='mates'; render();">공강 메이트${hasSaved ? ` ${mates.length}` : ''}</button>
+          <button type="button" class="tt-v3-seg-btn ${curTab === 'edit' ? 'active' : ''}" onclick="ensureTimetableDrafts(); state.timetable_tab='edit'; render();">내 시간표</button>
         </div>
-        ${curTab === 'edit' ? editorHtml : matesHtml}
+        ${curTab === 'edit' ? editorHtml : matesSectionHtml}
+        ${curTab === 'edit' ? `
+          <div class="tt-v3-sticky-save">
+            <button type="button" class="tt-v3-save-btn" onclick="saveUserTimetable()">시간표 저장</button>
+          </div>
+        ` : ''}
       `}
+      ${sheetHtml}
     </div>
   `;
 }
