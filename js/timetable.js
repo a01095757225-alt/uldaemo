@@ -44,6 +44,87 @@ function formatEverytimeSlotRange(day, periods) {
   return `${day}요일 ${first}~${lastEndStr}시`;
 }
 
+function minToHHMM(mins) {
+  const h = Math.floor(Number(mins) / 60);
+  const m = Number(mins) % 60;
+  return `${h}:${String(m).padStart(2, "0")}`;
+}
+
+function minToKoreanLabel(mins) {
+  const h = Math.floor(Number(mins) / 60);
+  const m = Number(mins) % 60;
+  const ap = h < 12 ? "오전" : "오후";
+  const h12 = h > 12 ? h - 12 : h;
+  return m === 0 ? `${ap} ${h12}시` : `${ap} ${h12}시 30분`;
+}
+
+function buildBlocksFromLegacy(ttObj, namesMap) {
+  const blocks = [];
+  TT_DAYS.forEach(d => {
+    const items = buildMergedDayItems(d, ttObj || {}, namesMap || {});
+    items.forEach(it => {
+      if (it.type === "block") {
+        blocks.push({
+          day: d,
+          name: it.name || "",
+          start_min: (8 + it.start) * 60,
+          end_min: (9 + it.end) * 60
+        });
+      }
+    });
+  });
+  return blocks;
+}
+
+function getUserTimetableBlocks(u) {
+  if (!u) return [];
+  if (Array.isArray(u.timetable_blocks) && u.timetable_blocks.length > 0) {
+    return JSON.parse(JSON.stringify(u.timetable_blocks));
+  }
+  return buildBlocksFromLegacy(u.timetable || {}, u.timetable_names || {});
+}
+
+function syncLegacyFromBlocks(blocks) {
+  const tt = { "월": [], "화": [], "수": [], "목": [], "금": [] };
+  const names = {};
+  const sets = { "월": new Set(), "화": new Set(), "수": new Set(), "목": new Set(), "금": new Set() };
+  (blocks || []).forEach(b => {
+    if (!b || !sets[b.day]) return;
+    const sm = Math.max(540, Math.min(1170, Number(b.start_min) || 540));
+    const em = Math.max(sm + 30, Math.min(1200, Number(b.end_min) || (sm + 60)));
+    const firstH = Math.floor(sm / 60);
+    const lastH = Math.floor((em - 1) / 60);
+    for (let h = Math.max(9, firstH); h <= Math.min(19, lastH); h++) {
+      const p = h - 8;
+      if (p >= 1 && p <= TT_PERIODS.length) {
+        sets[b.day].add(p);
+        if (b.name) names[`${b.day}_${p}`] = b.name;
+      }
+    }
+  });
+  TT_DAYS.forEach(d => {
+    tt[d] = [...sets[d]].sort((a, b) => a - b);
+  });
+  return { timetable: tt, timetable_names: names };
+}
+
+function buildCourseColorMapFromBlocks(blocks) {
+  const map = {};
+  let idx = 0;
+  const sorted = [...(blocks || [])].sort((a, b) => {
+    const di = TT_DAYS.indexOf(a.day) - TT_DAYS.indexOf(b.day);
+    return di !== 0 ? di : (a.start_min - b.start_min);
+  });
+  sorted.forEach(b => {
+    const nm = String((b && b.name) || "").trim();
+    if (nm && !map[nm]) {
+      map[nm] = TT_COURSE_PALETTE[idx % TT_COURSE_PALETTE.length];
+      idx += 1;
+    }
+  });
+  return map;
+}
+
 function buildCourseColorMap(draft, namesMap) {
   const map = {};
   let idx = 0;
@@ -292,12 +373,14 @@ function applyQuickFreeSlotToCreate(dateStr, timeStr) {
 
 function openTimetableModal(tab) {
   const u = DB.users[state.user_id];
-  if (u && !state._tt_draft) {
-    state._tt_draft = JSON.parse(JSON.stringify(u.timetable || {}));
-    state._tt_names_draft = JSON.parse(JSON.stringify(u.timetable_names || {}));
+  if (u && !state._tt_blocks_draft) {
+    state._tt_blocks_draft = getUserTimetableBlocks(u);
+    const synced = syncLegacyFromBlocks(state._tt_blocks_draft);
+    state._tt_draft = synced.timetable;
+    state._tt_names_draft = synced.timetable_names;
   }
   state._tt_sheet = null;
-  state.timetable_tab = tab || (hasUserTimetable(state.user_id) ? "mates" : "mates");
+  state.timetable_tab = tab || "mates";
   state.active_modal = "timetable";
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -306,6 +389,7 @@ function openTimetableModal(tab) {
 function closeTimetableModal() {
   state._tt_draft = null;
   state._tt_names_draft = null;
+  state._tt_blocks_draft = null;
   state._tt_sheet = null;
   state.active_modal = null;
   render();
@@ -313,22 +397,25 @@ function closeTimetableModal() {
 
 function ensureTimetableDrafts() {
   const u = (DB && DB.users && DB.users[state.user_id]) || {};
-  if (!state._tt_draft) state._tt_draft = JSON.parse(JSON.stringify(u.timetable || {}));
-  if (!state._tt_names_draft) state._tt_names_draft = JSON.parse(JSON.stringify(u.timetable_names || {}));
+  if (!Array.isArray(state._tt_blocks_draft)) {
+    state._tt_blocks_draft = getUserTimetableBlocks(u);
+  }
+  const synced = syncLegacyFromBlocks(state._tt_blocks_draft);
+  state._tt_draft = synced.timetable;
+  state._tt_names_draft = synced.timetable_names;
 }
 
-function openTimetableAddSheet(day, period) {
+function openTimetableAddSheet(day, startMin) {
   ensureTimetableDrafts();
-  const p = Number(period);
-  const busyArr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
-  const canExtend = p < TT_PERIODS.length && !busyArr.includes(p + 1);
+  const sm = Math.max(540, Math.min(1170, Number(startMin) || 540));
+  const em = Math.min(1200, sm + 60);
   state._tt_sheet = {
     mode: "add",
+    blockIdx: -1,
     day,
-    periods: [p],
-    name: "",
-    extendNext: false,
-    canExtend
+    start_min: sm,
+    end_min: em,
+    name: ""
   };
   render();
   setTimeout(() => {
@@ -337,22 +424,18 @@ function openTimetableAddSheet(day, period) {
   }, 30);
 }
 
-function openTimetableEditSheet(day, periodsCsv) {
+function openTimetableEditSheet(blockIdx) {
   ensureTimetableDrafts();
-  const periods = String(periodsCsv || "").split(",").map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
-  if (!periods.length) return;
-  const firstKey = `${day}_${periods[0]}`;
-  const curName = (state._tt_names_draft && state._tt_names_draft[firstKey]) || "";
-  const lastP = periods[periods.length - 1];
-  const busyArr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
-  const canExtend = lastP < TT_PERIODS.length && !busyArr.includes(lastP + 1);
+  const idx = Number(blockIdx);
+  const blk = state._tt_blocks_draft && state._tt_blocks_draft[idx];
+  if (!blk) return;
   state._tt_sheet = {
     mode: "edit",
-    day,
-    periods,
-    name: curName,
-    extendNext: false,
-    canExtend
+    blockIdx: idx,
+    day: blk.day,
+    start_min: Number(blk.start_min),
+    end_min: Number(blk.end_min),
+    name: blk.name || ""
   };
   render();
   setTimeout(() => {
@@ -366,11 +449,20 @@ function closeTimetableSheet() {
   render();
 }
 
-function toggleTimetableSheetExtend() {
-  if (!state._tt_sheet || !state._tt_sheet.canExtend) return;
+function updateTimetableSheetTime(field, val) {
+  if (!state._tt_sheet) return;
   const inp = document.getElementById("tt-sheet-name-input");
   if (inp) state._tt_sheet.name = inp.value;
-  state._tt_sheet.extendNext = !state._tt_sheet.extendNext;
+  const num = Number(val);
+  if (isNaN(num)) return;
+  if (field === "start_min") {
+    state._tt_sheet.start_min = num;
+    if (state._tt_sheet.end_min <= num) {
+      state._tt_sheet.end_min = Math.min(1200, num + 30);
+    }
+  } else if (field === "end_min") {
+    state._tt_sheet.end_min = Math.max(state._tt_sheet.start_min + 30, num);
+  }
   render();
 }
 
@@ -380,22 +472,20 @@ function submitTimetableSheet() {
   const sheet = state._tt_sheet;
   const inp = document.getElementById("tt-sheet-name-input");
   const cleanName = String(inp ? inp.value : sheet.name || "").trim().slice(0, 60);
-  const targetPeriods = [...sheet.periods];
-  if (sheet.extendNext && sheet.canExtend) {
-    const nextP = targetPeriods[targetPeriods.length - 1] + 1;
-    if (nextP <= TT_PERIODS.length && !targetPeriods.includes(nextP)) {
-      targetPeriods.push(nextP);
-    }
-  }
-  const arr = Array.isArray(state._tt_draft[sheet.day]) ? state._tt_draft[sheet.day].map(Number) : [];
-  targetPeriods.forEach(p => {
-    if (!arr.includes(p)) arr.push(p);
-    const k = `${sheet.day}_${p}`;
-    if (cleanName) state._tt_names_draft[k] = cleanName;
-    else delete state._tt_names_draft[k];
+  const sm = Math.max(540, Math.min(1170, Number(sheet.start_min) || 540));
+  const em = Math.max(sm + 30, Math.min(1200, Number(sheet.end_min) || (sm + 60)));
+
+  // 같은 요일에 겹치는 기존 블록 제거 후 새 블록 반영
+  const nextBlocks = (state._tt_blocks_draft || []).filter((b, i) => {
+    if (sheet.mode === "edit" && i === sheet.blockIdx) return false;
+    if (b.day !== sheet.day) return true;
+    return b.end_min <= sm || b.start_min >= em;
   });
-  arr.sort((a, b) => a - b);
-  state._tt_draft[sheet.day] = arr;
+  nextBlocks.push({ day: sheet.day, name: cleanName, start_min: sm, end_min: em });
+  state._tt_blocks_draft = nextBlocks;
+  const synced = syncLegacyFromBlocks(nextBlocks);
+  state._tt_draft = synced.timetable;
+  state._tt_names_draft = synced.timetable_names;
   state._tt_sheet = null;
   render();
 }
@@ -403,13 +493,13 @@ function submitTimetableSheet() {
 function deleteTimetableSheetSlots() {
   if (!state._tt_sheet) return;
   ensureTimetableDrafts();
-  const { day, periods } = state._tt_sheet;
-  const removeSet = new Set(periods.map(Number));
-  const arr = Array.isArray(state._tt_draft[day]) ? state._tt_draft[day].map(Number) : [];
-  state._tt_draft[day] = arr.filter(x => !removeSet.has(x));
-  periods.forEach(p => {
-    if (state._tt_names_draft) delete state._tt_names_draft[`${day}_${p}`];
-  });
+  const idx = state._tt_sheet.blockIdx;
+  if (idx >= 0) {
+    state._tt_blocks_draft = (state._tt_blocks_draft || []).filter((_, i) => i !== idx);
+    const synced = syncLegacyFromBlocks(state._tt_blocks_draft);
+    state._tt_draft = synced.timetable;
+    state._tt_names_draft = synced.timetable_names;
+  }
   state._tt_sheet = null;
   render();
 }
@@ -495,12 +585,16 @@ async function handleTimetableImageUpload(inputEl) {
       render();
       return showToast("사진에서 수업을 찾지 못했어요. 요일과 시간이 잘 보이는 캡처로 올려주세요.");
     }
-    state._tt_draft = data.timetable || {};
-    state._tt_names_draft = data.timetable_names || {};
+    state._tt_blocks_draft = Array.isArray(data.timetable_blocks) && data.timetable_blocks.length
+      ? data.timetable_blocks
+      : buildBlocksFromLegacy(data.timetable || {}, data.timetable_names || {});
+    const synced = syncLegacyFromBlocks(state._tt_blocks_draft);
+    state._tt_draft = synced.timetable;
+    state._tt_names_draft = synced.timetable_names;
     state._tt_sheet = null;
     state.timetable_tab = "edit";
     render();
-    showToast(`AI가 수업 ${cnt}칸을 자동으로 채웠어요! 확인 후 [시간표 저장]을 눌러주세요.`);
+    showToast(`AI가 수업 ${state._tt_blocks_draft.length}개를 자동으로 채웠어요! 확인 후 [시간표 저장]을 눌러주세요.`);
   } catch (e) {
     state._tt_ai_loading = false;
     render();
@@ -519,6 +613,7 @@ function buildTimetableDraftSummary(ttObj) {
 }
 
 function resetTimetableDraft() {
+  state._tt_blocks_draft = [];
   state._tt_draft = { "월": [], "화": [], "수": [], "목": [], "금": [] };
   state._tt_names_draft = {};
   state._tt_sheet = null;
@@ -529,16 +624,15 @@ function resetTimetableDraft() {
 function saveUserTimetable() {
   const u = DB.users[state.user_id];
   if (!u) return;
-  const draft = state._tt_draft || {};
-  const clean = {};
-  TT_DAYS.forEach(d => {
-    clean[d] = Array.isArray(draft[d]) ? [...new Set(draft[d].map(Number))].filter(n => n >= 1 && n <= TT_PERIODS.length).sort((a, b) => a - b) : [];
-  });
-  u.timetable = clean;
-  u.timetable_names = state._tt_names_draft || u.timetable_names || {};
+  const blocks = Array.isArray(state._tt_blocks_draft) ? state._tt_blocks_draft : getUserTimetableBlocks(u);
+  const synced = syncLegacyFromBlocks(blocks);
+  u.timetable_blocks = JSON.parse(JSON.stringify(blocks));
+  u.timetable = synced.timetable;
+  u.timetable_names = synced.timetable_names;
   u.timetable_saved = true;
   u.updated_at = Date.now();
   saveDB(true);
+  state._tt_blocks_draft = null;
   state._tt_draft = null;
   state._tt_names_draft = null;
   state._tt_sheet = null;
@@ -573,11 +667,12 @@ function renderTimetableModal() {
   if (!u) return "";
   const pcMode = isPC();
   const curTab = state.timetable_tab || "mates";
-  const draft = state._tt_draft || u.timetable || {};
-  const namesMap = state._tt_names_draft || u.timetable_names || {};
+  const blocks = Array.isArray(state._tt_blocks_draft) ? state._tt_blocks_draft : getUserTimetableBlocks(u);
+  const syncedDraft = syncLegacyFromBlocks(blocks);
+  const draft = syncedDraft.timetable;
   const hasSaved = hasUserTimetable(state.user_id);
   const mates = hasSaved ? getGonggangMates() : [];
-  const colorMap = buildCourseColorMap(draft, namesMap);
+  const colorMap = buildCourseColorMapFromBlocks(blocks);
   const sheet = state._tt_sheet || null;
 
   const todayDayRaw = getDayLabelFromDateStr(getTodayStr());
@@ -586,7 +681,8 @@ function renderTimetableModal() {
   const savedOrDraft = hasSaved ? (u.timetable || draft) : draft;
   const todayBusySet = new Set(Array.isArray(savedOrDraft[timelineDay]) ? savedOrDraft[timelineDay].map(Number) : []);
   const todayFreeCount = TT_PERIODS.filter(p => !todayBusySet.has(p)).length;
-  const totalWeeklyHours = TT_DAYS.reduce((acc, d) => acc + (Array.isArray(draft[d]) ? draft[d].length : 0), 0);
+  const totalWeeklyMins = blocks.reduce((acc, b) => acc + Math.max(30, (Number(b.end_min) - Number(b.start_min)) || 60), 0);
+  const totalWeeklyHoursLabel = totalWeeklyMins % 60 === 0 ? `${totalWeeklyMins / 60}시간` : `${(totalWeeklyMins / 60).toFixed(1)}시간`;
 
   const lockSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8B95A1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
   const cameraSvg = (strokeColor) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${strokeColor}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
@@ -604,33 +700,42 @@ function renderTimetableModal() {
     : "";
 
   const hourAxisHtml = TT_PERIODS.map((p, idx) =>
-    `<div class="tt-et-hour" style="grid-row:${idx + 2};">${periodToEverytimeHour(p)}${pcMode ? '시' : ''}</div>`
+    `<div class="tt-et-hour" style="grid-row:${idx * 2 + 2} / span 2;">${periodToEverytimeHour(p)}${pcMode ? '시' : ''}</div>`
   ).join("");
 
-  const cellsHtml = TT_DAYS.map((d, di) => {
+  // 22개 30분 단위 빈 셀 (09:00 ~ 20:00)
+  const emptyCellsHtml = TT_DAYS.map((d, di) => {
     const col = di + 2;
-    const items = buildMergedDayItems(d, draft, namesMap);
-    return items.map(item => {
-      if (item.type === "empty") {
-        const row = item.period + 1;
-        const isAdding = Boolean(sheet && sheet.mode === "add" && sheet.day === d && sheet.periods.includes(item.period));
-        return `<button type="button" class="tt-et-empty ${isAdding ? 'adding' : ''}" style="grid-column:${col}; grid-row:${row};" onclick="openTimetableAddSheet('${d}', ${item.period})" aria-label="${d} ${periodToEverytimeHour(item.period)}시 추가">${isAdding ? '+' : ''}</button>`;
-      }
-      const rowStart = item.start + 1;
-      const rowEnd = item.end + 2;
-      const firstKey = `${d}_${item.start}`;
-      const pal = (item.name && colorMap[item.name]) ? colorMap[item.name] : TT_COURSE_PALETTE[1];
-      const isSelected = Boolean(sheet && sheet.mode === "edit" && sheet.day === d && sheet.periods.includes(item.start));
-      const periodsCsv = item.periods.join(",");
-      return `
-        <button type="button" id="tt_block_${firstKey}" class="tt-et-block ${isSelected ? 'selected' : ''}"
-          style="grid-column:${col}; grid-row:${rowStart} / ${rowEnd}; background:${pal.bg}; color:${pal.text};"
-          onclick="openTimetableEditSheet('${d}', '${periodsCsv}')">
-          <span class="tt-et-block-name">${escHtml(item.name || "수업")}</span>
-          ${pcMode ? `<span class="tt-et-block-time">${formatBlockTimeRange(item.start, item.end)}</span>` : ''}
-        </button>
-      `;
-    }).join("");
+    let html = "";
+    for (let s = 0; s < 22; s++) {
+      const slotMin = 540 + s * 30;
+      const row = s + 2;
+      const isHalf = s % 2 === 1;
+      const isAdding = Boolean(sheet && sheet.mode === "add" && sheet.day === d && sheet.start_min === slotMin);
+      html += `<button type="button" class="tt-et-empty ${isHalf ? 'half' : ''} ${isAdding ? 'adding' : ''}" style="grid-column:${col}; grid-row:${row};" onclick="openTimetableAddSheet('${d}', ${slotMin})" aria-label="${d} ${minToHHMM(slotMin)} 추가">${isAdding ? '+' : ''}</button>`;
+    }
+    return html;
+  }).join("");
+
+  // 30분 단위 정밀 수업 블록
+  const blockCellsHtml = blocks.map((b, bi) => {
+    const di = TT_DAYS.indexOf(b.day);
+    if (di < 0) return "";
+    const col = di + 2;
+    const sm = Math.max(540, Math.min(1170, Number(b.start_min) || 540));
+    const em = Math.max(sm + 30, Math.min(1200, Number(b.end_min) || (sm + 60)));
+    const rowStart = Math.round((sm - 540) / 30) + 2;
+    const rowEnd = Math.round((em - 540) / 30) + 2;
+    const pal = (b.name && colorMap[b.name]) ? colorMap[b.name] : TT_COURSE_PALETTE[1];
+    const isSelected = Boolean(sheet && sheet.mode === "edit" && sheet.blockIdx === bi);
+    return `
+      <button type="button" class="tt-et-block ${isSelected ? 'selected' : ''}"
+        style="grid-column:${col}; grid-row:${rowStart} / ${rowEnd}; background:${pal.bg}; color:${pal.text};"
+        onclick="openTimetableEditSheet(${bi})">
+        <span class="tt-et-block-name">${escHtml(b.name || "수업")}</span>
+        ${pcMode ? `<span class="tt-et-block-time">${minToHHMM(sm)}–${minToHHMM(em)}</span>` : ''}
+      </button>
+    `;
   }).join("");
 
   const editorHtml = `
@@ -639,7 +744,7 @@ function renderTimetableModal() {
         <div class="tt-v3-card-head">
           <div>
             <div style="font-size:17px; font-weight:800; color:#191F28;">내 시간표</div>
-            <div class="tt-v3-hint-line" style="margin:4px 0 0;">주 ${totalWeeklyHours}시간 수업 · 수업 있는 칸을 눌러 추가</div>
+            <div class="tt-v3-hint-line" style="margin:4px 0 0;">주 ${totalWeeklyHoursLabel} 수업 · 30분 단위로 칸을 눌러 추가·수정</div>
           </div>
           <button type="button" class="tt-v3-reset-btn" onclick="resetTimetableDraft()">초기화</button>
         </div>
@@ -656,7 +761,7 @@ function renderTimetableModal() {
           : chevronRightSvg}
       </button>
 
-      ${!pcMode ? `<div class="tt-v3-hint-line">수업 있는 칸을 누르면 추가돼요 · 주 ${totalWeeklyHours}시간 수업</div>` : ''}
+      ${!pcMode ? `<div class="tt-v3-hint-line">빈 칸을 눌러 30분 단위로 추가 · 주 ${totalWeeklyHoursLabel} 수업</div>` : ''}
 
       <div class="tt-et-wrap">
         <div class="tt-et-grid">
@@ -664,7 +769,8 @@ function renderTimetableModal() {
           ${dayHeadersHtml}
           ${todayColBgHtml}
           ${hourAxisHtml}
-          ${cellsHtml}
+          ${emptyCellsHtml}
+          ${blockCellsHtml}
         </div>
       </div>
 
@@ -763,13 +869,16 @@ function renderTimetableModal() {
 
   let sheetHtml = "";
   if (sheet) {
-    const startP = sheet.periods[0];
-    const endP = sheet.periods[sheet.periods.length - 1];
-    const nextP = endP + 1;
-    const titleStr = sheet.periods.length === 1
-      ? `${sheet.day}요일 ${periodToKoreanHourText(startP)}`
-      : formatEverytimeSlotRange(sheet.day, sheet.periods);
-    const subStr = formatBlockTimeRange(startP, sheet.extendNext && sheet.canExtend ? nextP : endP);
+    const startOpts = [];
+    for (let m = 540; m <= 1170; m += 30) {
+      startOpts.push(`<option value="${m}" ${sheet.start_min === m ? 'selected' : ''}>${minToHHMM(m)} (${minToKoreanLabel(m)})</option>`);
+    }
+    const endOpts = [];
+    for (let m = sheet.start_min + 30; m <= 1200; m += 30) {
+      endOpts.push(`<option value="${m}" ${sheet.end_min === m ? 'selected' : ''}>${minToHHMM(m)} (${minToKoreanLabel(m)})</option>`);
+    }
+    const titleStr = `${sheet.day}요일 수업 ${sheet.mode === "edit" ? '수정' : '추가'}`;
+    const subStr = `${minToHHMM(sheet.start_min)} – ${minToHHMM(sheet.end_min)}`;
     sheetHtml = `
       <div class="tt-v3-sheet-backdrop" onclick="if(event.target===this) closeTimetableSheet();">
         <div class="tt-v3-sheet" onclick="event.stopPropagation();">
@@ -777,15 +886,18 @@ function renderTimetableModal() {
           <h3 class="tt-v3-sheet-title">${escHtml(titleStr)}</h3>
           <p class="tt-v3-sheet-sub">${escHtml(subStr)}</p>
           <div class="tt-v3-input-box">
-            <input id="tt-sheet-name-input" type="text" maxlength="60" value="${escHtml(sheet.name || '')}" placeholder="수업명 입력 (예: 인본적사고와공동체의가치)" onkeydown="if(event.key==='Enter'){event.preventDefault(); submitTimetableSheet();}" />
+            <input id="tt-sheet-name-input" type="text" maxlength="60" value="${escHtml(sheet.name || '')}" placeholder="수업명 입력 (예: ICT융합개론)" onkeydown="if(event.key==='Enter'){event.preventDefault(); submitTimetableSheet();}" />
           </div>
-          <p class="tt-v3-sheet-note">수업명은 나만 보여요 · 비워두면 '수업'으로 표시돼요</p>
-          ${sheet.canExtend ? `
-            <div class="tt-v3-cont-row" onclick="toggleTimetableSheetExtend()">
-              <span class="tt-v3-cont-label">${periodToKoreanHourText(nextP)}까지 이어서 추가</span>
-              <span class="tt-v3-switch ${sheet.extendNext ? 'on' : ''}"></span>
-            </div>
-          ` : ''}
+          <p class="tt-v3-sheet-note">수업명은 나만 보여요 · 30분 단위로 시작·종료 시간을 고를 수 있어요</p>
+          <div class="tt-v3-time-row">
+            <select class="tt-v3-time-select" aria-label="시작 시간" onchange="updateTimetableSheetTime('start_min', this.value)">
+              ${startOpts.join("")}
+            </select>
+            <span style="font-weight:800; color:#8B95A1;">~</span>
+            <select class="tt-v3-time-select" aria-label="종료 시간" onchange="updateTimetableSheetTime('end_min', this.value)">
+              ${endOpts.join("")}
+            </select>
+          </div>
           <div class="tt-v3-sheet-actions">
             ${sheet.mode === "edit"
               ? `<button type="button" class="tt-v3-btn-del" onclick="deleteTimetableSheetSlots()">삭제</button>`
