@@ -3875,9 +3875,11 @@
 
                 <div class="row-2" style="gap:10px;">
                   <div class="auth-v3-field">
-                    <label class="auth-v3-label" for="signup_dept">학과</label>
+                    <label class="auth-v3-label" for="signup_dept">단과대 · 학부/학과</label>
                     <div class="auth-v3-input-box">
-                      <input id="signup_dept" value="${escHtml(state.signup_dept || '')}" oninput="state.signup_dept=this.value;" placeholder="예: 컴퓨터공학과" />
+                      <select id="signup_dept" onchange="state.signup_dept=this.value;">
+                        ${renderUlsanDeptOptionsHtml(state.signup_dept || "", true)}
+                      </select>
                     </div>
                   </div>
                   <div class="auth-v3-field">
@@ -6517,13 +6519,13 @@
 
     function getBroadCollege(dept) {
       if (!dept) return "울산대 재학생";
-      if (/컴퓨터|IT|ICT|소프트웨어|AI|전기|전자|기계|화공|화학공|토목|신소재|건축|생명공|융합/i.test(dept)) return "공과대학";
-      if (/경영|경제|글로벌/i.test(dept)) return "경영대학";
-      if (/의|간호|약학/i.test(dept)) return "의과대학";
-      if (/디자인|미술|음악|예술|체육|스포츠/i.test(dept)) return "예술체육대학";
-      if (/국문|영문|인문|철학|역사|어문/i.test(dept)) return "인문대학";
-      if (/자연|수학|물리|생명과학/i.test(dept)) return "자연과학대학";
-      if (/사회/i.test(dept)) return "사회과학대학";
+      const s = String(dept);
+      if (/아산아너스|자율전공|자유전공/i.test(s)) return "아산아너스칼리지";
+      if (/의과|의예|의학|간호|약학/i.test(s)) return "의과대학";
+      if (/스마트도시|건축|도시|토목|건설|디자인|의류|패션|스포츠|체육/i.test(s)) return "스마트도시융합대학";
+      if (/경영|경제|회계|공공|행정|법학|사회|복지|경찰|아동/i.test(s)) return "경영·공공정책대학";
+      if (/인문|글로벌인문|국어|국문|영어|영문|일어|중국|프랑스|스페인|역사|철학|예술|음악|미술/i.test(s)) return "인문예술대학";
+      if (/미래엔지니어링|모빌리티|기계|조선|항공|에너지|화공|화학공|신소재|첨단소재|반도체|전기|전자|ICT|IT|컴퓨터|소프트웨어|AI|인공지능|산업|데이터|수학|물리|화학|바이오|생명|식품영양|융합/i.test(s)) return "미래엔지니어링융합대학";
       return "울산대 재학생";
     }
 
@@ -10575,18 +10577,57 @@
       }
     }
 
-    const ULSAN_DEPARTMENTS = [
-      "공과대학 · 기계공학부", "공과대학 · 조선해양공학부", "공과대학 · 전기전자컴퓨터공학부",
-      "공과대학 · IT융합학부", "공과대학 · 화학공학부", "공과대학 · 첨단소재공학부",
-      "공과대학 · 건설환경공학부", "공과대학 · 건축학부", "공과대학 · 산업경영공학부",
-      "경영대학 · 경영학부", "경영대학 · 경영정보학과", "경영대학 · 회계학과",
-      "사회과학대학 · 경제학과", "사회과학대학 · 행정학과", "사회과학대학 · 법학과", "사회과학대학 · 사회복지학과",
-      "인문대학 · 국어국문학과", "인문대학 · 영어영문학과", "인문대학 · 역사·문화학과", "인문대학 · 철학과",
-      "자연과학대학 · 수학과", "자연과학대학 · 물리학과", "자연과학대학 · 화학과", "자연과학대학 · 생명과학부",
-      "생활과학대학 · 식품영양학과", "생활과학대학 · 의류학과", "생활과학대학 · 아동·가정복지학과",
-      "예술대학 · 디자인학부", "예술대학 · 음악학부", "예술대학 · 미술학부",
-      "스포츠과학부", "의과대학 · 의예과/의학과", "간호학과", "아산아너스칼리지 · 자유전공학부"
+    // 울산대학교 글로컬대학30 개편 공식 체제 (6개 단과대학 · 16개 융합학부/학과)
+    const ULSAN_COLLEGE_GROUPS = [
+      {
+        college: "아산아너스칼리지",
+        depts: [
+          "아산아너스칼리지 · 자율전공학부"
+        ]
+      },
+      {
+        college: "미래엔지니어링융합대학",
+        depts: [
+          "미래엔지니어링융합대학 · 미래모빌리티공학부",
+          "미래엔지니어링융합대학 · 에너지화학공학부",
+          "미래엔지니어링융합대학 · 신소재·반도체융합학부",
+          "미래엔지니어링융합대학 · 전기전자융합학부",
+          "미래엔지니어링융합대학 · ICT융합학부",
+          "미래엔지니어링융합대학 · 바이오메디컬헬스학부"
+        ]
+      },
+      {
+        college: "스마트도시융합대학",
+        depts: [
+          "스마트도시융합대학 · 건축·도시환경학부",
+          "스마트도시융합대학 · 디자인융합학부",
+          "스마트도시융합대학 · 스포츠과학부"
+        ]
+      },
+      {
+        college: "경영·공공정책대학",
+        depts: [
+          "경영·공공정책대학 · 경영경제융합학부",
+          "경영·공공정책대학 · 공공인재학부"
+        ]
+      },
+      {
+        college: "인문예술대학",
+        depts: [
+          "인문예술대학 · 글로벌인문학부",
+          "인문예술대학 · 예술학부 (음악)",
+          "인문예술대학 · 예술학부 (미술)"
+        ]
+      },
+      {
+        college: "의과대학",
+        depts: [
+          "의과대학 · 의예과/의학과",
+          "의과대학 · 간호학과"
+        ]
+      }
     ];
+    const ULSAN_DEPARTMENTS = ULSAN_COLLEGE_GROUPS.flatMap(g => g.depts);
 
     function resolveClosestUlsanDept(savedDept) {
       const raw = String(savedDept || "").trim();
@@ -10594,6 +10635,22 @@
       if (ULSAN_DEPARTMENTS.includes(raw)) return raw;
       const found = ULSAN_DEPARTMENTS.find(d => d.includes(raw) || raw.includes(d.split(" · ").pop()));
       return found || raw;
+    }
+
+    function renderUlsanDeptOptionsHtml(selectedVal, includePlaceholder = false) {
+      const matched = resolveClosestUlsanDept(selectedVal);
+      let html = includePlaceholder
+        ? `<option value="" ${!matched ? 'selected' : ''}>단과대 · 학부 선택</option>`
+        : "";
+      if (matched && !ULSAN_DEPARTMENTS.includes(matched)) {
+        html += `<optgroup label="기존 등록 학과"><option value="${escHtml(matched)}" selected>${escHtml(matched)}</option></optgroup>`;
+      }
+      html += ULSAN_COLLEGE_GROUPS.map(g => `
+        <optgroup label="${escHtml(g.college)}">
+          ${g.depts.map(opt => `<option value="${escHtml(opt)}" ${opt === matched ? 'selected' : ''}>${escHtml(opt.split(" · ").slice(1).join(" · ") || opt)}</option>`).join("")}
+        </optgroup>
+      `).join("");
+      return html;
     }
 
     function renderProfileEditPanel(user, myTier) {
@@ -10690,7 +10747,7 @@
               <div>
                 <label class="label" style="margin:0 0 6px;">단과대 · 학부/학과</label>
                 <select id="edit_dept" class="select" onchange="updateProfilePreviewLive()" style="height:44px; background:#F7F9F8; border:1px solid #E5E8EB; border-radius:var(--radius-input); font-weight:700; margin-bottom:0;">
-                  ${deptOptions.map(opt => `<option value="${escHtml(opt)}" ${opt === matchedDept ? 'selected' : ''}>${escHtml(opt)}</option>`).join("")}
+                  ${renderUlsanDeptOptionsHtml(dept, false)}
                 </select>
               </div>
             </div>
