@@ -39,7 +39,7 @@
 
   <script src="/js/data.js?v=20261118"></script>
   <script src="/js/effects.js?v=20261118"></script>
-  <script src="/js/timetable.js?v=20261128uiv4b"></script>
+  <script src="/js/timetable.js?v=20261128uiv4c"></script>
   <script>
     window.onerror = function(msg, url, line, col, error) {
       console.error("Global JS Error:", msg, line, col, error);
@@ -1674,12 +1674,15 @@
           const me = (DB.users || {})[uid];
           if (me) {
             delete me.timetable;
+            delete me.timetable_names;
+            delete me.timetable_blocks;
             delete me.timetable_saved;
             me.updated_at = Date.now();
           }
           try { localStorage.removeItem("uldaemo_tt_" + uid); } catch (e) {}
           state.home_free_only = false;
           saveDB(true);
+          callApiAction("update_profile", { timetable: {}, timetable_names: {}, timetable_blocks: [] }).catch(() => {});
           showToast("시간표 데이터가 초기화되었어요.");
           render();
         }
