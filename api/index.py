@@ -486,8 +486,8 @@ def _gemini_one_call(model_name, url, body_obj, timeout_sec):
         return "", _scrub_secret(f"{model_name} {str(ex)[:80]}")
 
 
-def _gemini_race(body_obj, validator=None, timeout_sec=8.5, models=None, prefer_non_lite=False):
-    """여러 모델에 동시에 요청하고 유효한 응답을 사용 (비전 OCR은 비-lite 모델 우선)."""
+def _gemini_race(body_obj, validator=None, timeout_sec=6.5, models=None, prefer_non_lite=False):
+    """여러 모델에 동시에 요청하고 유효한 응답을 사용 (Vercel 10초 제한 내 확실히 응답)."""
     from concurrent.futures import as_completed
     cands = _gemini_endpoint_candidates(models or GEMINI_MODEL_CANDIDATES)
     errs = []
@@ -495,14 +495,19 @@ def _gemini_race(body_obj, validator=None, timeout_sec=8.5, models=None, prefer_
     ex = ThreadPoolExecutor(max_workers=len(cands))
     try:
         fut_to_model = {ex.submit(_gemini_one_call, m, u, body_obj, timeout_sec): m for m, u in cands}
+        deadline = time.time() + timeout_sec
+        pending_non_lite = sum(1 for m, _ in cands if "lite" not in m)
         try:
-            for fut in as_completed(list(fut_to_model.keys()), timeout=timeout_sec + 0.6):
+            for fut in as_completed(list(fut_to_model.keys()), timeout=max(1.0, deadline - time.time())):
                 m_name = fut_to_model[fut]
+                is_lite = "lite" in m_name
+                if not is_lite:
+                    pending_non_lite = max(0, pending_non_lite - 1)
                 txt, err = fut.result()
                 if txt:
                     val = txt if validator is None else validator(txt)
                     if val is not None:
-                        if prefer_non_lite and "lite" in m_name:
+                        if prefer_non_lite and is_lite and pending_non_lite > 0 and (deadline - time.time()) > 1.2:
                             if lite_fallback is None:
                                 lite_fallback = val
                             continue
@@ -510,6 +515,8 @@ def _gemini_race(body_obj, validator=None, timeout_sec=8.5, models=None, prefer_
                     errs.append(f"{m_name}:invalid_output")
                 else:
                     errs.append(err)
+                if lite_fallback is not None and pending_non_lite == 0:
+                    return lite_fallback, ""
         except Exception:
             errs.append("race_timeout")
     finally:
@@ -566,8 +573,8 @@ def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image
     return _gemini_race(
         body,
         validator=_parse_json_loose,
-        timeout_sec=8.5,
-        models=["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite"],
+        timeout_sec=6.5,
+        models=["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite", "gemini-flash-lite-latest"],
         prefer_non_lite=True,
     )
 
