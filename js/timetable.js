@@ -417,10 +417,10 @@ function renderTimetableModal() {
 
   return `
     <div style="max-width:920px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" onclick="closeTimetableModal()" style="width:36px; height:36px; border-radius:18px; border:1px solid #E5E8EB; background:#FFFFFF; color:#191F28; font-size:16px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-          <h1 style="margin:0; font-size:22px; font-weight:800; color:#191F28;">시간표 · 공강 메이트</h1>
+      <div class="v3-modal-head">
+        <div class="v3-modal-head-left">
+          <button type="button" class="v3-back-btn" onclick="closeTimetableModal()" aria-label="뒤로 가기"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <h1 style="margin:0; font-size:22px; font-weight:800; color:#191F28; line-height:1.25;">시간표 · 공강 메이트</h1>
         </div>
       </div>
 

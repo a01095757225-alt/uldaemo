@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3n" />
+  <link rel="stylesheet" href="/css/styles.css?v=20261128uiv3o" />
 </head>
 <body>
   <canvas id="confetti-canvas"></canvas>
@@ -39,7 +39,7 @@
 
   <script src="/js/data.js?v=20261118"></script>
   <script src="/js/effects.js?v=20261118"></script>
-  <script src="/js/timetable.js?v=20261126uiv2c"></script>
+  <script src="/js/timetable.js?v=20261128uiv3o"></script>
   <script>
     window.onerror = function(msg, url, line, col, error) {
       console.error("Global JS Error:", msg, line, col, error);
@@ -1173,6 +1173,10 @@
       `;
     }
 
+    function renderV3BackBtn(onclickAttr, ariaLabel = "뒤로 가기") {
+      return `<button type="button" class="v3-back-btn" onclick="${onclickAttr}" aria-label="${escHtml(ariaLabel)}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#191F28" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>`;
+    }
+
     function openReviewModal(postId) {
       state.review_modal_post_id = Number(postId);
       state.active_chat_post_id = Number(postId);
@@ -1259,15 +1263,15 @@
       return `
         <div style="max-width:680px; margin:0 auto;">
           <!-- 상단 네비게이션 헤더 -->
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <button type="button" onclick="closeReviewModal()" style="width:36px; height:36px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-              <div>
+          <div class="v3-modal-head">
+            <div class="v3-modal-head-left">
+              ${renderV3BackBtn("closeReviewModal()", "만남 후기 닫기")}
+              <div style="min-width:0;">
                 <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;">만남 후기 보내기</h1>
-                <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:1px;">따뜻한 후기는 상대방(+0.5°C)과 나(+0.2°C)의 매너온도를 올려줘요</div>
+                <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">따뜻한 후기는 상대방(+0.5°C)과 나(+0.2°C)의 매너온도를 올려줘요</div>
               </div>
             </div>
-            <span style="background:#EEF8F3; color:#287D62; font-size:var(--fs-xs); font-weight:800; padding:5px 12px; border-radius:var(--radius-chip);">
+            <span style="background:#EEF8F3; color:#287D62; font-size:var(--fs-xs); font-weight:800; padding:5px 12px; border-radius:var(--radius-chip); flex-shrink:0;">
               🌡️ 매너 칭찬 +0.5°C
             </span>
           </div>
@@ -2912,17 +2916,17 @@
 
       return `
         <div style="max-width:920px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <button type="button" onclick="state.active_modal=null; render();" style="width:36px; height:36px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-              <div>
-                <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">오늘의 학식</h1>
+          <div class="v3-modal-head">
+            <div class="v3-modal-head-left">
+              ${renderV3BackBtn("state.active_modal=null; render();", "학식 닫기")}
+              <div style="min-width:0;">
+                <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.25;">오늘의 학식</h1>
                 <div style="font-size:var(--fs-xs); color:var(--text-secondary); margin-top:2px;">청운학사 무거관 · 학생회관 주간 식단표</div>
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <button type="button" onclick="state.cafe_show_allergy=!state.cafe_show_allergy; render();" style="white-space:nowrap; flex-shrink:0; min-height:44px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid ${state.cafe_show_allergy ? '#287D62' : '#E5E8EB'}; background:${state.cafe_show_allergy ? '#EEF8F3' : '#FFFFFF'}; color:${state.cafe_show_allergy ? '#287D62' : 'var(--text-secondary)'}; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">${state.cafe_show_allergy ? escHtml(COPY.allergyHideBtn) : escHtml(COPY.allergyShowBtn)}</button>
-              <button type="button" onclick="loadCafeteriaMenu(true)" style="min-height:44px; padding:0 14px; border-radius:var(--radius-chip); border:none; background:#EEF8F3; color:#287D62; font-size:var(--fs-sm); font-weight:700; cursor:pointer;">새로고침</button>
+            <div class="v3-modal-head-actions">
+              <button type="button" onclick="state.cafe_show_allergy=!state.cafe_show_allergy; render();" style="white-space:nowrap; flex-shrink:0; height:38px; padding:0 13px; border-radius:var(--radius-chip); border:1px solid ${state.cafe_show_allergy ? '#287D62' : '#E5E8EB'}; background:${state.cafe_show_allergy ? '#EEF8F3' : '#FFFFFF'}; color:${state.cafe_show_allergy ? '#287D62' : 'var(--text-secondary)'}; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">${state.cafe_show_allergy ? escHtml(COPY.allergyHideBtn) : escHtml(COPY.allergyShowBtn)}</button>
+              <button type="button" onclick="loadCafeteriaMenu(true)" style="white-space:nowrap; flex-shrink:0; height:38px; padding:0 14px; border-radius:var(--radius-chip); border:none; background:#EEF8F3; color:#287D62; font-size:var(--fs-xs); font-weight:700; cursor:pointer;">새로고침</button>
             </div>
           </div>
 
@@ -4403,10 +4407,10 @@
 
       return `
         <div style="max-width:920px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <button type="button" onclick="state.active_modal=null; render();" style="width:36px; height:36px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-              <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">알림 · 울산대 공지</h1>
+          <div class="v3-modal-head">
+            <div class="v3-modal-head-left">
+              ${renderV3BackBtn("state.active_modal=null; render();", "알림 닫기")}
+              <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.25;">알림 · 울산대 공지</h1>
             </div>
           </div>
 
@@ -5361,12 +5365,12 @@
 
       return `
         <div id="food-map-modal-root" style="max-width:980px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <button type="button" onclick="closeFoodMapModal()" style="width:36px; height:36px; border-radius:var(--radius-card); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-lg); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-              <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary);">내 주변 맛집</h1>
+          <div class="v3-modal-head">
+            <div class="v3-modal-head-left">
+              ${renderV3BackBtn("closeFoodMapModal()", "맛집 지도 닫기")}
+              <h1 style="margin:0; font-size:var(--fs-xl); font-weight:800; color:var(--text-primary); line-height:1.25;">내 주변 맛집</h1>
             </div>
-            <select onchange="setFoodMapFilter({ platform: this.value })" style="height:34px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid #E5E8EB; background:#FFFFFF; font-size:var(--fs-xs); font-weight:700; color:var(--text-primary); cursor:pointer; outline:none;">
+            <select onchange="setFoodMapFilter({ platform: this.value })" style="height:36px; padding:0 12px; border-radius:var(--radius-chip); border:1px solid #E5E8EB; background:#FFFFFF; font-size:var(--fs-xs); font-weight:700; color:var(--text-primary); cursor:pointer; outline:none; flex-shrink:0;">
               <option value="all" ${platform === 'all' ? 'selected' : ''}>3사 통합 평점</option>
               <option value="naver" ${platform === 'naver' ? 'selected' : ''}>네이버 평점</option>
               <option value="kakao" ${platform === 'kakao' ? 'selected' : ''}>카카오 평점</option>
@@ -5934,10 +5938,10 @@
 
       return `
         <div style="max-width:920px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <button type="button" onclick="state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();" aria-label="뒤로 가기" style="width:44px; height:44px; border-radius:var(--radius-chip); border:1px solid #E5E8EB; background:#FFFFFF; color:var(--text-primary); font-size:var(--fs-xl); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">←</button>
-              <h1 style="margin:0; font-size:var(--fs-2xl); font-weight:800; color:var(--text-primary); letter-spacing:-0.02em;">번개 만들기</h1>
+          <div class="v3-modal-head">
+            <div class="v3-modal-head-left">
+              ${renderV3BackBtn("state.active_modal=null; state.prefill_title=''; state.prefill_loc=''; render();", "번개 만들기 닫기")}
+              <h1 style="margin:0; font-size:var(--fs-2xl); font-weight:800; color:var(--text-primary); letter-spacing:-0.02em; line-height:1.25;">번개 만들기</h1>
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <button type="button" onclick="openBlindPreviewModal()" style="min-height:44px; border:none; background:none; padding:2px 0; font-size:var(--fs-sm); font-weight:700; color:#287D62; cursor:pointer; text-decoration:underline;">${escHtml(COPY.blindNotice)}</button>
@@ -6400,7 +6404,10 @@
       return `
         <div style="max-width:920px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
-            <button type="button" onclick="state.active_modal=null; render();" style="display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:var(--text-secondary); font-size:var(--fs-md); font-weight:700; cursor:pointer; padding:6px 4px; min-height:44px;">← 목록으로</button>
+            <button type="button" onclick="state.active_modal=null; render();" style="display:inline-flex; align-items:center; gap:4px; border:none; background:none; color:var(--text-secondary); font-size:var(--fs-md); font-weight:700; cursor:pointer; padding:6px 4px; min-height:44px; flex-shrink:0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              <span>목록으로</span>
+            </button>
             <div style="display:inline-flex; align-items:center; gap:8px;">
               ${isPastPost ? `
                 <span style="background:#F2F4F6; color:#4E5968; font-size:var(--fs-xs); font-weight:700; padding:4px 12px; border-radius:var(--radius-chip);">종료된 번개</span>
