@@ -457,37 +457,51 @@ def call_gemini_api(prompt: str) -> str:
 
 def call_gemini_vision_json(prompt: str, image_b64: str, mime_type: str = "image/jpeg"):
     if not GEMINI_API_KEY or not image_b64:
-        return None
-    try:
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-        payload = json.dumps({
-            "contents": [{
-                "parts": [
-                    {"text": prompt},
-                    {"inline_data": {"mime_type": mime_type, "data": image_b64}},
-                ]
-            }],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "temperature": 0.1,
-            },
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=payload,
-            headers={
-                "x-goog-api-key": GEMINI_API_KEY,
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=22) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", str(raw_text).strip())
-            return json.loads(cleaned)
-    except Exception:
-        return None
+        return None, "missing_key"
+    models = ["gemini-2.5-flash", "gemini-flash-latest"]
+    last_err = "unknown"
+    for model_name in models:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+            payload = json.dumps({
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inlineData": {"mimeType": mime_type, "data": image_b64}},
+                    ]
+                }],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.1,
+                },
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={
+                    "x-goog-api-key": GEMINI_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=22) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", str(raw_text).strip())
+                return json.loads(cleaned), ""
+        except urllib.error.HTTPError as he:
+            err_body = ""
+            try:
+                err_body = he.read().decode("utf-8", "ignore")[:220]
+            except Exception:
+                pass
+            last_err = f"HTTP {he.code}: {err_body}"
+            if he.code in (400, 401, 403):
+                # 키 오류면 다음 모델 시도 불필요할 수 있으나 모델 미지원 400일 수도 있어 계속 시도
+                continue
+        except Exception as ex:
+            last_err = str(ex)[:160]
+    return None, last_err
 
 
 def send_smtp_otp(recipient_email: str, otp_code: str, sender_email: str = "", app_password: str = ""):
@@ -2592,9 +2606,14 @@ class handler(BaseHTTPRequestHandler):
                 "}\n"
                 "4) 시간표가 전혀 보이지 않으면 모든 요일을 빈 배열 []로 반환해."
             )
-            parsed = call_gemini_vision_json(tt_prompt, raw_img, mime)
+            parsed, err_detail = call_gemini_vision_json(tt_prompt, raw_img, mime)
             if not isinstance(parsed, dict):
-                self._send_json(502, {"ok": False, "message": "시간표 사진을 읽지 못했어요. 글자가 잘 보이는 캡처로 다시 시도해 주세요."})
+                hint_msg = "시간표 사진을 읽지 못했어요. 글자가 잘 보이는 캡처로 다시 시도해 주세요."
+                if "401" in err_detail or "403" in err_detail or "API_KEY_INVALID" in err_detail or "API key not valid" in err_detail:
+                    hint_msg = "Gemini API 키 인증에 실패했어요. Vercel의 GEMINI_API_KEY 값을 다시 확인해 주세요."
+                elif "429" in err_detail or "RESOURCE_EXHAUSTED" in err_detail:
+                    hint_msg = "AI 요청 한도를 잠시 초과했어요. 1분 뒤 다시 시도해 주세요."
+                self._send_json(502, {"ok": False, "message": hint_msg, "detail": err_detail[:180]})
                 return
 
             valid_days = ("월", "화", "수", "목", "금")
